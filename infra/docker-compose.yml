@@ -36,20 +36,20 @@ services:
     logging: *default-logging
     env_file: ["../env/.env"]
     environment:
-      POSTGRES_DB: ${PG_DB}
-      POSTGRES_USER: ${PG_USER}
-      POSTGRES_PASSWORD: ${PG_PASSWORD}
+      POSTGRES_DB: ${PG_DB:-warehouse}
+      POSTGRES_USER: ${PG_USER:-warehouse}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-changeme}
     volumes:
       - pg-data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${PG_USER} -d ${PG_DB}"]
+      # usa variáveis do CONTAINER (escapadas com $$)
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
       timeout: 5s
       retries: 10
     networks: [internal]
-    # Segurança: porta só local (acesso via túnel/NGINX se expor)
-    # ports: ["127.0.0.1:5432:5432"]
+    # ports: ["127.0.0.1:5432:5432"]  # habilite só se precisar depurar localmente
 
   minio:
     image: minio/minio:RELEASE.2024-09-01T00-00-00Z
@@ -58,20 +58,16 @@ services:
     logging: *default-logging
     env_file: ["../env/.env"]
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio123}
     command: server /data --console-address ":9001"
     volumes:
       - minio-data:/data
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/minio/health/ready || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 20
+    # healthcheck removido (imagem não tem curl/wget); o minio-mc espera em loop
     networks: [internal]
     # ports:
-    #   - "127.0.0.1:9000:9000"   # API S3 (opcional para depurar sem Nginx)
-    #   - "127.0.0.1:9001:9001"   # Console
+    #   - "127.0.0.1:9000:9000"
+    #   - "127.0.0.1:9001:9001"
 
   minio-mc:
     image: minio/mc:latest
@@ -79,8 +75,10 @@ services:
     depends_on:
       - minio
     entrypoint: ["/bin/sh", "/config/create-buckets.sh"]
+    env_file: ["../env/.env"]
     environment:
-      MC_HOST_minio: http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@minio:9000
+      # defaults para não quebrar se env não for carregado
+      MC_HOST_minio: http://${MINIO_ROOT_USER:-minio}:${MINIO_ROOT_PASSWORD:-minio123}@minio:9000
     volumes:
       - ./minio/create-buckets.sh:/config/create-buckets.sh:ro
     networks: [internal]
@@ -100,11 +98,12 @@ services:
       AIRFLOW__LOGGING__LOGGING_LEVEL: INFO
       AIRFLOW__CORE__DEFAULT_TIMEZONE: America/Sao_Paulo
       # Conexões
-      AIRFLOW_CONN_WAREHOUSE: postgresql+psycopg2://${PG_USER}:${PG_PASSWORD}@postgres:5432/${PG_DB}
-      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
-      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AIRFLOW_CONN_WAREHOUSE: postgresql+psycopg2://${PG_USER:-warehouse}:${PG_PASSWORD:-changeme}@postgres:5432/${PG_DB:-warehouse}
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minio123}
       AWS_DEFAULT_REGION: us-east-1
-      S3_ENDPOINT_URL: http://minio:9000
+      # Para boto3, o padrão é AWS_ENDPOINT_URL (não S3_ENDPOINT_URL)
+      AWS_ENDPOINT_URL: http://minio:9000
     volumes:
       - ../orchestration/dags:/opt/airflow/dags
       - ../ingestion:/opt/airflow/ingestion
@@ -130,10 +129,8 @@ services:
     logging: *default-logging
     env_file: ["../env/.env"]
     environment:
-      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
-      SQLALCHEMY_DATABASE_URI: postgresql+psycopg2://${PG_USER}:${PG_PASSWORD}@postgres:5432/${PG_DB}
-      # Usa subpath /superset atrás do Nginx
-      # (ver superset_config.py)
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-dev-secret-32chars}
+      SQLALCHEMY_DATABASE_URI: postgresql+psycopg2://${PG_USER:-warehouse}:${PG_PASSWORD:-changeme}@postgres:5432/${PG_DB:-warehouse}
     volumes:
       - superset-home:/app/superset_home
       - ./superset/superset_config.py:/app/pythonpath/superset_config.py
@@ -152,7 +149,7 @@ services:
       - superset
       - airflow
       - minio
-      - prometheus
+      # - prometheus   # opcional; não depende se não subir monitoramento
     ports:
       - "80:80"
       - "443:443"
@@ -190,8 +187,8 @@ services:
     profiles: ["monitoring"]
     restart: unless-stopped
     logging: *default-logging
-    network_mode: host
-    pid: host
+    networks: [internal]
     command: ["--path.rootfs=/host"]
     volumes:
       - /:/host:ro,rslave
+    # sem ports: Prometheus acessa por 'node_exporter:9100'
