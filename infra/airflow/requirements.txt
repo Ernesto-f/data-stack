@@ -1,0 +1,7 @@
+pandas
+pyarrow
+s3fs
+requests
+sqlalchemy
+psycopg2-binary
+apache-airflow-providers-amazon==9.*

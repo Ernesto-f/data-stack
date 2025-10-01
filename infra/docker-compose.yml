@@ -1,0 +1,197 @@
+name: data-stack
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  pg-data:
+    driver: local
+    driver_opts: { type: none, o: bind, device: /opt/data-stack/volumes/postgres/data }
+  minio-data:
+    driver: local
+    driver_opts: { type: none, o: bind, device: /opt/data-stack/volumes/minio/data }
+  airflow-logs:
+    driver: local
+    driver_opts: { type: none, o: bind, device: /opt/data-stack/volumes/airflow/logs }
+  superset-home:
+    driver: local
+    driver_opts: { type: none, o: bind, device: /opt/data-stack/volumes/superset/home }
+  prometheus-data:
+    driver: local
+    driver_opts: { type: none, o: bind, device: /opt/data-stack/volumes/prometheus/data }
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # ================== BASE ==================
+  postgres:
+    image: postgres:16
+    profiles: ["base"]
+    restart: unless-stopped
+    logging: *default-logging
+    env_file: ["../env/.env"]
+    environment:
+      POSTGRES_DB: ${PG_DB}
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER} -d ${PG_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+    # Segurança: porta só local (acesso via túnel/NGINX se expor)
+    # ports: ["127.0.0.1:5432:5432"]
+
+  minio:
+    image: minio/minio:RELEASE.2024-09-01T00-00-00Z
+    profiles: ["base"]
+    restart: unless-stopped
+    logging: *default-logging
+    env_file: ["../env/.env"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/minio/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    networks: [internal]
+    # ports:
+    #   - "127.0.0.1:9000:9000"   # API S3 (opcional para depurar sem Nginx)
+    #   - "127.0.0.1:9001:9001"   # Console
+
+  minio-mc:
+    image: minio/mc:latest
+    profiles: ["base"]
+    depends_on:
+      - minio
+    entrypoint: ["/bin/sh", "/config/create-buckets.sh"]
+    environment:
+      MC_HOST_minio: http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@minio:9000
+    volumes:
+      - ./minio/create-buckets.sh:/config/create-buckets.sh:ro
+    networks: [internal]
+    restart: "no"
+
+  # ================== ORCHESTRATOR ==================
+  airflow:
+    build: ./airflow
+    profiles: ["orchestrator"]
+    restart: unless-stopped
+    logging: *default-logging
+    env_file: ["../env/.env"]
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__WEBSERVER__RBAC: "True"
+      AIRFLOW__LOGGING__LOGGING_LEVEL: INFO
+      AIRFLOW__CORE__DEFAULT_TIMEZONE: America/Sao_Paulo
+      # Conexões
+      AIRFLOW_CONN_WAREHOUSE: postgresql+psycopg2://${PG_USER}:${PG_PASSWORD}@postgres:5432/${PG_DB}
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_DEFAULT_REGION: us-east-1
+      S3_ENDPOINT_URL: http://minio:9000
+    volumes:
+      - ../orchestration/dags:/opt/airflow/dags
+      - ../ingestion:/opt/airflow/ingestion
+      - airflow-logs:/opt/airflow/logs
+    depends_on:
+      postgres: { condition: service_healthy }
+      minio: { condition: service_started }
+      minio-mc: { condition: service_completed_successfully }
+    command: >
+      bash -c "
+        airflow db upgrade &&
+        airflow users create --username admin --password ${AIRFLOW_ADMIN_PWD:-admin} --firstname a --lastname b --role Admin --email admin@local || true &&
+        airflow webserver & airflow scheduler
+      "
+    networks: [internal]
+    # ports: ["127.0.0.1:8080:8080"]
+
+  # ================== ANALYTICS ==================
+  superset:
+    build: ./superset
+    profiles: ["analytics"]
+    restart: unless-stopped
+    logging: *default-logging
+    env_file: ["../env/.env"]
+    environment:
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
+      SQLALCHEMY_DATABASE_URI: postgresql+psycopg2://${PG_USER}:${PG_PASSWORD}@postgres:5432/${PG_DB}
+      # Usa subpath /superset atrás do Nginx
+      # (ver superset_config.py)
+    volumes:
+      - superset-home:/app/superset_home
+      - ./superset/superset_config.py:/app/pythonpath/superset_config.py
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [internal]
+    # ports: ["127.0.0.1:8088:8088"]
+
+  # ================== PROXY ==================
+  nginx:
+    image: nginx:1.27
+    profiles: ["proxy"]
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      - superset
+      - airflow
+      - minio
+      - prometheus
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /opt/data-stack/volumes/nginx/certs:/etc/letsencrypt:ro
+    networks: [internal]
+
+  # ================== MONITORING ==================
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks: [internal]
+    # ports: ["127.0.0.1:9090:9090"]
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks: [internal]
+
+  node_exporter:
+    image: prom/node-exporter:v1.8.2
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    logging: *default-logging
+    network_mode: host
+    pid: host
+    command: ["--path.rootfs=/host"]
+    volumes:
+      - /:/host:ro,rslave

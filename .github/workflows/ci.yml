@@ -1,0 +1,34 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+jobs:
+  lint-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Valida YAMLs (compose, prometheus, etc.)
+      - uses: ibiqlik/action-yamllint@v3
+
+      # Valida docker-compose (sem subir)
+      - name: Docker Compose config
+        run: docker compose -f infra/docker-compose.yml config
+
+      # Lint Dockerfiles (Airflow/Superset)
+      - uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: infra/airflow/Dockerfile
+
+      # Python: checa transform/ e ingestion/
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install ruff pytest
+      - run: ruff check ingestion transform orchestration || true
+      - run: pytest -q || true  # (opcional: se tiver testes)
+
+      # Build do Airflow (garante que a imagem compila)
+      - name: Build Airflow image
+        run: docker build -t airflow-local:ci infra/airflow

@@ -1,0 +1,8 @@
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/infra/airflow"
+    schedule: { interval: "weekly" }
+  - package-ecosystem: "docker"
+    directory: "/infra"
+    schedule: { interval: "weekly" }
