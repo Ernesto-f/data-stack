@@ -1,16 +1,25 @@
-# Habilita proxy e usa subpath /superset atrás do Nginx
+import os
+
+# Rodando atrás de proxy reverso
 ENABLE_PROXY_FIX = True
 
-# Se acessar via subpath:
-URL_PREFIX = '/superset'
-# Ajuste a URL base (opcional; útil para links absolutos)
-# WEBSERVER_BASEURL = 'https://SEU_DOMINIO/superset'
+# Superset servido em subpath pelo Nginx
+# (manter as duas para evitar problemas em versões/configs diferentes)
+APPLICATION_ROOT = "/superset"
+URL_PREFIX = "/superset"
 
-# Segurança básica
+# Esquema preferido; mude para "https" quando habilitar TLS
+PREFERRED_URL_SCHEME = "http"
+
+# Segurança de cookies
 SESSION_COOKIE_SAMESITE = "Lax"
-SESSION_COOKIE_SECURE = False  # True se usar HTTPS
+SESSION_COOKIE_SECURE = False  # mude para True quando usar HTTPS
+
+# CSRF ON
 WTF_CSRF_ENABLED = True
 
-# Performance/UX
+# Limites e performance
 ROW_LIMIT = 50000
-SIP_15_ENABLED = True
+
+# Deixe a URI do metastore vir do docker-compose (env)
+SQLALCHEMY_DATABASE_URI = os.environ.get("SQLALCHEMY_DATABASE_URI")

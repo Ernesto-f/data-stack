@@ -1,4 +1,12 @@
+# infra/docker-compose.yml
+version: "3.9"
 name: data-stack
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 
 networks:
   internal:
@@ -6,29 +14,12 @@ networks:
 
 volumes:
   pg-data:
-    driver: local
-    driver_opts: { type: none, o: bind, device: /opt/data-stack/volumes/postgres/data }
   minio-data:
-    driver: local
-    driver_opts: { type: none, o: bind, device: /opt/data-stack/volumes/minio/data }
-  airflow-logs:
-    driver: local
-    driver_opts: { type: none, o: bind, device: /opt/data-stack/volumes/airflow/logs }
   superset-home:
-    driver: local
-    driver_opts: { type: none, o: bind, device: /opt/data-stack/volumes/superset/home }
-  prometheus-data:
-    driver: local
-    driver_opts: { type: none, o: bind, device: /opt/data-stack/volumes/prometheus/data }
-
-x-logging: &default-logging
-  driver: "json-file"
-  options:
-    max-size: "10m"
-    max-file: "3"
+  airflow-logs:
 
 services:
-  # ================== BASE ==================
+  # ============ BASE ============
   postgres:
     image: postgres:16
     profiles: ["base"]
@@ -36,57 +27,77 @@ services:
     logging: *default-logging
     env_file: ["../env/.env"]
     environment:
-      POSTGRES_DB: ${PG_DB:-warehouse}
-      POSTGRES_USER: ${PG_USER:-warehouse}
-      POSTGRES_PASSWORD: ${PG_PASSWORD:-changeme}
+      POSTGRES_DB: ${PG_DB}
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
     volumes:
       - pg-data:/var/lib/postgresql/data
-      - ./postgres/init:/docker-entrypoint-initdb.d
+      # Se tiver scripts de init, mantenha aqui:
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      # usa variáveis do CONTAINER (escapadas com $$)
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432 || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 20
     networks: [internal]
-    # ports: ["127.0.0.1:5432:5432"]  # habilite só se precisar depurar localmente
 
   minio:
-    image: minio/minio:RELEASE.2024-09-01T00-00-00Z
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z-cpuv1
     profiles: ["base"]
     restart: unless-stopped
     logging: *default-logging
     env_file: ["../env/.env"]
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio123}
     command: server /data --console-address ":9001"
     volumes:
       - minio-data:/data
-    # healthcheck removido (imagem não tem curl/wget); o minio-mc espera em loop
     networks: [internal]
-    # ports:
-    #   - "127.0.0.1:9000:9000"
-    #   - "127.0.0.1:9001:9001"
 
+  # opcional: faz alias/config inicial no MinIO
   minio-mc:
     image: minio/mc:latest
     profiles: ["base"]
+    restart: "no"
+    logging: *default-logging
+    env_file: ["../env/.env"]
     depends_on:
-      - minio
-    entrypoint: ["/bin/sh", "/config/create-buckets.sh"]
+      minio: { condition: service_started }
+    entrypoint: >
+      sh -c '
+      set -eu;
+      for i in $$(seq 1 30); do
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" && exit 0 || sleep 2;
+      done;
+      echo "MinIO not ready" >&2; exit 1
+      '
+    networks: [internal]
+
+  # ============ ANALYTICS ============
+  superset:
+    image: apache/superset:4.0.2
+    profiles: ["analytics"]
+    restart: unless-stopped
+    logging: *default-logging
     env_file: ["../env/.env"]
     environment:
-      # defaults para não quebrar se env não for carregado
-      MC_HOST_minio: http://${MINIO_ROOT_USER:-minio}:${MINIO_ROOT_PASSWORD:-minio123}@minio:9000
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
+      SQLALCHEMY_DATABASE_URI: postgresql+psycopg2://${PG_USER}:${PG_PASSWORD}@postgres:5432/superset
+    depends_on:
+      postgres: { condition: service_healthy }
     volumes:
-      - ./minio/create-buckets.sh:/config/create-buckets.sh:ro
+      - superset-home:/app/superset_home
+      - ./superset/superset_config.py:/app/pythonpath/superset_config.py:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
     networks: [internal]
-    restart: "no"
 
-  # ================== ORCHESTRATOR ==================
+  # ============ ORCHESTRATOR ============
   airflow:
-    build: ./airflow
+    build:
+      context: ../airflow        # <-- seu Dockerfile/requirements/airflowsetting.json estão aqui
+    image: data-stack-airflow
     profiles: ["orchestrator"]
     restart: unless-stopped
     logging: *default-logging
@@ -94,52 +105,64 @@ services:
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      AIRFLOW__WEBSERVER__RBAC: "True"
-      AIRFLOW__LOGGING__LOGGING_LEVEL: INFO
       AIRFLOW__CORE__DEFAULT_TIMEZONE: America/Sao_Paulo
-      # Conexões
-      AIRFLOW_CONN_WAREHOUSE: postgresql+psycopg2://${PG_USER:-warehouse}:${PG_PASSWORD:-changeme}@postgres:5432/${PG_DB:-warehouse}
-      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
-      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minio123}
-      AWS_DEFAULT_REGION: us-east-1
-      # Para boto3, o padrão é AWS_ENDPOINT_URL (não S3_ENDPOINT_URL)
-      AWS_ENDPOINT_URL: http://minio:9000
-    volumes:
-      - ../orchestration/dags:/opt/airflow/dags
-      - ../ingestion:/opt/airflow/ingestion
-      - airflow-logs:/opt/airflow/logs
+
+      # atrás do Nginx em /airflow
+      AIRFLOW__WEBSERVER__WEB_SERVER_PORT: "8080"
+      AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX: "True"
+      AIRFLOW__WEBSERVER__WEB_SERVER_URL_PREFIX: /airflow
+      AIRFLOW__WEBSERVER__BASE_URL: http://10.113.120.154/airflow
+
+      # metastore do Airflow (usa DB airflow que você criou)
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${PG_USER}:${PG_PASSWORD}@postgres:5432/airflow
+
+      # conexão para DAGs (seus DAGs podem usar: conn_id="warehouse")
+      AIRFLOW_CONN_WAREHOUSE: postgresql+psycopg2://${PG_USER}:${PG_PASSWORD}@postgres:5432/${PG_DB}
     depends_on:
       postgres: { condition: service_healthy }
-      minio: { condition: service_started }
-      minio-mc: { condition: service_completed_successfully }
+    volumes:
+      - airflow-logs:/opt/airflow/logs
+      # se quiser mapear DAGs de fora, descomente e crie ../airflow/dags:
+      # - ../airflow/dags:/opt/airflow/dags:ro
     command: >
-      bash -c "
+      bash -lc "
         airflow db upgrade &&
-        airflow users create --username admin --password ${AIRFLOW_ADMIN_PWD:-admin} --firstname a --lastname b --role Admin --email admin@local || true &&
-        airflow webserver & airflow scheduler
+        airflow users create --username admin --password ${AIRFLOW_ADMIN_PWD:-admin} --firstname A --lastname D --role Admin --email admin@local || true &&
+        airflow webserver --port 8080 & airflow scheduler
       "
     networks: [internal]
-    # ports: ["127.0.0.1:8080:8080"]
 
-  # ================== ANALYTICS ==================
-  superset:
-    build: ./superset
-    profiles: ["analytics"]
+  # ============ MONITORING ============
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    profiles: ["monitoring"]
     restart: unless-stopped
     logging: *default-logging
-    env_file: ["../env/.env"]
-    environment:
-      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-dev-secret-32chars}
-      SQLALCHEMY_DATABASE_URI: postgresql+psycopg2://${PG_USER:-warehouse}:${PG_PASSWORD:-changeme}@postgres:5432/${PG_DB:-warehouse}
     volumes:
-      - superset-home:/app/superset_home
-      - ./superset/superset_config.py:/app/pythonpath/superset_config.py
-    depends_on:
-      postgres: { condition: service_healthy }
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     networks: [internal]
-    # ports: ["127.0.0.1:8088:8088"]
 
-  # ================== PROXY ==================
+  node_exporter:
+    image: prom/node-exporter:v1.8.2
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    logging: *default-logging
+    networks: [internal]
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    logging: *default-logging
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks: [internal]
+
+  # ============ PROXY ============
   nginx:
     image: nginx:1.27
     profiles: ["proxy"]
@@ -149,46 +172,10 @@ services:
       - superset
       - airflow
       - minio
-      # - prometheus   # opcional; não depende se não subir monitoramento
+      - prometheus
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - /opt/data-stack/volumes/nginx/certs:/etc/letsencrypt:ro
     networks: [internal]
-
-  # ================== MONITORING ==================
-  prometheus:
-    image: prom/prometheus:v2.55.1
-    profiles: ["monitoring"]
-    restart: unless-stopped
-    logging: *default-logging
-    volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus-data:/prometheus
-    networks: [internal]
-    # ports: ["127.0.0.1:9090:9090"]
-
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.49.1
-    profiles: ["monitoring"]
-    restart: unless-stopped
-    logging: *default-logging
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-    networks: [internal]
-
-  node_exporter:
-    image: prom/node-exporter:v1.8.2
-    profiles: ["monitoring"]
-    restart: unless-stopped
-    logging: *default-logging
-    networks: [internal]
-    command: ["--path.rootfs=/host"]
-    volumes:
-      - /:/host:ro,rslave
-    # sem ports: Prometheus acessa por 'node_exporter:9100'
