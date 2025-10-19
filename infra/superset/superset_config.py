@@ -5,8 +5,8 @@ ENABLE_PROXY_FIX = True
 
 # Superset servido em subpath pelo Nginx
 # (manter as duas para evitar problemas em versões/configs diferentes)
-APPLICATION_ROOT = "/superset"
-URL_PREFIX = "/superset"
+##APPLICATION_ROOT = "/superset"
+##URL_PREFIX = "/superset"
 
 # Esquema preferido; mude para "https" quando habilitar TLS
 PREFERRED_URL_SCHEME = "http"

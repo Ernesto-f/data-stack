@@ -1,7 +1,13 @@
-pandas
-pyarrow
-s3fs
-requests
-sqlalchemy
-psycopg2-binary
+# Data
+pandas==2.2.* 
+pyarrow==16.*        
+s3fs==2024.*       
+
+# HTTP
+requests>=2.31,<3
+
+# DB
+psycopg2-binary   
+
+# Providers
 apache-airflow-providers-amazon==9.*
