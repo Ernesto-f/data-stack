@@ -1,0 +1,11 @@
+env/.env
+env/secrets/
+volumes/
+**/logs/
+**/data/
+*.pem
+*.key
+*.crt
+*.pfx
+__pycache__/
+*.pyc
