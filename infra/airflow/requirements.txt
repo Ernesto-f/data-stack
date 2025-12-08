@@ -29,5 +29,5 @@ apache-airflow-providers-http==4.*
 # -------------------------
 # Extra utilities
 # -------------------------
-python-dotenv==1.0.*
+python-dotenv==1.2.*
 boto3==1.34.*
