@@ -1,0 +1,27 @@
+
+##/////////////////////////////////##
+##               SQL               ##
+##/////////////////////////////////##
+
+-> Valores manuais na PK - Primarikey
+    SET IDENTITY_INSERT nome_da_tabela ON;
+
+
+-> CONSULTA USUARIOS COM CONNECTIONS ABERTAS NO BANCO
+        SELECT
+        s.session_id,
+        s.login_name,
+        s.host_name,
+        s.program_name,
+        s.status,
+        s.login_time,
+        DATEDIFF(MINUTE, s.login_time, GETDATE()) AS minutos_conectado
+    FROM sys.dm_exec_sessions s
+    WHERE s.is_user_process = 1
+    ORDER BY minutos_conectado DESC;
+
+
+-> ALTERAR TABELA PARA ADICIONAR CONSTRAINT
+        ALTER TABLE nome_da_tabela
+        ADD CONSTRAINT PK_nome_da_tabela
+        PRIMARY KEY CLUSTERED (Cod_Record)

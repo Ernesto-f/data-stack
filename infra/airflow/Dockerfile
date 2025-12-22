@@ -1,20 +1,21 @@
-FROM apache/airflow:2.9.3
+FROM apache/airflow:3.1.4
 
 USER root
-RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates curl gettext-base \
- && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    unixodbc \
+    unixodbc-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
 USER airflow
 
-COPY requirements.txt /requirements.txt
-ARG AIRFLOW_VERSION=2.9.3
+COPY requirements.txt /
 
-# Descobre "major.minor" do Python (ex.: 3.12) e usa no constraints
-RUN PY_MM="$(python -c 'import sys; print(\".\".join(map(str, sys.version_info[:2])))')" && \
-    if [ -s /requirements.txt ]; then \
-      pip install --no-cache-dir -r /requirements.txt \
-        --constraint "https://raw.githubusercontent.com/apache/airflow/constraints/${AIRFLOW_VERSION}/constraints-${PY_MM}.txt"; \
-    fi
+RUN pip install --no-cache-dir \
+    -r /requirements.txt \
+    --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-3.1.4/constraints-3.12.txt"
 
 COPY airflowsetting.json /opt/airflow/airflowsetting.json

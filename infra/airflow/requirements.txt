@@ -1,13 +1,11 @@
-# Data
-pandas==2.2.* 
-pyarrow==16.*        
-s3fs==2024.*       
+apache-airflow-providers-amazon
+apache-airflow-providers-microsoft-mssql
+apache-airflow-providers-odbc
+apache-airflow-providers-postgres
+apache-airflow-providers-http
 
-# HTTP
-requests>=2.31,<3
-
-# DB
-psycopg2-binary   
-
-# Providers
-apache-airflow-providers-amazon==9.*
+requests
+psycopg2-binary
+pyodbc
+pymssql
+python-dotenv
