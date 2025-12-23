@@ -95,7 +95,7 @@ def copiar_lote_leaf_productionorderlog():
     # 3) Buscar um lote de linhas na origem acima desse ID
     sql_busca = f"""
         SELECT TOP ({LOTE}) {", ".join(COLUNAS_tb_ProductionOrderLog)}
-        FROM {TABELA_ORIGEM}
+        FROM {TABELA_ORIGEM} WITH (NOLOCK)
         WHERE {CHAVE_ID} > {ultimo_id}
         ORDER BY {CHAVE_ID} ASC
     """
@@ -256,7 +256,7 @@ def copiar_lote_leaf_productionorder():
     # 3) Buscar um lote de linhas na origem acima desse ID
     sql_busca = f"""
         SELECT TOP ({LOTE}) {", ".join(COLUNAS_tb_ProductionOrder)}
-        FROM {TABELA_ORIGEM}
+        FROM {TABELA_ORIGEM} WITH (NOLOCK)
         WHERE {CHAVE_ID} > {ultimo_id}
         ORDER BY {CHAVE_ID} ASC
     """
@@ -421,7 +421,7 @@ def copiar_lote_leaf_container():
     # 3) Buscar um lote de linhas na origem acima desse ID
     sql_busca = f"""
         SELECT TOP ({LOTE}) {", ".join(COLUNAS_tb_Container)}
-        FROM {TABELA_ORIGEM}
+        FROM {TABELA_ORIGEM} WITH (NOLOCK)
         WHERE {CHAVE_ID} > {ultimo_id}
         ORDER BY {CHAVE_ID} ASC
     """
@@ -592,7 +592,7 @@ def copiar_lote_leaf_qualitysample():
     # 3) Buscar um lote de linhas na origem acima desse ID
     sql_busca = f"""
         SELECT TOP ({LOTE}) {", ".join(COLUNAS_tb_QualitySample)}
-        FROM {TABELA_ORIGEM}
+        FROM {TABELA_ORIGEM} WITH (NOLOCK)
         WHERE {CHAVE_ID} > {ultimo_id}
         ORDER BY {CHAVE_ID} ASC
     """
@@ -747,7 +747,7 @@ def copiar_lote_leaf_qualitysampleresult():
     # 3) Buscar um lote de linhas na origem acima desse ID
     sql_busca = f"""
         SELECT TOP ({LOTE}) {", ".join(COLUNAS_tb_QualitySampleResult)}
-        FROM {TABELA_ORIGEM}
+        FROM {TABELA_ORIGEM} WITH (NOLOCK)
         WHERE {CHAVE_ID} > {ultimo_id}
         ORDER BY {CHAVE_ID} ASC
     """
@@ -898,7 +898,7 @@ def copiar_lote_leaf_experiment():
     # 3) Buscar um lote de linhas na origem acima desse ID
     sql_busca = f"""
         SELECT TOP ({LOTE}) {", ".join(COLUNAS_tb_Experiment)}
-        FROM {TABELA_ORIGEM}
+        FROM {TABELA_ORIGEM} WITH (NOLOCK)
         WHERE {CHAVE_ID} > {ultimo_id}
         ORDER BY {CHAVE_ID} ASC
     """
@@ -1059,7 +1059,7 @@ def copiar_lote_leaf_characteristic():
     # 3) Buscar um lote de linhas na origem acima desse ID
     sql_busca = f"""
         SELECT TOP ({LOTE}) {", ".join(COLUNAS_tb_Characteristic)}
-        FROM {TABELA_ORIGEM}
+        FROM {TABELA_ORIGEM} WITH (NOLOCK)
         WHERE {CHAVE_ID} > {ultimo_id}
         ORDER BY {CHAVE_ID} ASC
     """
@@ -1208,7 +1208,7 @@ def copiar_lote_leaf_containerqualitystatushistory():
     # 3) Buscar um lote de linhas na origem acima desse ID
     sql_busca = f"""
         SELECT TOP ({LOTE}) {", ".join(COLUNAS_tb_ContainerQualityStatusHistory)}
-        FROM {TABELA_ORIGEM}
+        FROM {TABELA_ORIGEM} WITH (NOLOCK)
         WHERE {CHAVE_ID} > {ultimo_id}
         ORDER BY {CHAVE_ID} ASC
     """

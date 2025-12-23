@@ -3,6 +3,7 @@ apache-airflow-providers-microsoft-mssql
 apache-airflow-providers-odbc
 apache-airflow-providers-postgres
 apache-airflow-providers-http
+apache-airflow-providers-keycloak
 
 requests
 psycopg2-binary

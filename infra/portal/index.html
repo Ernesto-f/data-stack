@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Apex Portal</title>
+
+  <!-- Ícones (Font Awesome) -->
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    referrerpolicy="no-referrer"
+  />
+
+  <style>
+    :root{
+      --bg1:#0b1220;
+      --bg2:#0a1b2e;
+      --card:#0f2138cc;
+      --stroke:#214366;
+      --text:#e8f0ff;
+      --muted:#a8c0dd;
+      --shadow: 0 10px 35px rgba(0,0,0,.35);
+      --radius: 18px;
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      color:var(--text);
+      min-height:100vh;
+      background:
+        radial-gradient(900px 600px at 20% 10%, #1a4b7a55, transparent 55%),
+        radial-gradient(900px 600px at 80% 15%, #7a1a5b44, transparent 60%),
+        linear-gradient(160deg, var(--bg1), var(--bg2));
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:28px;
+    }
+
+    .shell{
+      width:min(1100px, 100%);
+    }
+
+    header{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:16px;
+      margin-bottom:18px;
+    }
+
+    .title{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+
+    h1{
+      margin:0;
+      font-size:28px;
+      letter-spacing:.2px;
+    }
+    .subtitle{
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.35;
+    }
+
+    .status{
+      color:var(--muted);
+      font-size:12px;
+      border:1px solid var(--stroke);
+      background:rgba(16,36,58,.45);
+      padding:10px 12px;
+      border-radius:14px;
+      backdrop-filter: blur(8px);
+      box-shadow: var(--shadow);
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: repeat( auto-fit, minmax(220px, 1fr) );
+      gap:14px;
+    }
+
+    a.card{
+      text-decoration:none;
+      color:inherit;
+      border:1px solid var(--stroke);
+      background: var(--card);
+      border-radius: var(--radius);
+      padding:18px;
+      display:flex;
+      gap:14px;
+      align-items:center;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      transition: transform .15s ease, border-color .15s ease, background .15s ease;
+      outline:none;
+    }
+    a.card:hover{
+      transform: translateY(-2px);
+      border-color:#3a77b6;
+      background: rgba(18,46,78,.75);
+    }
+    a.card:focus-visible{
+      box-shadow: 0 0 0 3px rgba(90,160,255,.35), var(--shadow);
+    }
+
+    .icon{
+      width:48px;
+      height:48px;
+      border-radius:14px;
+      display:grid;
+      place-items:center;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.18);
+      flex: 0 0 48px;
+    }
+    .icon i{
+      font-size:22px;
+      opacity:.95;
+    }
+
+    .meta{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      min-width:0;
+    }
+    .name{
+      font-weight:650;
+      letter-spacing:.15px;
+      font-size:16px;
+      margin:0;
+    }
+    .desc{
+      margin:0;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.25;
+    }
+
+    footer{
+      margin-top:14px;
+      color:var(--muted);
+      font-size:12px;
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .pill{
+      border:1px solid var(--stroke);
+      padding:8px 10px;
+      border-radius:999px;
+      background: rgba(16,36,58,.35);
+    }
+
+    /* Cores sutis por serviço */
+    .g{ border-color: rgba(255,255,255,.12); }
+    .g .icon{ background: rgba(255,142,0,.12); }     /* Grafana */
+    .s .icon{ background: rgba(0,163,255,.12); }     /* Superset */
+    .a .icon{ background: rgba(65,214,133,.12); }    /* Airflow */
+    .n .icon{ background: rgba(255,75,75,.10); }     /* Node-RED */
+    .c .icon{ background: rgba(0,145,255,.12); }     /* Nextcloud */
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div class="title">
+        <h1>Apex Portal</h1>
+        <div class="subtitle">Acesso centralizado às soluções. Use este menu como página inicial no navegador.</div>
+      </div>
+      <div class="status">
+        <div><strong>Ambiente:</strong> Internal</div>
+        <div><strong>SSO:</strong> Keycloak</div>
+      </div>
+    </header>
+
+    <section class="grid">
+      <!-- Ajuste os href para seus caminhos no Nginx (recomendado: /grafana, /superset, etc.) -->
+      <a class="card g" href="/grafana/" aria-label="Abrir Grafana">
+        <div class="icon"><i class="fa-solid fa-chart-line"></i></div>
+        <div class="meta">
+          <p class="name">Grafana</p>
+          <p class="desc">Dashboards e observabilidade.</p>
+        </div>
+      </a>
+
+      <a class="card s" href="/superset/" aria-label="Abrir Superset">
+        <div class="icon"><i class="fa-solid fa-chart-column"></i></div>
+        <div class="meta">
+          <p class="name">Superset</p>
+          <p class="desc">BI, exploração e visualização.</p>
+        </div>
+      </a>
+
+      <a class="card a" href="/airflow/" aria-label="Abrir Airflow">
+        <div class="icon"><i class="fa-solid fa-diagram-project"></i></div>
+        <div class="meta">
+          <p class="name">Airflow</p>
+          <p class="desc">Orquestração de pipelines.</p>
+        </div>
+      </a>
+
+      <a class="card n" href="/nodered/" aria-label="Abrir Node-RED">
+        <div class="icon"><i class="fa-solid fa-sitemap"></i></div>
+        <div class="meta">
+          <p class="name">Node-RED</p>
+          <p class="desc">Automação e integrações.</p>
+        </div>
+      </a>
+
+      <a class="card c" href="/nextcloud/" aria-label="Abrir Nextcloud">
+        <div class="icon"><i class="fa-solid fa-cloud"></i></div>
+        <div class="meta">
+          <p class="name">Nextcloud</p>
+          <p class="desc">Arquivos, colaboração e apps.</p>
+        </div>
+      </a>
+    </section>
+
+    <footer>
+      <div class="pill">Dica: fixe esta página como “Home” no Chromium em modo kiosk.</div>
+      <div class="pill">URL: <span id="url"></span></div>
+    </footer>
+  </div>
+
+  <script>
+    document.getElementById("url").textContent = window.location.origin + "/";
+  </script>
+</body>
+</html>

@@ -25,3 +25,45 @@
         ALTER TABLE nome_da_tabela
         ADD CONSTRAINT PK_nome_da_tabela
         PRIMARY KEY CLUSTERED (Cod_Record)
+
+
+-> CRIAR USUARIO NOVO E TORNAR ADMIN
+    CREATE LOGIN novo_usuario
+    WITH PASSWORD = 'SenhaForte@123',
+    CHECK_POLICY = ON,
+    CHECK_EXPIRATION = ON;
+
+    -tornar adm
+    ALTER SERVER ROLE sysadmin
+    ADD MEMBER novo_usuario;
+
+-> BACKUP / RESTORE DE DATABASE
+    BACKUP DATABASE leaf_db_mcExperienceSuite
+    TO DISK = 'D:\Program Files\Microsoft SQL Server\MSSQL16.SQLEXPRESS\MSSQL\Backup\leaf_db_mcExperienceSuite.bak'
+    GO
+
+
+    RESTORE DATABASE leaf_db_mcExperienceSuite
+    FROM DISK = 'D:\Program Files\Microsoft SQL Server\MSSQL16.SQLEXPRESS\MSSQL\Backup\leaf_db_mcExperienceSuite.bak'
+    GO
+
+
+
+    
+
+##/////////////////////////////////##
+##               docker            ##
+##/////////////////////////////////##
+
+-> Criando diretorios novos
+    Sempre que for subir um docker do zero, precisa criar os diretorios no servidor que serao espelhados com o container
+    mkdir -p infra/nginx/sites-available
+    mkdir -p infra/nginx/sites-enabled
+
+-> falha em criar arquivo dentro de pasta (outro dono, sem permissão)
+    -> ver quem é o dono
+        ls -ld /caminho/da/pasta
+
+    ->trocar o dono 
+        sudo chown -R $USER:$USER /caminho/da/pasta
+

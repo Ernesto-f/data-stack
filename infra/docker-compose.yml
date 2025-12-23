@@ -12,6 +12,8 @@ networks:
     driver: bridge
   nextcloud-net:
     driver: bridge
+  budibase_net:
+    driver: bridge
 
 volumes:
   pg-data:
@@ -27,6 +29,15 @@ volumes:
   nextcloud_data:
   nodered_data:
   keycloak_data:
+  keycloak_db:
+  portal:
+
+
+  budibase_data:
+  budibase_pg:
+  budibase_redis:
+
+
 
 services:
 
@@ -168,10 +179,35 @@ services:
     restart: unless-stopped
     logging: *default-logging
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_DEFAULT_THEME=dark
-      - TZ=America/Sao_Paulo
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_DEFAULT_THEME: dark
+      TZ: America/Sao_Paulo
+
+      GF_SERVER_DOMAIN: "10.113.120.154"
+      GF_SERVER_ROOT_URL: "http://10.113.120.154/grafana/"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_AUTH_OAUTH_AUTO_LOGIN: "true"
+
+      GF_AUTH_GENERIC_OAUTH_ENABLED: "true"
+      GF_AUTH_GENERIC_OAUTH_NAME: Keycloak
+      GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP: "true"
+      GF_AUTH_GENERIC_OAUTH_CLIENT_ID: grafana
+      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: 1s5pz1ZiF5dGHFYV0nQrJE38XYsf1WNo
+
+      GF_AUTH_GENERIC_OAUTH_AUTH_URL:  http://10.113.120.154:82/realms/apex/protocol/openid-connect/auth
+      GF_AUTH_GENERIC_OAUTH_TOKEN_URL: http://10.113.120.154:82/realms/apex/protocol/openid-connect/token
+      GF_AUTH_GENERIC_OAUTH_API_URL:   http://10.113.120.154:82/realms/apex/protocol/openid-connect/userinfo
+
+      GF_AUTH_GENERIC_OAUTH_REDIRECT_URL: "http://10.113.120.154/grafana/login/generic_oauth"
+      GF_AUTH_GENERIC_OAUTH_SCOPES: openid profile email
+      GF_AUTH_GENERIC_OAUTH_LOGIN_ATTRIBUTE_PATH: preferred_username
+      GF_AUTH_GENERIC_OAUTH_EMAIL_ATTRIBUTE_PATH: email
+        
+
+    
     ports:
       - "3000:3000"
     volumes:
@@ -237,6 +273,8 @@ services:
 
       AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: "admin:admin,viewer:viewer"
       AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: /opt/airflow/simple_auth_manager_passwords.json.generated
+      
+
 
     volumes:
       - /home/pc01/data-stack/orchestration/dags:/opt/airflow/dags:ro
@@ -280,12 +318,28 @@ services:
       AIRFLOW__LOGGING__BASE_LOG_FOLDER: /opt/airflow/logs
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
 
-      AIRFLOW__API__BASE_URL: ${AIRFLOW_API_BASE_URL}
-      AIRFLOW__CORE__EXECUTION_API_SERVER_URL: ${AIRFLOW_EXECUTION_API_URL}
+      AIRFLOW__API__BASE_URL: http://10.113.120.154/airflow
+      #${AIRFLOW_API_BASE_URL}
+      AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
+      #${AIRFLOW_EXECUTION_API_URL}
 
-      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: "admin:admin,viewer:viewer"
-      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: /opt/airflow/simple_auth_manager_passwords.json.generated
+      #AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: "admin:admin,viewer:viewer"
+      #AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: /opt/airflow/simple_auth_manager_passwords.json.generated
 
+      AIRFLOW__WEBSERVER__BASE_URL: "http://10.113.120.154/airflow"
+      AIRFLOW__WEBSERVER__WEB_SERVER_PATH: "/airflow"
+      AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX: "true"
+
+      AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.keycloak.auth_manager.keycloak_auth_manager.KeycloakAuthManager
+      AIRFLOW__KEYCLOAK_AUTH_MANAGER__SERVER_URL: "http://10.113.120.154:82"
+      AIRFLOW__KEYCLOAK_AUTH_MANAGER__REALM: apex
+      AIRFLOW__KEYCLOAK_AUTH_MANAGER__CLIENT_ID: airflow
+      AIRFLOW__KEYCLOAK_AUTH_MANAGER__CLIENT_SECRET: 0PoCcRvFIo4sCEB4rdhWo5r8Ku7ooZkH
+      AIRFLOW__FAB__AUTH_ROLE_MAPPING: "{\"airflow-admin\":[\"Admin\"]}"
+
+
+
+  
     command: ["airflow", "api-server"]
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8080/api/v2/monitor/health"]
@@ -324,6 +378,11 @@ services:
       AIRFLOW__LOGGING__BASE_LOG_FOLDER: /opt/airflow/logs
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
       
+      AIRFLOW__WEBSERVER__BASE_URL: "http://10.113.120.154/airflow"
+      AIRFLOW__WEBSERVER__WEB_SERVER_URL_PREFIX: "/airflow"
+      AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX: "true"
+
+      
 
 
       AIRFLOW__API__BASE_URL: ${AIRFLOW_API_BASE_URL}
@@ -359,6 +418,10 @@ services:
       AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
       AIRFLOW__LOGGING__BASE_LOG_FOLDER: /opt/airflow/logs
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__WEBSERVER__BASE_URL: http://10.113.120.154/airflow
+      AIRFLOW__WEBSERVER__WEB_SERVER_URL_PREFIX: /airflow
+      AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX: "true"
+
       
 
       AIRFLOW__API__BASE_URL: ${AIRFLOW_API_BASE_URL}
@@ -427,29 +490,70 @@ services:
 
 
   nginx:
-    image: nginx:1.27
-    profiles: ["proxy"]
+    image: nginx:alpine
+    container_name: nginx
+    profiles:
+      - proxy
     restart: unless-stopped
-    logging: *default-logging
     ports:
       - "80:80"
-   #   - "443:443"
     volumes:
+      - ./portal:/usr/share/nginx/html:ro
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-    networks: [internal]
+      - ./nginx/sites-available:/etc/nginx/sites-available:ro
+      - ./nginx/sites-enabled:/etc/nginx/sites-enabled:ro
+      - ./nginx/locations-enabled:/etc/nginx/locations-enabled:ro
+    networks:
+      - internal
+
+  
+  keycloak-db:
+    image: postgres:16
+    container_name: keycloak-db
+    profiles:
+      - auth
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak_pwd
+      KC_PROXY_HEADERS: "xforwarded"
+
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+    volumes:
+      - keycloak_db:/var/lib/postgresql/data
+      
+    networks:
+      - internal
 
   keycloak:
-    image: quay.io/keycloak/keycloak:latest
-    profiles: ["keykloak"]
+    image: quay.io/keycloak/keycloak:25.0
+    container_name: keycloak
+    profiles:
+      - auth
+    depends_on:
+      - keycloak-db
+    command: ["start-dev"]
     environment:
-      - KEYCLOAK_USER=admin
-      - KEYCLOAK_PASSWORD=admin
-    ports:
-      - "8080:8080"
-    volumes:
-      - keycloak_data:/opt/jboss/keycloak/standalone/data
-  
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak_pwd
 
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin123
+
+
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: "xforwarded"
+      KC_HOSTNAME_STRICT: "false"
+    ports:
+      - "82:8080"
+    networks:
+      - internal
 
 
 
@@ -506,7 +610,7 @@ services:
     depends_on:
       - nextcloud-db
     networks:
-      - nextcloud-net
+      - internal
 
 
 
@@ -527,3 +631,80 @@ services:
       - TZ=America/Sao_Paulo
     volumes:
       - nodered_data:/data
+    networks:
+      - internal
+
+
+
+
+
+
+
+  # ======================================================================================= #
+  # ===============================                     =================================== #
+  # ===============================       BUDI-BASE     =================================== #
+  # ===============================                     =================================== #
+  # ======================================================================================= #
+  budibase:
+    image: budibase/budibase:latest
+    container_name: budibase
+    profiles:
+      - budibase
+    depends_on:
+      - postgres-budibase
+      - redis
+    ports:
+      - "10000:80"
+    environment:
+      # URLs internas
+      - INTERNAL_API=http://budibase:80
+
+      # Banco (Budibase usa Postgres)
+      - BB_DB=postgres
+      - BB_DB_HOST=postgres
+      - BB_DB_PORT=5432
+      - BB_DB_USER=budibase
+      - BB_DB_PASS=budibase_pwd
+      - BB_DB_NAME=budibase
+
+      # Redis (fila/cache)
+      - REDIS_URL=redis://:redis_pwd_forte@redis:6379
+
+      # Chaves/segredos (troque!)
+      - JWT_SECRET=troque_esta_string_grande_e_aleatoria
+      - ENCRYPTION_KEY=troque_esta_outra_string_grande_e_aleatoria
+
+      # URL pública (ajuda em links/redirects)
+      - PUBLIC_URL=http://10.113.120.154:10000
+    volumes:
+      - budibase_data:/data
+    restart: unless-stopped
+    networks:
+      - budibase_net
+
+  postgres-budibase:
+    image: postgres:16
+    container_name: budibase-postgres
+    profiles:
+      - budibase
+    environment:
+      - POSTGRES_DB=budibase
+      - POSTGRES_USER=budibase
+      - POSTGRES_PASSWORD=budibase_pwd
+    volumes:
+      - budibase_pg:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - budibase_net
+
+  redis:
+    image: redis:7
+    container_name: budibase-redis
+    profiles:
+      - budibase
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "redis_pwd_forte"]
+    volumes:
+      - budibase_redis:/data
+    restart: unless-stopped
+    networks:
+      - budibase_net
