@@ -7,6 +7,7 @@ x-logging: &default-logging
     max-size: "10m"
     max-file: "3"
 
+
 networks:
   internal:
     driver: bridge
@@ -14,29 +15,6 @@ networks:
     driver: bridge
   budibase_net:
     driver: bridge
-
-volumes:
-  pg-data:
-  minio-data:
-  superset-home:
-  airflow-logs:
-  pg-airflow-data:
-  pg-superset-data:
-  prom-data:
-  grafana-data:
-  nextcloud_db:
-  nextcloud_html:
-  nextcloud_data:
-  nodered_data:
-  keycloak_data:
-  keycloak_db:
-  portal:
-
-
-  budibase_data:
-  budibase_pg:
-  budibase_redis:
-
 
 
 services:
@@ -65,7 +43,7 @@ services:
       POSTGRES_USER: ${PG_USER}
       POSTGRES_PASSWORD: ${PG_PASSWORD}
     volumes:
-      - pg-data:/var/lib/postgresql/data
+      - ./volumes/pg-data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h localhost -p 5432 -U $${PG_USER} -d $${PG_DB} || exit 1"]
@@ -90,7 +68,7 @@ services:
     env_file: [".env"]
     command: server /data --console-address ":9001"
     volumes:
-      - minio-data:/data
+      - ./volumes/minio-data:/data
     networks: [internal]
 
   # opcional: faz alias/config inicial no MinIO
@@ -120,7 +98,7 @@ services:
 
   postgres-superset:
     image: postgres:16
-    profiles: ["analytics"]
+    profiles: ["superset"]
     container_name: postgres-superset
     restart: unless-stopped
     env_file: [".env"]
@@ -134,12 +112,12 @@ services:
       timeout: 5s
       retries: 10
     volumes:
-      - pg-superset-data:/var/lib/postgresql/data
+      - ./volumes/pg-superset-data:/var/lib/postgresql/data
     networks: [internal]
 
   superset:
     image: apache/superset:4.0.2
-    profiles: ["analytics"]
+    profiles: ["superset"]
     container_name: superset
     ports:
       - "8088:8088"
@@ -154,10 +132,11 @@ services:
       ADMIN_USER: ${ST_ADMIN_USER}
       ADMIN_EMAIL: ${ST_ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ST_ADMIN_PASSWORD}
+      ENABLE_PROXY_FIX: "True"
     depends_on:
       postgres-superset: { condition: service_healthy }
     volumes:
-      - superset-home:/app/superset_home
+      - ./volumes/superset-home:/app/superset_home
       - ./superset/superset_config.py:/app/pythonpath/superset_config.py:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
@@ -176,46 +155,45 @@ services:
     image: grafana/grafana:latest
     profiles: ["analytics"]
     container_name: grafana
+    env_file:
+      - .env
     restart: unless-stopped
     logging: *default-logging
     environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_USER: ${GF_SECURITY_ADMIN_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD}
       GF_USERS_DEFAULT_THEME: dark
       TZ: America/Sao_Paulo
-
-      GF_SERVER_DOMAIN: "10.113.120.154"
-      GF_SERVER_ROOT_URL: "http://10.113.120.154/grafana/"
+      GF_SERVER_ROOT_URL: "http://10.113.120.120/grafana/"
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
 
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+
       GF_AUTH_DISABLE_LOGIN_FORM: "true"
-      GF_AUTH_OAUTH_AUTO_LOGIN: "true"
+      GF_USERS_ALLOW_SIGN_UP: "false"
 
-      GF_AUTH_GENERIC_OAUTH_ENABLED: "true"
-      GF_AUTH_GENERIC_OAUTH_NAME: Keycloak
-      GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP: "true"
-      GF_AUTH_GENERIC_OAUTH_CLIENT_ID: grafana
-      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: 1s5pz1ZiF5dGHFYV0nQrJE38XYsf1WNo
+      #GF_AUTH_GENERIC_OAUTH_ENABLED: "true"
+      #GF_AUTH_GENERIC_OAUTH_NAME: Keycloak
+      #GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP: "true"
+      #GF_AUTH_GENERIC_OAUTH_CLIENT_ID: grafana
+      #GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: 1s5pz1ZiF5dGHFYV0nQrJE38XYsf1WNo
 
-      GF_AUTH_GENERIC_OAUTH_AUTH_URL:  http://10.113.120.154:82/realms/apex/protocol/openid-connect/auth
-      GF_AUTH_GENERIC_OAUTH_TOKEN_URL: http://10.113.120.154:82/realms/apex/protocol/openid-connect/token
-      GF_AUTH_GENERIC_OAUTH_API_URL:   http://10.113.120.154:82/realms/apex/protocol/openid-connect/userinfo
+      #GF_AUTH_GENERIC_OAUTH_AUTH_URL:  http://10.113.120.154:82/realms/apex/protocol/openid-connect/auth
+      #GF_AUTH_GENERIC_OAUTH_TOKEN_URL: http://10.113.120.154:82/realms/apex/protocol/openid-connect/token
+      #GF_AUTH_GENERIC_OAUTH_API_URL:   http://10.113.120.154:82/realms/apex/protocol/openid-connect/userinfo
 
-      GF_AUTH_GENERIC_OAUTH_REDIRECT_URL: "http://10.113.120.154/grafana/login/generic_oauth"
-      GF_AUTH_GENERIC_OAUTH_SCOPES: openid profile email
-      GF_AUTH_GENERIC_OAUTH_LOGIN_ATTRIBUTE_PATH: preferred_username
-      GF_AUTH_GENERIC_OAUTH_EMAIL_ATTRIBUTE_PATH: email
+      #GF_AUTH_GENERIC_OAUTH_REDIRECT_URL: "http://10.113.120.154/grafana/login/generic_oauth"
+      #GF_AUTH_GENERIC_OAUTH_SCOPES: openid profile email
+      #GF_AUTH_GENERIC_OAUTH_LOGIN_ATTRIBUTE_PATH: preferred_username
+      #GF_AUTH_GENERIC_OAUTH_EMAIL_ATTRIBUTE_PATH: email
         
 
-    
     ports:
       - "3000:3000"
     volumes:
-      - grafana-data:/var/lib/grafana
+      - ./volumes/grafana-data:/var/lib/grafana
     networks: [internal]
-    depends_on:
-      postgres-superset:
-        condition: service_started
 
   # ========================================================================================= #
   # ===================================                  ==================================== #
@@ -238,7 +216,7 @@ services:
       POSTGRES_PASSWORD: airflow
       TZ: ${TZ}
     volumes:
-      - pg-airflow-data:/var/lib/postgresql/data
+      - ./volumes/pg-airflow-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
       interval: 10s
@@ -267,21 +245,23 @@ services:
       # Use uma única fonte: AIRFLOW__CORE__FERNET_KEY (não deixe vazio)
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
 
-      AIRFLOW__API__BASE_URL: ${AIRFLOW_API_BASE_URL}
+      AIRFLOW__API__BASE_URL: ${AIRFLOW__API__BASE_URL}
       AIRFLOW__CORE__EXECUTION_API_SERVER_URL: ${AIRFLOW_EXECUTION_API_URL}
       AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW__API_AUTH__JWT_SECRET}
 
-      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: "admin:admin,viewer:viewer"
+      #AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: "admin:admin,viewer:viewer"
       AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: /opt/airflow/simple_auth_manager_passwords.json.generated
       
+      #loga todos como admin
+      #simple_auth_manager_all_admins: "True"
 
 
     volumes:
       - /home/pc01/data-stack/orchestration/dags:/opt/airflow/dags:ro
-      - ./airflow/logs:/opt/airflow/logs
-      - ./airflow/plugins:/opt/airflow/plugins
+      - ./volumes/airflow/logs:/opt/airflow/logs
+      - ./volumes/airflow/plugins:/opt/airflow/plugins
       # REMOVIDO:
-      # - ./airflow/simple_auth_manager_passwords.json.generated:/opt/airflow/simple_auth_manager_passwords.json.generated
+      - ./airflow/simple_auth_manager_passwords.json.generated:/opt/airflow/simple_auth_manager_passwords.json.generated
 
     entrypoint: []
     command: >
@@ -307,6 +287,8 @@ services:
     depends_on:
       airflow-init:
         condition: service_completed_successfully
+    expose:
+      - "8080"
     ports:
       - "8081:8080"
     environment:
@@ -316,28 +298,27 @@ services:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
       AIRFLOW__LOGGING__BASE_LOG_FOLDER: /opt/airflow/logs
-      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
 
-      AIRFLOW__API__BASE_URL: http://10.113.120.154/airflow
-      #${AIRFLOW_API_BASE_URL}
-      AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
-      #${AIRFLOW_EXECUTION_API_URL}
+      AIRFLOW__API__BASE_URL: ${AIRFLOW__API__BASE_URL}
+      AIRFLOW__CORE__EXECUTION_API_SERVER_URL: ${AIRFLOW_EXECUTION_API_URL}
 
+      # variaveis para modo dev (login facil)
       #AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: "admin:admin,viewer:viewer"
-      #AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: /opt/airflow/simple_auth_manager_passwords.json.generated
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: /opt/airflow/simple_auth_manager_passwords.json.generated
+      AIRFLOW__CORE__ENABLE_PROXY_FIX: "true"
 
-      AIRFLOW__WEBSERVER__BASE_URL: "http://10.113.120.154/airflow"
-      AIRFLOW__WEBSERVER__WEB_SERVER_PATH: "/airflow"
-      AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX: "true"
-
-      AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.keycloak.auth_manager.keycloak_auth_manager.KeycloakAuthManager
-      AIRFLOW__KEYCLOAK_AUTH_MANAGER__SERVER_URL: "http://10.113.120.154:82"
-      AIRFLOW__KEYCLOAK_AUTH_MANAGER__REALM: apex
-      AIRFLOW__KEYCLOAK_AUTH_MANAGER__CLIENT_ID: airflow
-      AIRFLOW__KEYCLOAK_AUTH_MANAGER__CLIENT_SECRET: 0PoCcRvFIo4sCEB4rdhWo5r8Ku7ooZkH
-      AIRFLOW__FAB__AUTH_ROLE_MAPPING: "{\"airflow-admin\":[\"Admin\"]}"
-
-
+      #config para autenticação com keycloak e OAuth2
+      #AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "True"
+      #AIRFLOW__API__SECRET_KEY: "9f2a8c4e7b6d1c8a3e5f2b7a8d4c9e1f7b3a8c2e4d6f7a9b1c3d5e7f2a8c4e9b"
+      #AIRFLOW__CORE__AUTH_MANAGER: airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager
+      #airflow.providers.keycloak.auth_manager.keycloak_auth_manager.KeycloakAuthManager
+      
+      #AIRFLOW__API__AUTH_BACKEND: airflow.api.auth.backend.session
+      #AIRFLOW__KEYCLOAK_AUTH_MANAGER__SERVER_URL: "http://keycloak:8080"
+      #AIRFLOW__KEYCLOAK_AUTH_MANAGER__REALM: apex
+      #AIRFLOW__KEYCLOAK_AUTH_MANAGER__CLIENT_ID: airflow
+      #AIRFLOW__KEYCLOAK_AUTH_MANAGER__CLIENT_SECRET: lgnM1JJzl1324mns7v7bfa6v9C4lEDD8
 
   
     command: ["airflow", "api-server"]
@@ -347,7 +328,7 @@ services:
       timeout: 5s
       retries: 10
     volumes:
-      - /home/pc01/data-stack/orchestration/dags:/opt/airflow/dags:ro
+      - /home/apex/data-stack/orchestration/dags:/opt/airflow/dags:ro
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/plugins:/opt/airflow/plugins
       - ./airflow/simple_auth_manager_passwords.json.generated:/opt/airflow/simple_auth_manager_passwords.json.generated
@@ -376,23 +357,17 @@ services:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
       AIRFLOW__LOGGING__BASE_LOG_FOLDER: /opt/airflow/logs
-      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
-      
-      AIRFLOW__WEBSERVER__BASE_URL: "http://10.113.120.154/airflow"
-      AIRFLOW__WEBSERVER__WEB_SERVER_URL_PREFIX: "/airflow"
-      AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX: "true"
-
-      
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
 
 
-      AIRFLOW__API__BASE_URL: ${AIRFLOW_API_BASE_URL}
+      AIRFLOW__API__BASE_URL: ${AIRFLOW__API__BASE_URL}
       AIRFLOW__CORE__EXECUTION_API_SERVER_URL: ${AIRFLOW_EXECUTION_API_URL}
 
     command: ["airflow", "scheduler"]
     volumes:
-      - /home/pc01/data-stack/orchestration/dags:/opt/airflow/dags:ro
-      - ./airflow/logs:/opt/airflow/logs
-      - ./airflow/plugins:/opt/airflow/plugins
+      - /home/apex/data-stack/orchestration/dags:/opt/airflow/dags:ro
+      - ./volumes/airflow/logs:/opt/airflow/logs
+      - ./volumes/airflow/plugins:/opt/airflow/plugins
     dns:
       - 10.113.21.7
     networks: [internal]
@@ -417,21 +392,17 @@ services:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
       AIRFLOW__LOGGING__BASE_LOG_FOLDER: /opt/airflow/logs
-      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
-      AIRFLOW__WEBSERVER__BASE_URL: http://10.113.120.154/airflow
-      AIRFLOW__WEBSERVER__WEB_SERVER_URL_PREFIX: /airflow
-      AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX: "true"
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
 
-      
 
-      AIRFLOW__API__BASE_URL: ${AIRFLOW_API_BASE_URL}
+      AIRFLOW__API__BASE_URL: ${AIRFLOW__API__BASE_URL}
       AIRFLOW__CORE__EXECUTION_API_SERVER_URL: ${AIRFLOW_EXECUTION_API_URL}
 
     command: ["airflow", "dag-processor"]
     volumes:
-      - /home/pc01/data-stack/orchestration/dags:/opt/airflow/dags:ro
-      - ./airflow/logs:/opt/airflow/logs
-      - ./airflow/plugins:/opt/airflow/plugins
+      - /home/apex/data-stack/orchestration/dags:/opt/airflow/dags:ro
+      - ./volumes/airflow/logs:/opt/airflow/logs
+      - ./volumes/airflow/plugins:/opt/airflow/plugins
     dns:
       - 10.113.21.7
     networks: [internal]
@@ -454,7 +425,9 @@ services:
     restart: unless-stopped
     logging: *default-logging
     volumes:
-      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./volumes/prom-data:/prometheus
+
     networks: [internal]
 
   node_exporter:
@@ -476,7 +449,8 @@ services:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
       - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
     networks: [internal]
 
 
@@ -505,13 +479,14 @@ services:
       - ./nginx/locations-enabled:/etc/nginx/locations-enabled:ro
     networks:
       - internal
+      - nextcloud-net
 
   
   keycloak-db:
     image: postgres:16
     container_name: keycloak-db
     profiles:
-      - auth
+      - keycloak
     environment:
       POSTGRES_DB: keycloak
       POSTGRES_USER: keycloak
@@ -521,7 +496,7 @@ services:
       KC_HOSTNAME_STRICT: "false"
       KC_HOSTNAME_STRICT_HTTPS: "false"
     volumes:
-      - keycloak_db:/var/lib/postgresql/data
+      - ./volumes/keycloak_db:/var/lib/postgresql/data
       
     networks:
       - internal
@@ -529,8 +504,10 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:25.0
     container_name: keycloak
+    env_file:
+      - .env
     profiles:
-      - auth
+      - keycloak
     depends_on:
       - keycloak-db
     command: ["start-dev"]
@@ -540,13 +517,15 @@ services:
       KC_DB_USERNAME: keycloak
       KC_DB_PASSWORD: keycloak_pwd
 
-      KC_BOOTSTRAP_ADMIN_USERNAME: admin
-      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
 
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin123
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
 
 
+      KC_HTTP_RELATIVE_PATH: "/keylogin"
+      KC_HOSTNAME_URL: "http://10.113.120.120/keylogin"
       KC_HTTP_ENABLED: "true"
       KC_PROXY_HEADERS: "xforwarded"
       KC_HOSTNAME_STRICT: "false"
@@ -557,10 +536,52 @@ services:
 
 
 
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
+    container_name: oauth2-proxy
+    profiles:
+      - auth2
+    networks:
+      - internal
+    environment:
+      OAUTH2_PROXY_PROVIDER: "keycloak-oidc"
+      OAUTH2_PROXY_OIDC_ISSUER_URL: "http://10.113.120.120/keylogin/realms/apex"
+      OAUTH2_PROXY_CLIENT_ID: "oauth2-proxy"
+      OAUTH2_PROXY_CLIENT_SECRET: "WBEfllaM1Gm6IwZ9Jj2BKT9dQz2LLAa9"
+      OAUTH2_PROXY_WHITELIST_DOMAINS: "10.113.120.120"
 
 
+      # Prefixo onde o oauth2-proxy fica publicado no Nginx
+      OAUTH2_PROXY_PROXY_PREFIX: "/oauth2"
 
+      # Callback do OIDC (tem que bater com o client no Keycloak)
+      OAUTH2_PROXY_REDIRECT_URL: "http://10.113.120.120/oauth2/callback"
 
+      # Para auth_request (não proxyar app, só responder /oauth2/*)
+      OAUTH2_PROXY_UPSTREAMS: "static://200"
+      OAUTH2_PROXY_HTTP_ADDRESS: "0.0.0.0:4180"
+      OAUTH2_PROXY_REVERSE_PROXY: "true"
+
+      # Cookie
+      OAUTH2_PROXY_COOKIE_SECRET: "J9kZB9a4o7g9r8Ww5XrK3c2R1vQyZkN5H7PpL6T4D8M"
+      OAUTH2_PROXY_COOKIE_SAMESITE: "lax"
+      OAUTH2_PROXY_COOKIE_PATH: "/"
+      OAUTH2_PROXY_COOKIE_EXPIRE: "8h"
+      OAUTH2_PROXY_COOKIE_SECURE: "false"
+
+      # Fluxo OIDC
+      OAUTH2_PROXY_EMAIL_DOMAINS: "*"
+      OAUTH2_PROXY_SCOPE: "openid email profile"
+
+      # Headers p/ auth_request
+      OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
+      OAUTH2_PROXY_PASS_USER_HEADERS: "true"
+
+      # Opcional
+      OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
+
+      # Permitir email não verificado (correção do erro 500)
+      OAUTH2_PROXY_INSECURE_OIDC_ALLOW_UNVERIFIED_EMAIL: "true"    
 
 
 
@@ -583,13 +604,15 @@ services:
       POSTGRES_USER: nextcloud
       POSTGRES_PASSWORD: nextcloud_pwd
     volumes:
-      - nextcloud_db:/var/lib/postgresql/data
+      - ./volumes/nextcloud/nextcloud_db:/var/lib/postgresql/data
     networks:
       - nextcloud-net
 
   nextcloud-app:
     image: nextcloud:29-apache
     container_name: nextcloud-app
+    env_file:
+      - .env
     profiles: ["storage"]
     restart: unless-stopped
     ports:
@@ -599,18 +622,32 @@ services:
       POSTGRES_DB: nextcloud
       POSTGRES_USER: nextcloud
       POSTGRES_PASSWORD: nextcloud_pwd
-      NEXTCLOUD_ADMIN_USER: admin
-      NEXTCLOUD_ADMIN_PASSWORD: admin123
+      NEXTCLOUD_ADMIN_USER: ${NEXTCLOUD_ADMIN_USER}
+      NEXTCLOUD_ADMIN_PASSWORD: ${NEXTCLOUD_ADMIN_USER}
       OVERWRITEPROTOCOL: http
-      NEXTCLOUD_TRUSTED_DOMAINS: 10.113.120.154
+      NEXTCLOUD_TRUSTED_DOMAINS_0: 10.113.120.120
+      NEXTCLOUD_TRUSTED_DOMAINS_1: localhost
+      
+      # Reverse proxy + subpath
+      #OVERWRITEHOST: 10.113.120.154
+      OVERWRITEWEBROOT: /cloud
+      #OVERWRITECLIURL: http://10.113.120.154/cloud
+
+      # Confiança no proxy (ajuste conforme sua rede Docker)
+      # - opção 1: confiar na subnet do docker network "internal"
+      TRUSTED_PROXIES_0: 172.16.0.0/12
+      TRUSTED_PROXIES_1: 10.113.21.7
+
+      # Opcional: reduzir warnings de .well-known (quando usa /cloud)
+      #APACHE_DISABLE_REWRITE_IP: "1"
 
     volumes:
-      - nextcloud_html:/var/www/html
-      - nextcloud_data:/var/www/html/data
+      - ./volumes/nextcloud/nextcloud_html:/var/www/html
+      - ./volumes/nextcloud/nextcloud_data:/var/www/html/data
     depends_on:
       - nextcloud-db
     networks:
-      - internal
+      - nextcloud-net
 
 
 
@@ -630,7 +667,7 @@ services:
     environment:
       - TZ=America/Sao_Paulo
     volumes:
-      - nodered_data:/data
+      - ./volumes/nodered_data:/data
     networks:
       - internal
 
@@ -675,9 +712,9 @@ services:
       - ENCRYPTION_KEY=troque_esta_outra_string_grande_e_aleatoria
 
       # URL pública (ajuda em links/redirects)
-      - PUBLIC_URL=http://10.113.120.154:10000
+      - PUBLIC_URL=http://10.113.120.120:10000
     volumes:
-      - budibase_data:/data
+      - ./volumes/budibase_data:/data
     restart: unless-stopped
     networks:
       - budibase_net
@@ -692,7 +729,7 @@ services:
       - POSTGRES_USER=budibase
       - POSTGRES_PASSWORD=budibase_pwd
     volumes:
-      - budibase_pg:/var/lib/postgresql/data
+      - ./volumes/budibase_pg:/var/lib/postgresql/data
     restart: unless-stopped
     networks:
       - budibase_net
@@ -704,7 +741,112 @@ services:
       - budibase
     command: ["redis-server", "--appendonly", "yes", "--requirepass", "redis_pwd_forte"]
     volumes:
-      - budibase_redis:/data
+      - ./volumes/budibase_redis:/data
     restart: unless-stopped
     networks:
       - budibase_net
+
+
+
+
+  # ======================================================================================= #
+  # ===============================                     =================================== #
+  # ===============================  acesso remoto vnc  =================================== #
+  # ===============================                     =================================== #
+  # ======================================================================================= #
+
+  guacdb:
+    image: mariadb:10.9.5
+    container_name: guacamoledb
+    restart: unless-stopped
+    profiles:
+      - vnc
+    environment:
+      MARIADB_ROOT_PASSWORD: "MariaDBRootPass"
+      MARIADB_DATABASE: "guacamole_db"
+      MARIADB_USER: "guacamole_user"
+      MARIADB_PASSWORD: "MariaDBUserPass"
+      TZ: America/Sao_Paulo
+    volumes:
+      - ./volumes/db-data:/var/lib/mysql
+      - ./volumes/guacamole/init/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d:ro
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -uroot -p$${MARIADB_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  guacd:
+    image: guacamole/guacd:1.4.0
+    container_name: guacd
+    restart: unless-stopped
+    profiles:
+      - vnc
+    networks:
+      - internal
+
+  guacamole:
+    image: guacamole/guacamole:1.4.0
+    container_name: guacamole
+    profiles:
+      - vnc
+    restart: unless-stopped
+    depends_on:
+      guacdb:
+        condition: service_healthy
+      guacd:
+        condition: service_started
+    environment:
+      GUACD_HOSTNAME: "guacd"
+      MYSQL_HOSTNAME: "guacdb"
+      MYSQL_DATABASE: "guacamole_db"
+      MYSQL_USER: "guacamole_user"
+      MYSQL_PASSWORD: "MariaDBUserPass"
+      TOTP_ENABLED: "false"
+      TZ: America/Sao_Paulo
+    ports:
+      - "8087:8080"
+    networks:
+      - internal
+
+
+  # ======================================================================================= #
+  # ===============================                     =================================== #
+  # ===============================        drawio       =================================== #
+  # ===============================                     =================================== #
+  # ======================================================================================= #
+  drawio:
+    image: jgraph/drawio:latest
+    container_name: drawio
+    profiles:
+      - flow-charts
+    restart: unless-stopped
+    environment:
+      # Ajuda o drawio a montar URLs corretas quando está atrás de proxy/https
+      - PUBLIC_DNS=10.113.120.120
+      - ORGANISATION_NAME=Apex
+    networks:
+      - internal
+
+
+
+
+
+  # ======================================================================================= #
+  # ===============================                     =================================== #
+  # ===============================    SQL Management   =================================== #
+  # ===============================                     =================================== #
+  # ======================================================================================= #
+
+  cloudbeaver:
+    image: dbeaver/cloudbeaver:latest
+    container_name: cloudbeaver
+    profiles:
+      - Dbeaver-SQLManagement
+    ports:
+      - "8978:8978"
+    volumes:
+      - ./volumes/cloudbeaver_data:/opt/cloudbeaver/workspace
+    restart: unless-stopped
