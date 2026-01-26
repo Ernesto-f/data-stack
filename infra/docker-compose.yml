@@ -217,11 +217,13 @@ services:
       TZ: ${TZ}
     volumes:
       - ./volumes/pg-airflow-data:/var/lib/postgresql/data
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 30s
     networks: [internal]
 
   # ===================== INIT =====================
@@ -231,6 +233,7 @@ services:
     profiles: ["orchestrator"]
     env_file:
       - .env
+    restart: "no"
     depends_on:
       postgres-airflow:
         condition: service_healthy
@@ -284,7 +287,10 @@ services:
       - .env
     profiles: ["orchestrator"]
     user: "${AIRFLOW_UID}:${AIRFLOW_GID}"
+    restart: unless-stopped
     depends_on:
+      postgres-airflow:
+        condition: service_healthy
       airflow-init:
         condition: service_completed_successfully
     expose:
@@ -347,9 +353,12 @@ services:
 
     profiles: ["orchestrator"]
     user: "${AIRFLOW_UID}:${AIRFLOW_GID}"
+    restart: unless-stopped
     depends_on:
-      airflow-apiserver:
+      postgres-airflow:
         condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
     environment:
       TZ: ${TZ}
 
@@ -382,9 +391,12 @@ services:
       - .env
     profiles: ["orchestrator"]
     user: "${AIRFLOW_UID}:${AIRFLOW_GID}"
+    restart: unless-stopped
     depends_on:
-      airflow-apiserver:
+      postgres-airflow:
         condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
     environment:
       TZ: ${TZ}
 
@@ -406,6 +418,7 @@ services:
     dns:
       - 10.113.21.7
     networks: [internal]
+
 
 
   # ======================================================================================= #
@@ -623,10 +636,12 @@ services:
       POSTGRES_USER: nextcloud
       POSTGRES_PASSWORD: nextcloud_pwd
       NEXTCLOUD_ADMIN_USER: ${NEXTCLOUD_ADMIN_USER}
-      NEXTCLOUD_ADMIN_PASSWORD: ${NEXTCLOUD_ADMIN_USER}
+      NEXTCLOUD_ADMIN_PASSWORD: ${NEXTCLOUD_ADMIN_PASSWORD}
       OVERWRITEPROTOCOL: http
       NEXTCLOUD_TRUSTED_DOMAINS_0: 10.113.120.120
       NEXTCLOUD_TRUSTED_DOMAINS_1: localhost
+      NEXTCLOUD_TRUSTED_DOMAINS_2: 172.20.0.11
+      NEXTCLOUD_TRUSTED_DOMAINS_3: 172.20.0.31
       
       # Reverse proxy + subpath
       #OVERWRITEHOST: 10.113.120.154
@@ -637,9 +652,7 @@ services:
       # - opção 1: confiar na subnet do docker network "internal"
       TRUSTED_PROXIES_0: 172.16.0.0/12
       TRUSTED_PROXIES_1: 10.113.21.7
-
-      # Opcional: reduzir warnings de .well-known (quando usa /cloud)
-      #APACHE_DISABLE_REWRITE_IP: "1"
+      TRUSTED_PROXIES_2: 172.20.0.0/24
 
     volumes:
       - ./volumes/nextcloud/nextcloud_html:/var/www/html
@@ -658,7 +671,7 @@ services:
   # ===============================                     =================================== #
   # ======================================================================================= #
   nodered:
-    image: nodered/node-red:latest
+    image: datastack-noderedplc
     profiles: ["nodered"]
     container_name: nodered
     restart: unless-stopped
@@ -755,6 +768,25 @@ services:
   # ===============================                     =================================== #
   # ======================================================================================= #
 
+  guacdb-init:
+    image: mariadb:10.9.5
+    container_name: guacdb-init
+    profiles:
+    - vnc-init
+    depends_on:
+      guacdb:
+        condition: service_healthy
+    volumes:
+     - ./guacamole/init:/init:ro
+    entrypoint: >
+      sh -c "
+      echo 'Applying Guacamole schema...' &&
+      cat /init/*.sql | mariadb -h guacdb -u guacamole_user -pMariaDBUserPass guacamole_db &&
+      echo 'Schema applied.'"
+    networks:
+      - internal
+    restart: "no"
+
   guacdb:
     image: mariadb:10.9.5
     container_name: guacamoledb
@@ -827,6 +859,8 @@ services:
       # Ajuda o drawio a montar URLs corretas quando está atrás de proxy/https
       - PUBLIC_DNS=10.113.120.120
       - ORGANISATION_NAME=Apex
+    ports:
+      - 8090:8080
     networks:
       - internal
 
@@ -846,7 +880,9 @@ services:
     profiles:
       - Dbeaver-SQLManagement
     ports:
-      - "8978:8978"
+      - 8978:8978
+    environment:
+      - CLOUDBEAVER_ROOT_URI=/dbeaver/
     volumes:
       - ./volumes/cloudbeaver_data:/opt/cloudbeaver/workspace
     restart: unless-stopped
