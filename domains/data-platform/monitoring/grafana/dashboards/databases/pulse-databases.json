@@ -1,0 +1,242 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(110, 203, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "max": 7, "min": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": 0 }, { "color": "green", "value": 7 }] }, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "editorMode": "code", "expr": "sum(pg_up{job=\"postgres_exporters\"})", "instant": true, "refId": "A" }],
+      "title": "Alvos PostgreSQL conectados",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+      "id": 2,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "editorMode": "code", "expr": "sum(pg_stat_database_numbackends{job=\"postgres_exporters\",datname!~\"template.*\"})", "instant": true, "refId": "A" }],
+      "title": "Conexões ativas",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "bytes" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+      "id": 3,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "editorMode": "code", "expr": "sum(pg_database_size_bytes{job=\"postgres_exporters\",datname!~\"template.*\"})", "instant": true, "refId": "A" }],
+      "title": "Espaço total dos bancos",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+      "id": 4,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "editorMode": "code", "expr": "sum(rate(pg_stat_database_deadlocks{job=\"postgres_exporters\"}[5m]))", "instant": true, "refId": "A" }],
+      "title": "Deadlocks por segundo",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 4, "showPoints": "auto", "spanNulls": false }, "unit": "ops" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
+      "id": 5,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [{ "editorMode": "code", "expr": "sum by (database_service) (rate(pg_stat_database_xact_commit{job=\"postgres_exporters\",datname!~\"template.*\"}[5m]))", "legendFormat": "{{database_service}}", "refId": "A" }],
+      "title": "Transações confirmadas por segundo",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 4, "showPoints": "auto", "spanNulls": false }, "max": 1, "min": 0, "unit": "percentunit" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
+      "id": 6,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [{ "editorMode": "code", "expr": "sum by (database_service, datname) (rate(pg_stat_database_blks_hit{job=\"postgres_exporters\",datname!~\"template.*\"}[5m])) / clamp_min(sum by (database_service, datname) (rate(pg_stat_database_blks_hit{job=\"postgres_exporters\",datname!~\"template.*\"}[5m]) + rate(pg_stat_database_blks_read{job=\"postgres_exporters\",datname!~\"template.*\"}[5m])), 1)", "legendFormat": "{{database_service}} / {{datname}}", "refId": "A" }],
+      "title": "Cache hit ratio",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false }, "unit": "bytes" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 13 },
+      "id": 7,
+      "options": { "showHeader": true, "sortBy": [{ "desc": true, "displayName": "Value" }] },
+      "targets": [{ "editorMode": "code", "expr": "pg_database_size_bytes{job=\"postgres_exporters\",datname!~\"template.*\"}", "format": "table", "instant": true, "refId": "A" }],
+      "title": "Tamanho por instância e banco",
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 13 },
+      "id": 8,
+      "options": { "showHeader": true, "sortBy": [{ "desc": true, "displayName": "Value" }] },
+      "targets": [{ "editorMode": "code", "expr": "pg_up{job=\"postgres_exporters\"}", "format": "table", "instant": true, "refId": "A" }],
+      "title": "Disponibilidade por instância",
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "weknora-metrics" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 21 },
+      "id": 9,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "format": "table", "rawSql": "SELECT vector_rows_estimate AS value FROM grafana_readonly.vector_summary;", "refId": "A" }],
+      "title": "Vetores indexados (estimativa)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "weknora-metrics" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "bytes" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 21 },
+      "id": 10,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "format": "table", "rawSql": "SELECT table_bytes AS value FROM grafana_readonly.vector_summary;", "refId": "A" }],
+      "title": "Tabela de vetores",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "weknora-metrics" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "bytes" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 21 },
+      "id": 11,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "format": "table", "rawSql": "SELECT hnsw_index_bytes AS value FROM grafana_readonly.vector_summary;", "refId": "A" }],
+      "title": "Armazenamento dos índices HNSW",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "weknora-metrics" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 21 },
+      "id": 12,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "format": "table", "rawSql": "SELECT hnsw_indexes AS value FROM grafana_readonly.vector_summary;", "refId": "A" }],
+      "title": "Quantidade de índices HNSW",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "weknora-metrics" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false } }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 24, "x": 0, "y": 26 },
+      "id": 13,
+      "options": { "showHeader": true },
+      "targets": [{ "format": "table", "rawSql": "SELECT extension, version FROM grafana_readonly.vector_extensions ORDER BY extension;", "refId": "A" }],
+      "title": "Extensões vetoriais/textuais instaladas",
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 3, "showPoints": "auto", "spanNulls": false }, "max": 100, "min": 0, "unit": "percent" }, "overrides": [] },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 31 },
+      "id": 14,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [{ "editorMode": "code", "expr": "100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{job=\"vm_node\",mode=\"idle\"}[5m])))", "legendFormat": "CPU {{instance}}", "refId": "A" }],
+      "title": "CPU do host",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 3, "showPoints": "auto", "spanNulls": false }, "max": 100, "min": 0, "unit": "percent" }, "overrides": [] },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 31 },
+      "id": 15,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [{ "editorMode": "code", "expr": "100 * (1 - node_memory_MemAvailable_bytes{job=\"vm_node\"} / node_memory_MemTotal_bytes{job=\"vm_node\"})", "legendFormat": "RAM usada", "refId": "A" }],
+      "title": "Memória do host",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 3, "showPoints": "auto", "spanNulls": false }, "max": 100, "min": 0, "unit": "percent" }, "overrides": [] },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 31 },
+      "id": 16,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [{ "editorMode": "code", "expr": "100 * (1 - node_filesystem_avail_bytes{job=\"vm_node\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{job=\"vm_node\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"})", "legendFormat": "Uso de /", "refId": "A" }],
+      "title": "Disco raiz do host",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 3, "showPoints": "auto", "spanNulls": false }, "unit": "bytes" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 38 },
+      "id": 17,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [{ "editorMode": "code", "expr": "container_memory_working_set_bytes{job=\"vm_cadvisor\",name=~\".*(postgres|WeKnora|pulse-archive|salus-demo|pulse-tracking).*\"}", "legendFormat": "{{name}}", "refId": "A" }],
+      "title": "Memória dos containers de banco",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 3, "showPoints": "auto", "spanNulls": false }, "unit": "cores" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 38 },
+      "id": 18,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [{ "editorMode": "code", "expr": "sum by (name) (rate(container_cpu_usage_seconds_total{job=\"vm_cadvisor\",name=~\".*(postgres|WeKnora|pulse-archive|salus-demo|pulse-tracking).*\"}[5m]))", "legendFormat": "{{name}}", "refId": "A" }],
+      "title": "CPU dos containers de banco",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": 0 }, { "color": "red", "value": 1 }] }, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 8, "x": 0, "y": 46 },
+      "id": 19,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "editorMode": "code", "expr": "sum(pg_slow_queries_slow_query_count{job=\"postgres_exporters\"}) or vector(0)", "instant": true, "refId": "A" }],
+      "title": "Consultas acima do limiar",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 46 },
+      "id": 20,
+      "options": { "showHeader": true, "sortBy": [{ "desc": true, "displayName": "Value" }] },
+      "targets": [{ "editorMode": "code", "expr": "pg_slow_queries_max_duration_seconds{job=\"postgres_exporters\"}", "format": "table", "instant": true, "refId": "A" }],
+      "title": "Duração máxima acima do limiar (s)",
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 8, "x": 16, "y": 46 },
+      "id": 21,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["max"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "editorMode": "code", "expr": "max(pg_slow_query_config_threshold_seconds{job=\"postgres_exporters\"})", "instant": true, "refId": "A" }],
+      "title": "Limiar configurado",
+      "type": "stat"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["Pulse", "PostgreSQL", "TimescaleDB", "ParadeDB", "pgvector"],
+  "templating": { "list": [] },
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Pulse Infra, Databases & Vetores",
+  "uid": "pulse-databases-vectors",
+  "version": 1
+}

@@ -1,0 +1,174 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "5m"
+    max-file: "2"
+
+
+networks:
+  internal:
+    external: true
+    name: data-stack_internal
+  knowledge_metrics:
+    external: true
+    name: pulse-knowledge-metrics
+
+
+services:
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    container_name: PROMETHEUS
+    restart: unless-stopped
+
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=3d"
+      - "--storage.tsdb.retention.size=512MB"
+      - "--web.enable-lifecycle"
+
+    ports:
+      - "127.0.0.1:19090:9090"
+
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+
+    networks:
+      - internal
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+
+  node-exporter-vm:
+    image: prom/node-exporter:v1.9.1
+    container_name: NODE_EXPORTER_VM
+    restart: unless-stopped
+    network_mode: host
+    pid: host
+    logging: *default-logging
+
+    command:
+      - "--web.listen-address=172.17.0.1:9100"
+      - "--path.rootfs=/host"
+      - "--collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run|var/lib/docker/.+|var/lib/containerd/.+)($$|/)"
+      - "--collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$$"
+
+    volumes:
+      - "/:/host:ro"
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://172.17.0.1:9100/metrics || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+
+  cadvisor-vm:
+    image: ghcr.io/google/cadvisor:v0.60.3
+    container_name: CADVISOR_VM
+    restart: unless-stopped
+    privileged: true
+    logging: *default-logging
+
+    command:
+      - "--housekeeping_interval=30s"
+      - "--docker_only=true"
+      - "--store_container_labels=false"
+
+    volumes:
+      - "/:/rootfs:ro"
+      - "/var/run:/var/run:rw"
+      - "/sys:/sys:ro"
+      - "/var/lib/docker/:/var/lib/docker:ro"
+      - "/dev/disk/:/dev/disk:ro"
+
+    devices:
+      - "/dev/kmsg"
+
+    networks:
+      - internal
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/metrics || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+
+  grafana:
+    image: grafana/grafana:12.3.1
+    container_name: DATA_PLATFORM_GRAFANA
+    restart: unless-stopped
+    logging: *default-logging
+    ports:
+      - "127.0.0.1:13001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?set GRAFANA_ADMIN_USER in the data-platform .env}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in the data-platform .env}
+      GRAFANA_WEKNORA_DB_PASSWORD: ${GRAFANA_WEKNORA_DB_PASSWORD:?set GRAFANA_WEKNORA_DB_PASSWORD in the data-platform .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-https://analytics.izatacore.com/}
+      GF_AUTH_GENERIC_OAUTH_ENABLED: "true"
+      GF_AUTH_GENERIC_OAUTH_NAME: "Keycloak"
+      GF_AUTH_GENERIC_OAUTH_CLIENT_ID: ${GRAFANA_OIDC_CLIENT_ID:?set GRAFANA_OIDC_CLIENT_ID in .env}
+      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: ${GRAFANA_OIDC_CLIENT_SECRET:?set GRAFANA_OIDC_CLIENT_SECRET in .env}
+      GF_AUTH_GENERIC_OAUTH_SCOPES: "openid profile email groups"
+      GF_AUTH_GENERIC_OAUTH_AUTH_URL: "https://portal.izatacore.com/keylogin/realms/pulse/protocol/openid-connect/auth"
+      GF_AUTH_GENERIC_OAUTH_TOKEN_URL: "https://portal.izatacore.com/keylogin/realms/pulse/protocol/openid-connect/token"
+      GF_AUTH_GENERIC_OAUTH_API_URL: "https://portal.izatacore.com/keylogin/realms/pulse/protocol/openid-connect/userinfo"
+      GF_AUTH_GENERIC_OAUTH_USE_PKCE: "true"
+      GF_AUTH_GENERIC_OAUTH_LOGIN_ATTRIBUTE_PATH: "preferred_username"
+      GF_AUTH_GENERIC_OAUTH_EMAIL_ATTRIBUTE_PATH: "email"
+      GF_AUTH_GENERIC_OAUTH_NAME_ATTRIBUTE_PATH: "name"
+      GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH: "contains(groups[*], '/pulse/admin') && 'Admin' || contains(groups[*], '/pulse/home/analytics-admin') && 'Editor' || 'Viewer'"
+      GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP: "true"
+      GF_AUTH_GENERIC_OAUTH_SKIP_ORG_ROLE_SYNC: "true"
+      GF_AUTH_GENERIC_OAUTH_AUTO_LOGIN: "false"
+      GF_AUTH_DISABLE_LOGIN_FORM: "false"
+      GF_AUTH_SIGNOUT_REDIRECT_URL: "https://portal.izatacore.com/keylogin/realms/pulse/protocol/openid-connect/logout"
+      GF_WHITE_LABELING_APP_TITLE: Pulse Analytics
+      GF_WHITE_LABELING_LOGIN_TITLE: Pulse Analytics
+      GF_WHITE_LABELING_LOGIN_SUBTITLE: Analytics e observabilidade da plataforma Pulse
+      GF_WHITE_LABELING_LOGIN_LOGO: /public/img/pulse-logo-dark.svg
+      GF_WHITE_LABELING_FAV_ICON: /public/img/pulse-fav32.png
+      TZ: America/Sao_Paulo
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./grafana/branding/pulse-logo-dark.svg:/usr/share/grafana/public/img/pulse-logo-dark.svg:ro
+      - ./grafana/branding/pulse-logo-light.svg:/usr/share/grafana/public/img/pulse-logo-light.svg:ro
+      - ./grafana/branding/pulse-icon.svg:/usr/share/grafana/public/img/pulse-icon.svg:ro
+      - ./grafana/branding/pulse-icon.svg:/usr/share/grafana/public/img/grafana_icon.svg:ro
+      - ./grafana/branding/pulse-icon.svg:/usr/share/grafana/public/img/grafana_icon.1e0deb6b.svg:ro
+      - ./grafana/branding/pulse-icon.svg:/usr/share/grafana/public/build/static/img/grafana_icon.1e0deb6b.svg:ro
+      - ./grafana/branding/pulse-logo-dark.svg:/usr/share/grafana/public/img/g8_login_dark.svg:ro
+      - ./grafana/branding/pulse-logo-light.svg:/usr/share/grafana/public/img/g8_login_light.svg:ro
+      - ./grafana/branding/pulse-logo-dark.svg:/usr/share/grafana/public/img/grafana_text_logo-dark.svg:ro
+      - ./grafana/branding/pulse-logo-light.svg:/usr/share/grafana/public/img/grafana_text_logo-light.svg:ro
+      - ./grafana/branding/pulse-logo-dark.svg:/usr/share/grafana/public/img/grafana_text_logo_dark.svg:ro
+      - ./grafana/branding/pulse-logo-light.svg:/usr/share/grafana/public/img/grafana_text_logo_light.svg:ro
+      - ./grafana/branding/pulse-fav32.png:/usr/share/grafana/public/img/fav32.png:ro
+      - ./grafana/branding/pulse-apple-touch-icon.png:/usr/share/grafana/public/img/apple-touch-icon.png:ro
+      - ./grafana/branding/pulse-icon.svg:/usr/share/grafana/public/img/grafana_mask_icon.svg:ro
+      - ./grafana/custom/css/grafana.dark.1e8d85816912aadbbba5.css:/usr/share/grafana/public/build/grafana.dark.1e8d85816912aadbbba5.css:ro
+      - ./grafana/custom/css/grafana.light.111a5a99fcebc0962ddc.css:/usr/share/grafana/public/build/grafana.light.111a5a99fcebc0962ddc.css:ro
+    networks:
+      - internal
+      - knowledge_metrics
+
+
+volumes:
+  prometheus-data:
+    external: true
+    name: data-stack_prometheus-data
+  grafana-data:
+    external: true
+    name: data-stack_grafana-data

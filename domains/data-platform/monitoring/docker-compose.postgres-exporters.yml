@@ -1,0 +1,121 @@
+name: pulse-postgres-exporters
+
+x-exporter: &exporter
+  image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
+  restart: unless-stopped
+  # Avoid exporting SQL text or server settings; retain DB, table, lock, WAL,
+  # transaction and cache statistics.
+  command:
+    - --config.file=/etc/postgres-exporter.yml
+    - --no-collector.settings
+    - --no-collector.stat_activity
+    - --no-collector.stat_statements
+    - --no-collector.wal
+  volumes:
+    - ./postgres-exporter.yml:/etc/postgres-exporter.yml:ro
+    - ./postgres-exporter-slow-queries.yml:/etc/postgres-exporter-slow-queries.yml:ro
+  environment: &exporter-environment
+    PG_EXPORTER_EXTEND_QUERY_PATH: /etc/postgres-exporter-slow-queries.yml
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  tmpfs:
+    - /tmp
+  logging: &default-logging
+    driver: json-file
+    options:
+      max-size: 5m
+      max-file: "2"
+
+services:
+  pg-exporter-warehouse:
+    <<: *exporter
+    container_name: pg-exporter-warehouse
+    environment:
+      <<: *exporter-environment
+      DATA_SOURCE_URI: data-platform-warehouse:5432/warehouse?sslmode=disable
+      DATA_SOURCE_USER: postgres_exporter
+      DATA_SOURCE_PASS: ${PG_EXPORTER_WAREHOUSE_PASSWORD:?set PG_EXPORTER_WAREHOUSE_PASSWORD}
+    networks: [data_stack]
+
+  pg-exporter-airflow:
+    <<: *exporter
+    container_name: pg-exporter-airflow
+    environment:
+      <<: *exporter-environment
+      DATA_SOURCE_URI: data-platform-airflow-postgres:5432/airflow?sslmode=disable
+      DATA_SOURCE_USER: postgres_exporter
+      DATA_SOURCE_PASS: ${PG_EXPORTER_AIRFLOW_PASSWORD:?set PG_EXPORTER_AIRFLOW_PASSWORD}
+    networks: [data_stack]
+
+  pg-exporter-weknora:
+    <<: *exporter
+    container_name: pg-exporter-weknora
+    environment:
+      <<: *exporter-environment
+      DATA_SOURCE_URI: WeKnora-postgres:5432/WeKnora?sslmode=disable
+      DATA_SOURCE_USER: postgres_exporter
+      DATA_SOURCE_PASS: ${PG_EXPORTER_WEKNORA_PASSWORD:?set PG_EXPORTER_WEKNORA_PASSWORD}
+    networks: [data_stack, knowledge_metrics]
+
+  pg-exporter-archive:
+    <<: *exporter
+    container_name: pg-exporter-archive
+    environment:
+      <<: *exporter-environment
+      DATA_SOURCE_URI: pulse-archive-postgres:5432/paperless?sslmode=disable
+      DATA_SOURCE_USER: postgres_exporter
+      DATA_SOURCE_PASS: ${PG_EXPORTER_ARCHIVE_PASSWORD:?set PG_EXPORTER_ARCHIVE_PASSWORD}
+    networks: [data_stack, archive]
+
+  pg-exporter-salus-erp:
+    <<: *exporter
+    container_name: pg-exporter-salus-erp
+    environment:
+      <<: *exporter-environment
+      DATA_SOURCE_URI: salus-demo-erp-postgres:5432/salus_erp_demo?sslmode=disable
+      DATA_SOURCE_USER: postgres_exporter
+      DATA_SOURCE_PASS: ${PG_EXPORTER_SALUS_ERP_PASSWORD:?set PG_EXPORTER_SALUS_ERP_PASSWORD}
+    networks: [data_stack, salus_erp]
+
+  pg-exporter-salus-lims:
+    <<: *exporter
+    container_name: pg-exporter-salus-lims
+    environment:
+      <<: *exporter-environment
+      DATA_SOURCE_URI: salus-demo-lims-postgres:5432/salus_ambiental_demo?sslmode=disable
+      DATA_SOURCE_USER: postgres_exporter
+      DATA_SOURCE_PASS: ${PG_EXPORTER_SALUS_LIMS_PASSWORD:?set PG_EXPORTER_SALUS_LIMS_PASSWORD}
+    networks: [data_stack, salus_lims]
+
+  pg-exporter-traccar:
+    <<: *exporter
+    container_name: pg-exporter-traccar
+    environment:
+      <<: *exporter-environment
+      DATA_SOURCE_URI: pulse-tracking-db:5432/traccar?sslmode=disable
+      DATA_SOURCE_USER: postgres_exporter
+      DATA_SOURCE_PASS: ${PG_EXPORTER_TRACCAR_PASSWORD:?set PG_EXPORTER_TRACCAR_PASSWORD}
+    networks: [data_stack, traccar]
+
+networks:
+  data_stack:
+    external: true
+    name: data-stack_internal
+  knowledge_metrics:
+    external: true
+    name: pulse-knowledge-metrics
+  archive:
+    external: true
+    name: pulse-archive_internal
+  salus_erp:
+    external: true
+    name: salus-demo_erp-internal
+  salus_lims:
+    external: true
+    name: salus-demo_lims-internal
+  traccar:
+    external: true
+    name: pulse-tracking_tracking-net

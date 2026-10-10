@@ -1,0 +1,213 @@
+name: data-stack
+
+x-airflow-environment: &airflow-environment
+  TZ: ${TZ:-America/Sao_Paulo}
+  AIRFLOW__CORE__EXECUTOR: LocalExecutor
+  AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+  AIRFLOW__LOGGING__BASE_LOG_FOLDER: /opt/airflow/logs
+  AIRFLOW__LOGGING__LOGGING_LEVEL: INFO
+  AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+  AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+  AIRFLOW__CORE__PARALLELISM: ${AIRFLOW_PARALLELISM:-4}
+  AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:?set AIRFLOW_FERNET_KEY in .env}
+  AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AF_PG_PASSWORD:?set AF_PG_PASSWORD in .env}@postgres-airflow:5432/airflow
+  AIRFLOW__API__SECRET_KEY: ${AIRFLOW_API_SECRET_KEY:?set AIRFLOW_API_SECRET_KEY in .env}
+  AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET:?set AIRFLOW_JWT_SECRET in .env}
+  AIRFLOW__API__BASE_URL: ${AIRFLOW_PUBLIC_BASE_URL:-http://localhost:18082}
+  AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/airflow/execution
+  AIRFLOW__CORE__ENABLE_PROXY_FIX: "true"
+  AIRFLOW__FAB__ENABLE_PROXY_FIX: "true"
+  AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+  AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: ${AIRFLOW_ADMIN_USER:-admin}:admin
+  AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: /opt/airflow/simple_auth_manager_passwords.json
+  AIRFLOW_OIDC_CLIENT_ID: ${AIRFLOW_OIDC_CLIENT_ID:?set AIRFLOW_OIDC_CLIENT_ID in .env}
+  AIRFLOW_OIDC_CLIENT_SECRET: ${AIRFLOW_OIDC_CLIENT_SECRET:?set AIRFLOW_OIDC_CLIENT_SECRET in .env}
+  S3_ENDPOINT: http://minio:9000
+  S3_ACCESS_KEY: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env}
+  S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
+
+x-airflow-common: &airflow-common
+  image: data-stack-airflow:demo
+  build:
+    context: ../../infra/airflow
+    dockerfile: Dockerfile
+  environment: *airflow-environment
+  user: "${AIRFLOW_UID:-50000}:${AIRFLOW_GID:-0}"
+  volumes:
+    - ./orchestration/dags:/opt/airflow/dags:ro
+    - airflow-logs:/opt/airflow/logs
+    - airflow-plugins:/opt/airflow/plugins
+    - ./secrets/simple_auth_manager_passwords.json:/opt/airflow/simple_auth_manager_passwords.json
+    - ./webserver_config.py:/opt/airflow/webserver_config.py:ro
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  networks:
+    - internal
+  restart: unless-stopped
+  logging: &default-logging
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "3"
+
+networks:
+  internal:
+    name: data-stack_internal
+    driver: bridge
+
+volumes:
+  warehouse-data:
+  airflow-postgres-data:
+  airflow-logs:
+  airflow-plugins:
+  minio-data:
+
+services:
+  warehouse-postgres:
+    image: postgres:16
+    container_name: data-platform-warehouse
+    profiles: [collection]
+    environment:
+      TZ: ${TZ:-America/Sao_Paulo}
+      POSTGRES_DB: ${PG_DB:-warehouse}
+      POSTGRES_USER: ${PG_USER:-warehouse}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:?set PG_PASSWORD in .env}
+    ports:
+      - "${DATA_PG_BIND:-127.0.0.1}:${DATA_PG_PORT:-15432}:5432"
+    volumes:
+      - warehouse-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks: [internal]
+    logging: *default-logging
+
+  postgres-airflow:
+    image: postgres:16
+    container_name: data-platform-airflow-postgres
+    profiles: [collection]
+    environment:
+      TZ: ${TZ:-America/Sao_Paulo}
+      POSTGRES_DB: airflow
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: ${AF_PG_PASSWORD:?set AF_PG_PASSWORD in .env}
+    volumes:
+      - airflow-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U airflow -d airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks: [internal]
+    logging: *default-logging
+
+  minio:
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    container_name: data-platform-minio
+    profiles: [collection]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
+      MINIO_BROWSER_REDIRECT_URL: http://localhost:${MINIO_CONSOLE_PORT:-19001}/
+    command: server --address ":9000" --console-address ":9001" /data
+    ports:
+      - "${MINIO_BIND:-127.0.0.1}:${MINIO_API_PORT:-19000}:9000"
+      - "${MINIO_BIND:-127.0.0.1}:${MINIO_CONSOLE_PORT:-19001}:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: [CMD, mc, ready, local]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+    networks: [internal]
+    logging: *default-logging
+
+  minio-init:
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    container_name: data-platform-minio-init
+    profiles: [collection]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
+    entrypoint: [sh, -ec]
+    command:
+      - |
+        mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"
+        for bucket in bronze silver gold backups fileupload utilidades; do
+          mc mb --ignore-existing "local/$${bucket}"
+        done
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: "no"
+    networks: [internal]
+    logging: *default-logging
+
+  airflow-init:
+    <<: *airflow-common
+    container_name: data-platform-airflow-init
+    profiles: [collection]
+    restart: "no"
+    depends_on:
+      postgres-airflow:
+        condition: service_healthy
+    command: [bash, -lc, "airflow db migrate"]
+
+  airflow-apiserver:
+    <<: *airflow-common
+    container_name: data-platform-airflow-api
+    profiles: [collection]
+    ports:
+      - "127.0.0.1:${AIRFLOW_API_PORT:-18082}:8080"
+    depends_on:
+      postgres-airflow:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    command: [airflow, api-server]
+    healthcheck:
+      test: [CMD-SHELL, "curl -sf http://localhost:8080/api/v2/monitor/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: data-platform-airflow-scheduler
+    profiles: [collection]
+    depends_on:
+      postgres-airflow:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    command: [airflow, scheduler]
+
+  airflow-dag-processor:
+    <<: *airflow-common
+    container_name: data-platform-airflow-dag-processor
+    profiles: [collection]
+    depends_on:
+      postgres-airflow:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    command: [airflow, dag-processor]
+
+  airflow-triggerer:
+    <<: *airflow-common
+    container_name: data-platform-airflow-triggerer
+    profiles: [collection]
+    depends_on:
+      postgres-airflow:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    command: [airflow, triggerer]

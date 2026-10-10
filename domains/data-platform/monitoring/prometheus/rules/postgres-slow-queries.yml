@@ -1,0 +1,11 @@
+groups:
+  - name: postgresql-slow-queries
+    rules:
+      - alert: PostgreSQLSlowQueryOverThreshold
+        expr: sum by (database_service, datname, threshold_seconds) (pg_slow_queries_slow_query_count{job="postgres_exporters"}) > 0
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Consulta PostgreSQL acima do limite"
+          description: "{{ $labels.database_service }}/{{ $labels.datname }} tem {{ $value }} consulta(s) ativa(s) acima de {{ $labels.threshold_seconds }}s. O texto SQL não é coletado."

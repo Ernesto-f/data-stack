@@ -1,0 +1,112 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(110, 203, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "weknora-metrics" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "format": "table", "rawSql": "SELECT knowledge_bases AS value FROM grafana_readonly.knowledge_summary;", "refId": "A" }],
+      "title": "Bases de conhecimento",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "weknora-metrics" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+      "id": 2,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "format": "table", "rawSql": "SELECT documents AS value FROM grafana_readonly.knowledge_summary;", "refId": "A" }],
+      "title": "Documentos",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "weknora-metrics" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+      "id": 3,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "format": "table", "rawSql": "SELECT completed AS value FROM grafana_readonly.knowledge_summary;", "refId": "A" }],
+      "title": "Processados",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "weknora-metrics" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+      "id": 4,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "format": "table", "rawSql": "SELECT failed AS value FROM grafana_readonly.knowledge_summary;", "refId": "A" }],
+      "title": "Falhas no processamento",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "weknora-metrics" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 5 },
+      "id": 5,
+      "options": { "displayLabels": ["name", "value"], "legend": { "displayMode": "list", "placement": "right", "showLegend": true }, "pieType": "donut", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true }, "tooltip": { "mode": "single", "sort": "none" } },
+      "targets": [{ "format": "table", "rawSql": "SELECT parse_status, documents FROM grafana_readonly.knowledge_parse_status ORDER BY documents DESC;", "refId": "A" }],
+      "title": "Documentos por status",
+      "type": "piechart"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "weknora-metrics" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 4, "showPoints": "auto", "spanNulls": false }, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 16, "x": 8, "y": 5 },
+      "id": 6,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [{ "format": "time_series", "rawSql": "SELECT created_day AS time, parse_status AS metric, documents AS value FROM grafana_readonly.knowledge_daily_ingestion WHERE $__timeFilter(created_day) ORDER BY 1, 2;", "refId": "A" }],
+      "title": "Ingestão diária por status",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "weknora-metrics" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 13 },
+      "id": 7,
+      "options": { "showHeader": true, "sortBy": [{ "desc": true, "displayName": "documents" }] },
+      "targets": [{ "format": "table", "rawSql": "SELECT file_type, documents FROM grafana_readonly.knowledge_file_types ORDER BY documents DESC;", "refId": "A" }],
+      "title": "Documentos por tipo de arquivo",
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "weknora-metrics" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 13 },
+      "id": 8,
+      "options": { "showHeader": true, "sortBy": [{ "desc": true, "displayName": "runs" }] },
+      "targets": [{ "format": "table", "rawSql": "SELECT stage, status, runs, avg_duration_ms, last_seen FROM grafana_readonly.processing_stages ORDER BY last_seen DESC NULLS LAST;", "refId": "A" }],
+      "title": "Etapas do pipeline",
+      "type": "table"
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "tags": ["Pulse", "Knowledge", "WeKnora"],
+  "templating": { "list": [] },
+  "time": { "from": "now-30d", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Pulse Knowledge — Visão geral",
+  "uid": "pulse-knowledge-overview",
+  "version": 1
+}
