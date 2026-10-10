@@ -12,6 +12,9 @@ jobs:
 
       # Valida YAMLs (compose, prometheus, etc.)
       - uses: ibiqlik/action-yamllint@v3
+        with:
+          config_file: .yamllint
+          strict: false
 
       # Validate supported Compose files with committed, non-secret examples.
       - name: Validate Compose files
