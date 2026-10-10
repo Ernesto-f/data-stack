@@ -1,0 +1,44 @@
+# An aggregate-only sentinel. Query text, SQL literals, usernames and
+# application names are intentionally not selected or exported.
+pg_slow_queries:
+  query: |
+    SELECT
+      datname,
+      count(*)::float AS slow_query_count,
+      max(extract(epoch FROM clock_timestamp() - query_start))::float AS max_duration_seconds,
+      coalesce(nullif(current_setting('pulse.slow_query_threshold_seconds', true), '')::integer, 180)::text AS threshold_seconds
+    FROM pg_catalog.pg_stat_activity
+    WHERE pid <> pg_backend_pid()
+      AND backend_type = 'client backend'
+      AND state = 'active'
+      AND query_start IS NOT NULL
+      AND usename <> current_user
+      AND clock_timestamp() - query_start >= make_interval(
+        secs => coalesce(nullif(current_setting('pulse.slow_query_threshold_seconds', true), '')::double precision, 180)
+      )
+    GROUP BY datname
+  metrics:
+    - datname:
+        usage: LABEL
+        description: Database containing active statements over the configured threshold
+    - threshold_seconds:
+        usage: LABEL
+        description: Configured slow-query threshold in seconds
+    - slow_query_count:
+        usage: GAUGE
+        description: Number of active statements whose query_start exceeds the configured threshold
+    - max_duration_seconds:
+        usage: GAUGE
+        description: Longest active statement duration in seconds
+
+pg_slow_query_config:
+  query: |
+    SELECT current_database() AS datname,
+           coalesce(nullif(current_setting('pulse.slow_query_threshold_seconds', true), '')::integer, 180) AS threshold_seconds
+  metrics:
+    - datname:
+        usage: LABEL
+        description: Database used by this exporter target
+    - threshold_seconds:
+        usage: GAUGE
+        description: Configured slow-query threshold in seconds

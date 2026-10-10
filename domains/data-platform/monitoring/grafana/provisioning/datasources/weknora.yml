@@ -1,0 +1,21 @@
+apiVersion: 1
+
+datasources:
+  - name: Pulse Knowledge (read-only)
+    uid: weknora-metrics
+    type: grafana-postgresql-datasource
+    access: proxy
+    url: WeKnora-postgres:5432
+    user: grafana_knowledge_reader
+    database: WeKnora
+    isDefault: false
+    editable: false
+    jsonData:
+      postgresVersion: 1700
+      sslmode: disable
+      timescaledb: false
+      maxOpenConns: 5
+      maxIdleConns: 2
+      connMaxLifetime: 14400
+    secureJsonData:
+      password: $GRAFANA_WEKNORA_DB_PASSWORD

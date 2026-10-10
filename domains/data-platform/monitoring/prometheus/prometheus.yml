@@ -1,0 +1,56 @@
+global:
+  scrape_interval: 30s
+  scrape_timeout: 10s
+  evaluation_interval: 30s
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+scrape_configs:
+
+  # Prometheus da VPS
+  - job_name: "prometheus"
+    static_configs:
+      - targets:
+          - "prometheus:9090"
+        labels:
+          servidor: "demo-dev-vps"
+          componente: "prometheus"
+
+  # Node Exporter do host VPS
+  - job_name: "vm_node"
+    static_configs:
+      - targets:
+          - "host.docker.internal:9100"
+        labels:
+          servidor: "demo-dev-vps"
+          tipo: "vm"
+
+  # cAdvisor da VPS
+  # Coleta CPU, RAM, rede, filesystem e I/O por container Docker na VM.
+  - job_name: "vm_cadvisor"
+    static_configs:
+      - targets:
+          - "cadvisor-vm:8080"
+        labels:
+          servidor: "demo-dev-vps"
+          tipo: "docker"
+          componente: "cadvisor"
+
+  # PostgreSQL / ParadeDB / TimescaleDB — exporters internos, sem portas no host.
+  - job_name: "postgres_exporters"
+    static_configs:
+      - targets: ["pg-exporter-warehouse:9187"]
+        labels: {database_service: "warehouse", database_kind: "analytics"}
+      - targets: ["pg-exporter-airflow:9187"]
+        labels: {database_service: "airflow-metadata", database_kind: "metadata"}
+      - targets: ["pg-exporter-weknora:9187"]
+        labels: {database_service: "weknora-paradedb", database_kind: "vector-search"}
+      - targets: ["pg-exporter-archive:9187"]
+        labels: {database_service: "pulse-archive", database_kind: "documents"}
+      - targets: ["pg-exporter-salus-erp:9187"]
+        labels: {database_service: "salus-erp-demo", database_kind: "odoo"}
+      - targets: ["pg-exporter-salus-lims:9187"]
+        labels: {database_service: "salus-lims-demo", database_kind: "odoo"}
+      - targets: ["pg-exporter-traccar:9187"]
+        labels: {database_service: "pulse-tracking-timescale", database_kind: "timescale"}
