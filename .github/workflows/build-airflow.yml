@@ -4,6 +4,7 @@ on:
     branches: [ main ]
     paths:
       - 'infra/airflow/**'
+      - 'domains/data-platform/**'
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository }}/airflow
