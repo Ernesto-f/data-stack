@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#07111f" />
+    <link rel="icon" type="image/png" href="/pulse-fav32.png" />
+    <title>Pulse Portal</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #07111f;
+        --panel: #0e2033;
+        --line: #1e3a55;
+        --text: #eff7ff;
+        --muted: #a8bdd1;
+        --pulse: #8f1d2c;
+        --cyan: #6ecbff;
+        --green: #5fe0a1;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        min-height: 100vh;
+        margin: 0;
+        padding: clamp(20px, 4vw, 56px);
+        color: var(--text);
+        background:
+          radial-gradient(900px 520px at 8% -5%, #19517b66, transparent 62%),
+          radial-gradient(700px 400px at 100% 5%, #8f1d2c38, transparent 60%),
+          linear-gradient(145deg, #050b13, var(--bg) 52%, #0c1730);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+
+      .shell { width: min(1120px, 100%); margin: 0 auto; }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 42px;
+      }
+
+      .brand { display: flex; align-items: center; gap: 16px; }
+      .brand-logo { display: block; width: 148px; height: auto; }
+      .mark {
+        display: grid;
+        width: 58px;
+        height: 58px;
+        place-items: center;
+        border: 1px solid #d45a6b66;
+        border-radius: 17px;
+        background: linear-gradient(145deg, #a42a3b, #5f1422);
+        box-shadow: 0 12px 34px #8f1d2c40;
+      }
+      .mark svg { width: 38px; height: 38px; }
+      .brand-name { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -.04em; }
+      .brand-subtitle { margin: 4px 0 0; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; }
+      .environment {
+        padding: 9px 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: #c5d6e7;
+        background: #0d2035bb;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+      }
+
+      .hero {
+        margin-bottom: 28px;
+        padding: clamp(25px, 4vw, 40px);
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background: linear-gradient(115deg, #102842ee, #101c34ee);
+        box-shadow: 0 20px 54px #0005;
+      }
+      .eyebrow { color: var(--cyan); font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+      h1 { margin: 12px 0 10px; font-size: clamp(31px, 5vw, 48px); letter-spacing: -.045em; }
+      .hero p { max-width: 700px; margin: 0; color: #b5c9dc; font-size: 15px; line-height: 1.6; }
+
+      .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 22px 0 18px; }
+      .search {
+        width: min(420px, 100%);
+        padding: 12px 15px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        outline: none;
+        color: var(--text);
+        background: #091726cc;
+        font: inherit;
+      }
+      .search:focus { border-color: #6ecbff99; box-shadow: 0 0 0 3px #6ecbff1f; }
+      .count { color: var(--muted); font-size: 12px; }
+
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; }
+      .card {
+        --accent: var(--cyan);
+        position: relative;
+        display: flex;
+        min-height: 178px;
+        flex-direction: column;
+        padding: 19px;
+        overflow: hidden;
+        border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+        border-radius: 17px;
+        color: inherit;
+        background: linear-gradient(150deg, #112840, #0c1b2d);
+        text-decoration: none;
+        transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+      }
+      a.card:hover { transform: translateY(-3px); border-color: var(--accent); box-shadow: 0 16px 38px #0005; }
+      .card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+      .icon {
+        display: grid;
+        width: 43px;
+        height: 43px;
+        place-items: center;
+        border: 1px solid color-mix(in srgb, var(--accent) 42%, transparent);
+        border-radius: 13px;
+        color: var(--accent);
+        background: color-mix(in srgb, var(--accent) 13%, transparent);
+        font-size: 19px;
+        font-weight: 800;
+      }
+      .status { color: #a9c2d8; font-size: 10px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+      .status::before { display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--green); content: ""; }
+      .card h2 { margin: 15px 0 6px; font-size: 16px; }
+      .card p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+      .open { margin-top: auto; padding-top: 15px; color: var(--accent); font-size: 11px; font-weight: 800; }
+      .pending { --accent: #c5a9fa; opacity: .72; }
+      .pending .status::before { background: #f3c86a; }
+      .pending .open { color: #f3c86a; }
+      .pending:hover { transform: none; box-shadow: none; }
+
+      footer { margin-top: 26px; padding-top: 17px; border-top: 1px solid var(--line); color: #819ab1; font-size: 11px; }
+
+      @media (max-width: 620px) {
+        body { padding: 18px 14px; }
+        header { align-items: flex-start; margin-bottom: 27px; }
+        .environment { font-size: 9px; }
+        .toolbar { align-items: flex-start; flex-direction: column; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header>
+        <div class="brand">
+          <img class="brand-logo" src="/pulse-logo.svg" alt="Pulse" />
+        <div>
+            <p class="brand-name">Portal</p>
+            <p class="brand-subtitle">Seu ecossistema conectado</p>
+        </div>
+      </div>
+        <span class="environment">Inteligência · Dados · Automação</span>
+      </header>
+
+      <section class="hero">
+        <div class="eyebrow">Pulse · Plataforma de soluções</div>
+        <h1>Uma operação mais conectada começa aqui.</h1>
+        <p>Explore soluções que transformam documentos em conhecimento, dados em decisões e processos em fluxos automatizados.</p>
+      </section>
+
+      <div class="toolbar">
+        <input class="search" id="service-search" type="search" placeholder="Buscar serviço…" aria-label="Buscar serviço" />
+         <span class="count" id="service-count">9 serviços</span>
+      </div>
+
+      <section class="grid" id="service-grid" aria-label="Serviços disponíveis">
+        <a class="card" style="--accent:#70c8ff" href="https://knowledge.izatacore.com" target="_blank" rel="noopener noreferrer" data-search="samia rag conhecimento documentos weknora">
+          <div class="card-top"><span class="icon">S</span><span class="status">Disponível</span></div>
+          <h2>Samia</h2><p>Encontre respostas e conhecimento dentro dos seus documentos.</p><span class="open">Explorar conhecimento ↗</span>
+        </a>
+        <a class="card" style="--accent:#ffae52" href="https://analytics.izatacore.com" target="_blank" rel="noopener noreferrer" data-search="pulse analytics grafana dashboards observabilidade">
+          <div class="card-top"><span class="icon">A</span><span class="status">Disponível</span></div>
+          <h2>Pulse Analytics</h2><p>Transforme indicadores em visibilidade para agir com confiança.</p><span class="open">Explorar indicadores ↗</span>
+        </a>
+        <a class="card" style="--accent:#58dda0" href="https://automation.izatacore.com" target="_blank" rel="noopener noreferrer" data-search="pulse automation airflow pipelines orquestracao">
+          <div class="card-top"><span class="icon">A</span><span class="status">Disponível</span></div>
+          <h2>Pulse Automation</h2><p>Orquestre pipelines e mantenha seus fluxos de dados em movimento.</p><span class="open">Automatizar processos ↗</span>
+        </a>
+        <a class="card" style="--accent:#ff7582" href="https://datalogger.izatacore.com" target="_blank" rel="noopener noreferrer" data-search="pulse datalogger node red automacao integracao plc">
+          <div class="card-top"><span class="icon">D</span><span class="status">Disponível</span></div>
+          <h2>Pulse DataLogger</h2><p>Conecte equipamentos e capture dados da operação industrial.</p><span class="open">Conectar operação ↗</span>
+        </a>
+        <a class="card" style="--accent:#e66a86" href="https://tracking.izatacore.com" target="_blank" rel="noopener noreferrer" data-search="pulse tracking rastreamento gps frota veículos ativos traccar">
+          <div class="card-top"><span class="icon">T</span><span class="status">Disponível</span></div>
+          <h2>Pulse Tracking</h2><p>Acompanhe veículos e ativos em tempo real, com posições, alertas e relatórios.</p><span class="open">Abrir rastreamento ↗</span>
+        </a>
+        <a class="card" style="--accent:#c49cff" href="https://smartetl.izatacore.com" target="_blank" rel="noopener noreferrer" data-search="pulse smartetl preprocessamento docetl documentos">
+          <div class="card-top"><span class="icon">E</span><span class="status">Disponível</span></div>
+          <h2>Pulse SmartETL</h2><p>Prepare documentos com IA para busca e análise mais precisas.</p><span class="open">Preparar documentos ↗</span>
+        </a>
+        <a class="card" style="--accent:#d788a0" href="https://archive.izatacore.com" target="_blank" rel="noopener noreferrer" data-search="pulse archive paperless documentos arquivo ocr">
+          <div class="card-top"><span class="icon">P</span><span class="status">Disponível</span></div>
+          <h2>Pulse Archive</h2><p>Centralize documentos com OCR, organização e busca em um só lugar.</p><span class="open">Abrir Archive ↗</span>
+        </a>
+        <a class="card" style="--accent:#68c7ff" href="/pulse-invoice/" data-search="pulse invoice nota fiscal nfse conferência revisão faturas">
+          <div class="card-top"><span class="icon">I</span><span class="status">MVP demo</span></div>
+          <h2>Pulse Invoice</h2><p>Extraia, confira e aprove notas fiscais de serviço com rastreabilidade.</p><span class="open">Abrir Pulse Invoice →</span>
+        </a>
+        <a class="card" style="--accent:#875a7b" href="https://crm.izatacore.com" target="_blank" rel="noopener noreferrer" data-search="pulse crm odoo leads oportunidades contatos vendas">
+          <div class="card-top"><span class="icon">C</span><span class="status">Demo interna</span></div>
+          <h2>Pulse CRM</h2><p>Organize contatos, oportunidades e atividades comerciais.</p><span class="open">Abrir CRM ↗</span>
+        </a>
+      </section>
+
+      <footer>Pulse · Tecnologia a serviço da sua operação</footer>
+    </main>
+    <script>
+      const search = document.getElementById("service-search");
+      const cards = [...document.querySelectorAll("#service-grid .card")];
+      const count = document.getElementById("service-count");
+      search.addEventListener("input", () => {
+        const query = search.value.trim().toLocaleLowerCase("pt-BR");
+        let visible = 0;
+        for (const card of cards) {
+          const matches = `${card.textContent} ${card.dataset.search || ""}`.toLocaleLowerCase("pt-BR").includes(query);
+          card.hidden = !matches;
+          if (matches) visible++;
+        }
+        count.textContent = `${visible} serviço${visible === 1 ? "" : "s"}`;
+      });
+    </script>
+  </body>
+</html>

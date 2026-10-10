@@ -1,75 +1,85 @@
-# CRM
+# Pulse CRM — Odoo Community
 
-Domínio reservado para um futuro CRM no ambiente demo/dev. Nenhuma aplicação, fornecedor, URL, client OIDC ou integração foi selecionada. Este documento registra a sequência de decisão e integração sem assumir uma plataforma específica.
+O Pulse CRM usa Odoo Community 19.0 com o aplicativo CRM e login OIDC pelo Keycloak Pulse. O ambiente é uma instância demo/dev interna; não é multi-tenant e não deve receber clientes externos.
 
-## Objetivo e limites
+| Item | Configuração |
+| --- | --- |
+| URL | `https://crm.izatacore.com` |
+| Keycloak client | `pulse-crm` |
+| Grupo obrigatório | `/pulse/home/crm` |
+| Odoo/PostgreSQL | Compose próprio; PostgreSQL 16 e Odoo publicados no host somente em `127.0.0.1:18095` |
+| OIDC | OCA `auth_oidc`, Authorization Code + PKCE, cliente confidencial |
 
-O CRM deve organizar empresas, contatos, oportunidades e atividades comerciais e, quando existir um contrato de integração claro, oferecer contexto comercial aos produtos Pulse. Não deve se tornar fonte de autorização para dados financeiros/documentais: cada produto continua responsável pelo próprio acesso e isolamento por tenant.
+## Autorização de usuários
 
-O CRM não está implantado. Não há contas de cliente, dados comerciais, credenciais ou integração ativa. Não anunciar URL nem conceder permissões como se o produto já existisse.
+O Nginx exige `/pulse/home/crm` antes de encaminhar tráfego ao Odoo. O addon `pulse_crm_sso` também confere o grupo no ID token, exige `email_verified=true` e valida o issuer Pulse. No primeiro login, ele vincula o `sub` Keycloak a exatamente um usuário Odoo interno, ativo e previamente criado com o mesmo e-mail verificado. Logins posteriores usam o `sub` estável.
 
-## Decisões antes da seleção
+O fluxo falha fechado se não encontrar exatamente um usuário elegível, se o e-mail não estiver verificado, se faltar o grupo ou se a identidade já estiver vinculada a outra conta. O SSO não cria usuários automaticamente nem concede funções do Odoo: administradores do Odoo provisionam usuários internos e atribuem grupos locais do CRM. O perfil de usuário e seus grupos locais continuam sendo a autorização efetiva dentro do Odoo.
 
-Registrar requisitos e aprovadores para:
+## OIDC e confiança
 
-1. Usuários e processo: número de equipes, pipeline, atividades, importação/exportação, automação e relatórios.
-2. Hospedagem e operação: SaaS versus instalação controlada, residência/região de dados, backup, disponibilidade, atualização e custo total.
-3. Segurança: OIDC/SAML, MFA, SCIM ou provisionamento manual, RBAC, auditoria, retenção, exportação e exclusão de dados.
-4. Multi-tenancy: se o CRM será exclusivamente interno (preferível para o primeiro corte) ou terá acesso de clientes. Se houver portal de cliente, definir isolamento de registros por organização e provar acesso cruzado negado.
-5. Integração: APIs/webhooks, limites, idempotência, versionamento, autenticação serviço-a-serviço e tratamento de falhas.
-6. Modelo de dados: identificador imutável da organização/tenant, regras para duplicatas e correspondência CRM ↔ tenant Pulse; não usar e-mail como chave de autorização.
+O client Keycloak é `pulse-crm`, confidential, com Standard Flow habilitado e redirect URI exato:
 
-Documentar as alternativas avaliadas, evidências, custo e decisão aprovada antes de criar infraestrutura ou registrar dados reais.
+```text
+https://crm.izatacore.com/auth_oauth/signin
+```
 
-## Identidade e autorização planejadas
+O OCA `auth_oidc` implementa o fluxo Authorization Code com PKCE e valida assinatura RS256, audiência e validade do ID token. O addon Pulse ainda exige o issuer `https://portal.izatacore.com/keylogin/realms/pulse`, o grupo de CRM e e-mail verificado. O código do OCA `server-auth` é obtido por commit fixado no `Dockerfile`; o módulo `auth_oidc` é Beta e AGPL-3. Revise a versão/licença antes de atualizar o pin.
 
-- Usar realm `pulse` com client OIDC próprio e redirect URIs exatos, se o CRM suportar OIDC. Se usar SaaS sem federação adequada, documentar a exceção, MFA, ciclo de vida e fronteira de credenciais.
-- Separar grupos de função comercial (por exemplo, usuário, gerente e operador) dos grupos de acesso de aplicação e dos grupos/IDs de tenant. Os nomes são exemplos, não grupos existentes.
-- Começar com acesso interno e leitura/escrita limitadas a equipes aprovadas. Não conceder `/pulse/admin` para acesso rotineiro ao CRM.
-- Criar, alterar e desativar usuários por processo rastreável; alinhar desligamento do Keycloak e do CRM. Provisionamento manual deve ter dono e revisão periódica até eventual automação.
-- Nunca confiar num `tenant_key` informado pelo navegador ou enviado por CRM para autorizar Invoice, Archive, Analytics ou Samia. O backend do produto deve validar a identidade/associação e aplicar suas próprias políticas.
+### Registrar o client no Keycloak
 
-## Plano de implantação em fases
+1. No arquivo privado `/srv/data-stack/infra/.env.auth`, definir `ODOO_OIDC_CLIENT_ID=pulse-crm` e criar `ODOO_OIDC_CLIENT_SECRET` aleatório e exclusivo.
+2. Executar `python3 /srv/data-stack/infra/keycloak/bootstrap_realm.py`. Ele cria o client e o grupo `/pulse/home/crm`; não copiar o segredo para Git, tickets ou comandos exibidos em logs.
+3. Provisionar o usuário operador com `/pulse/home/crm` usando `infra/keycloak/create_user.py`.
 
-### Fase 0 — Descoberta e decisão
+### Configurar o provider Odoo
 
-Validar requisitos, fornecedor, modelo de hospedagem, classificação dos dados, base legal/consentimento de contatos, custos, responsáveis e critérios de saída. Aprovar mapa de dados e modelo de organização antes da importação.
+O módulo cria o provider **Pulse SSO** desabilitado. No Odoo, entre como administrador local, ative o modo desenvolvedor e abra **Settings → Users & Companies → OAuth Providers**, informe o segredo privado do client e habilite o provider. Confirme:
 
-### Fase 1 — Piloto interno
+- Auth Flow: **OpenID Connect (authorization code flow)**
+- Client ID: `pulse-crm`
+- Scope: `openid email profile`
+- Authorization URL: `https://portal.izatacore.com/keylogin/realms/pulse/protocol/openid-connect/auth`
+- Token URL: `https://portal.izatacore.com/keylogin/realms/pulse/protocol/openid-connect/token`
+- JWKS URL: `https://portal.izatacore.com/keylogin/realms/pulse/protocol/openid-connect/certs`
+- Body/button: `Entrar com Pulse`
 
-Implantar em ambiente demo/dev separado, com dados sintéticos. Configurar SSO/MFA quando suportado, funções mínimas, auditoria, backup/restauração e processo de conta. Testar desativação, exportação e exclusão. Sem acesso de cliente e sem sincronização para outros produtos.
+O client scope `groups` é adicionado por padrão pelo bootstrap compartilhado Keycloak; a claim com caminhos completos permite que Odoo e Nginx exijam `/pulse/home/crm`.
 
-### Fase 2 — Integrações controladas
+## Inicialização demo/dev
 
-Priorizar integrações somente leitura e com benefício definido:
+Na VPS, com o repositório em `/srv/data-stack`:
 
-| Sistema | Integração possível | Limite obrigatório |
-| --- | --- | --- |
-| Portal | Link contextual para ficha/conta ou acesso a aplicação | O Portal continua sendo navegação/SSO; o CRM verifica seu próprio papel. |
-| Pulse Invoice | Exibir referência comercial/estado agregado autorizado | Sem PDF, OCR, valores ou endpoints de cliente até contrato de dados e tenant validado; não usar o CRM para escolher o tenant da API. |
-| Pulse Archive | Referência a documentos autorizados ou metadados mínimos | Sem links públicos/signed URL persistentes; checar ACL no Archive a cada acesso. |
-| Samia | Busca contextual opcional sobre conteúdo explicitamente autorizado | Isolar tenant e aplicar permissões documentais; não indexar contatos/notas sem aprovação. |
-| Analytics | Relatórios agregados e filtrados por função/tenant | Grafana atual é interno; não conectar o CRM a dashboards de clientes sem RBAC/filtro validado. |
-| Automation/Airflow | Eventos de negócio com allowlist e idempotência | Não disparar gravações em PLC/DB nem DAGs produtivas a partir do CRM sem revisão e mecanismo de pausa. |
+```bash
+cd /srv/data-stack/domains/crm
+bash ./setup-secrets.sh
+docker compose build odoo
+bash ./initialize-db.sh
+bash ./deploy.sh
+```
 
-### Fase 3 — Produção por cliente (se necessária)
+`setup-secrets.sh` cria `.env` e `config/odoo.conf` locais com permissões restritas. `initialize-db.sh` instala `crm`, `auth_oidc` e `pulse_crm_sso` numa base nova e define a senha inicial do administrador local. Execute-o somente uma vez; ele recusa bases existentes para não sobrescrever a senha do administrador. `deploy.sh` inicia os serviços depois da configuração inicial.
 
-Definir responsável contratual e operacional, ambientes e credenciais separados, tenant mapping confiável, SLA, monitoramento, restauração, retenção/exclusão e suporte. Executar teste de autorização negativa entre duas organizações antes de importar dados reais ou ativar usuários externos.
+O arquivo `nginx/crm.izatacore.com.conf` configura TLS, gate Keycloak/OAuth2 Proxy e proxy para `127.0.0.1:18095`. Instale-o no Nginx do host, valide com `nginx -t` e recarregue o serviço. O serviço Odoo não publica porta em interfaces externas e o PostgreSQL não publica porta no host.
 
-## Contrato técnico para integrações
+Após subir o CRM:
 
-- Preferir chamadas backend-a-backend com credenciais próprias por integração, escopo mínimo, rotação e revogação documentadas; nunca embutir segredo em frontend.
-- Definir dono e finalidade de cada campo sincronizado, fonte de verdade, direção do fluxo, frequência, retenção e procedimento de correção/exclusão.
-- Usar IDs externos imutáveis, idempotência, paginação, limites de taxa, validação de assinatura de webhook e fila/retry com dead-letter quando apropriado.
-- Minimizar dados pessoais. Evitar sincronizar documentos, OCR ou conteúdo financeiro quando bastar um identificador/estado agregado.
-- Registrar eventos de auditoria sem tokens, senhas, PDFs, conteúdo de notas ou dados pessoais desnecessários.
-- Falhas de CRM não podem ampliar autorização nem bloquear a revogação de acesso a dados nos produtos Pulse.
+1. Adicione o operador Odoo como usuário **Internal User** e atribua os grupos Sales/CRM apropriados.
+2. Para o primeiro acesso administrativo, use o login local `admin` e a senha inicial `CRM_INITIAL_ADMIN_PASSWORD` do `.env` privado do CRM. Crie um usuário interno pessoal; não compartilhe a conta `admin`.
+3. Confirme que o e-mail do usuário Odoo corresponde ao e-mail verificado no Keycloak.
+4. Entre em `https://crm.izatacore.com` com uma identidade no grupo `/pulse/home/crm` e escolha **Entrar com Pulse**.
+5. Confirme que o Odoo vinculou essa identidade somente ao usuário interno provisionado. Teste também usuário sem grupo, e-mail não verificado e usuário Odoo ausente: todos devem ser negados.
 
-## Checklist para liberar cada fase
+## Dados e operação
 
-- Decisão de produto e responsável aprovados; URL e ambiente documentados.
-- Login, MFA, funções e desativação testados; grupos/claims conferidos no client correto.
-- Dados sintéticos primeiro; teste cruzado de organização/tenant falha fechado.
-- Fluxos de exportação, exclusão, backup/restauração e auditoria exercitados.
-- Integrações têm escopo, dono, rate limit, idempotência, rotação e plano de desligamento.
-- Guia de demonstração atualizado em `../GUIA-OPERACIONAL-DE-DEMO-E-ACESSOS.md`.
+- Use apenas dados sintéticos/autorizados. Não importar listas de clientes reais para a demonstração.
+- CRM é interno; Odoo ACLs e grupos locais não equivalem a isolamento entre organizações.
+- Invoice, Archive, Samia e Analytics mantêm suas próprias políticas. O CRM não escolhe `tenant_key` e não recebe tokens de serviço desses produtos.
+- Não publicar a interface de administração Odoo, o PostgreSQL, o `.env` nem `config/odoo.conf`.
+- Para verificar estado: `docker compose ps`; para logs: `docker compose logs -f odoo crm-db`.
+- Preserve os volumes `crm-db-data` e `crm-odoo-data`. Não execute `docker compose down -v` sem backup aprovado.
+- Dados de produção de cliente devem ir para infraestrutura e banco separados, nunca para este Compose demo/dev.
+
+## Integrações futuras
+
+Começar por links contextuais e integração backend somente leitura. Antes de sincronizar empresas, contatos ou oportunidades com outros produtos, definir dono e finalidade de cada campo, consentimento/retention, IDs imutáveis, idempotência, escopos de serviço e testes de autorização negativa. O CRM não é fonte de autorização para dados documentais ou financeiros.

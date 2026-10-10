@@ -1,0 +1,14 @@
+[options]
+admin_passwd = REPLACED_BY_setup-secrets.sh
+addons_path = /usr/lib/python3/dist-packages/odoo/addons,/mnt/extra-addons
+db_host = crm-db
+db_port = 5432
+db_user = REPLACED_BY_setup-secrets.sh
+db_password = REPLACED_BY_setup-secrets.sh
+db_name = pulse_crm_demo
+dbfilter = ^pulse_crm_demo$
+list_db = False
+proxy_mode = True
+without_demo = all
+workers = 0
+max_cron_threads = 1

@@ -10,5 +10,6 @@ Catálogo de acesso às aplicações demo/dev da IzataCore. A página é servida
 - Pulse DataLogger — `datalogger.izatacore.com`
 - Pulse SmartETL — `smartetl.izatacore.com`
 - Pulse Archive — `archive.izatacore.com`
+- Pulse CRM — `crm.izatacore.com`
 
 Esta versão enxuta do **Pulse Portal** usa links para os subdomínios atuais. Os produtos integrados usam identidades individuais do Keycloak e grupos de acesso específicos por serviço.

@@ -26,5 +26,8 @@ domains/automation/.htpasswd*
 domains/automation/data/
 domains/archive/.env
 domains/archive/data/
+domains/crm/.env
+domains/crm/config/odoo.conf
+domains/crm/data/
 infra/airflow/auth/simple_auth_manager_passwords.json
 infra/airflow/simple_auth_manager_passwords.json.generated

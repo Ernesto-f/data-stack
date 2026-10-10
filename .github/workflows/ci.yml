@@ -21,19 +21,24 @@ jobs:
         run: |
           docker compose --env-file domains/data-platform/.env.example -f domains/data-platform/docker-compose.yml config --quiet
           docker compose --env-file domains/data-platform/.env.example -f domains/data-platform/monitoring/docker-compose.monitoring.yml config --quiet
+          CRM_ENV_FILE=.env.example docker compose --env-file domains/crm/.env.example -f domains/crm/docker-compose.yml config --quiet
           AUTH_ENV_FILE=.env.auth.example docker compose --env-file infra/.env.auth.example -f infra/compose.auth.yml config --quiet
           docker compose --env-file infra/.env.apextools.example -f infra/compose.apextools.yml config --quiet
 
-      # Lint Dockerfiles (Airflow/Superset)
+      # Lint Dockerfiles (Airflow/CRM)
       - uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: infra/airflow/Dockerfile
+      - uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: domains/crm/Dockerfile
 
       # Python: checa os pipelines da plataforma de dados
       - uses: actions/setup-python@v5
         with: { python-version: '3.11' }
       - run: pip install ruff pytest -r domains/pulse-invoice/api/requirements.txt
-      - run: ruff check --select E4,E7,E9,F infra/keycloak/bootstrap_realm.py
+      - run: ruff check --select E4,E7,E9,F infra/keycloak/bootstrap_realm.py domains/crm/addons/pulse_crm_sso
+      - run: python -m compileall -q domains/crm/addons/pulse_crm_sso
       - run: >-
           PYTHONPATH=domains/pulse-invoice/api pytest -q
           domains/pulse-invoice/tests/test_auth.py
