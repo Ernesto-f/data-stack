@@ -1,0 +1,59 @@
+name: pulse-crm
+
+services:
+  crm-db:
+    image: postgres:16
+    container_name: pulse-crm-db
+    env_file: ${CRM_ENV_FILE:-.env}
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: ${CRM_DB_USER:?Set CRM_DB_USER in .env}
+      POSTGRES_PASSWORD: ${CRM_DB_PASSWORD:?Set CRM_DB_PASSWORD in .env}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - crm-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 15s
+    restart: unless-stopped
+    networks: [crm-internal]
+
+  odoo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: pulse-crm-odoo:19.0
+    container_name: pulse-crm-odoo
+    env_file: ${CRM_ENV_FILE:-.env}
+    environment:
+      HOST: crm-db
+      PORT: 5432
+      USER: ${CRM_DB_USER:?Set CRM_DB_USER in .env}
+      PASSWORD: ${CRM_DB_PASSWORD:?Set CRM_DB_PASSWORD in .env}
+    depends_on:
+      crm-db:
+        condition: service_healthy
+    volumes:
+      - crm-odoo-data:/var/lib/odoo
+      - ./config/odoo.conf:/etc/odoo/odoo.conf:ro
+    ports:
+      - "127.0.0.1:18095:8069"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8069/web/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    restart: unless-stopped
+    networks: [crm-internal]
+
+volumes:
+  crm-db-data:
+  crm-odoo-data:
+
+networks:
+  crm-internal:
+    driver: bridge

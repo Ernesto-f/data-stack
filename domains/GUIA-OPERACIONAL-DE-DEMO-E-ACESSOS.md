@@ -18,7 +18,7 @@ O princípio operacional é conceder o menor acesso necessário, validar o login
 | Pulse Analytics / Grafana | <https://analytics.izatacore.com> | OAuth2 Proxy exige `/pulse/home/analytics`, seguido de login OIDC nativo | Mapeamento Grafana: `/pulse/admin` → Admin; `/pulse/home/analytics-admin` → Editor; demais usuários autenticados → Viewer. Conceder também o grupo de acesso Analytics a quem necessitar de papel Editor/Admin. Grafana é operacional/interno; não expor dashboards globais a clientes. |
 | Samia / WeKnora | <https://knowledge.izatacore.com> | OIDC nativo; na tela de login, escolher **Pulse** | Cadastro self-service está habilitado no demo/dev. Conta da aplicação é vinculada ao e-mail OIDC e ao tenant interno do WeKnora; confirmar escopo dos dados antes de uma demonstração com conteúdo de cliente. |
 | Pulse Invoice | <https://portal.izatacore.com/pulse-invoice/> | Sessão Pulse via Portal e API com token validado | Só existe tenant/membership interno `pulse-invoice-demo`; não há tenant externo. Não reutilizar o endpoint `fileupload-api` antigo para notas fiscais externas. |
-| CRM | Ainda não existe | Sem URL, client ou grupo definido | Domínio reservado; consultar o roadmap em `crm/README.md`. |
+| Pulse CRM / Odoo | <https://crm.izatacore.com> | OAuth2 Proxy exige `/pulse/home/crm`; Odoo usa OCA OpenID Connect por Authorization Code + PKCE | Provisionar usuário interno no Odoo com e-mail verificado igual ao Keycloak e grupos locais Sales/CRM. Não há criação automática de contas. |
 
 URLs e políticas podem mudar; antes de uma sessão externa, confronte esta tabela com as configurações Nginx/Compose atuais e faça um login de teste. CloudBeaver, Guacamole e outras ferramentas administrativas não fazem parte do roteiro de cliente: seus grupos e rotas dão acesso a recursos operacionais.
 
@@ -46,6 +46,7 @@ Grupos permitidos pelo script no estado atual:
 | `/pulse/home/analytics-admin` | Papel Editor no Grafana |
 | `/pulse/admin` | Administração Pulse e papel Admin no Grafana; não conceder para demonstração padrão |
 | `/pulse/home/archive` | Acesso básico/grupo OIDC do Archive; ACL de cada documento permanece separada |
+| `/pulse/home/crm` | Acesso à rota do Pulse CRM/Odoo; autorização interna também depende dos grupos locais do Odoo |
 
 Outros grupos existem no bootstrap e em configuração de serviços — por exemplo `/pulse/home/airflow`, `/pulse/home/airflow-admin`, `/pulse/home/cloudbeaver` e `/pulse/home/guacamole` — mas não são aceitos pelo script interativo. Não contornar essa validação nem editar grupos diretamente sem procedimento de operador revisado. O acesso ao Airflow requer ainda correspondência entre o gate Nginx e os papéis FAB.
 
@@ -60,7 +61,7 @@ Outros grupos existem no bootstrap e em configuração de serviços — por exem
 7. Teste a URL e a função com a própria identidade criada. Para produtos com autorização interna, complete também a associação/ACL descrita abaixo.
 8. Registre quem aprovou e quando revisar/remover a conta. Ao encerrar a demo, desabilite ou remova a identidade e revogue também acessos e compartilhamentos no produto.
 
-O script cria identidade e associa grupos Keycloak apenas. Não cria a conta local do Paperless, tenant Invoice, ACL documental, Connections do Airflow ou dados/roles no CRM.
+O script cria identidade e associa grupos Keycloak apenas. Não cria contas/roles locais do Paperless ou Odoo, tenant Invoice, ACL documental nem Connections do Airflow.
 
 ## Acesso mínimo e operação por produto
 
@@ -81,6 +82,10 @@ Adicionar `/pulse/home/smartetl` e testar o redirecionamento/login OIDC. Demonst
 ### Pulse DataLogger
 
 O grupo `/pulse/home/datalogger` protege a rota OAuth2 Proxy. Não conceder edição de flows nem ativar execuções agendadas/escritas em PLC ou banco sem uma revisão operacional explícita. O modo atual é safe mode.
+
+### Pulse CRM / Odoo
+
+Exigir `/pulse/home/crm` e usar o botão **Entrar com Pulse**. O addon OIDC valida issuer, assinatura/audiência, e-mail verificado e grupo CRM. Um login só pode ser associado a um usuário Odoo interno, ativo e previamente provisionado com o mesmo e-mail; grupos locais do Odoo determinam os acessos a CRM. O ambiente é interno e não tem isolamento multi-tenant.
 
 ### Airflow / Pulse Automation
 
@@ -128,7 +133,7 @@ A API valida token OIDC, deriva o tenant de `sub` por meio de `tenant_membership
 - O provisionador interativo não inclui grupos de Airflow. Uniformizar e validar esse fluxo antes de oferecer autoatendimento.
 - Archive ainda requer validação de ACL na instância ativa para uso multi-tenant; Invoice não tem cliente externo provisionado.
 - Samia permite cadastro no demo/dev; confirmar isolamento de tenant e conhecimento antes de convidar público externo.
-- CRM não tem produto, URL, client OIDC ou matriz de permissão. A decisão e a sequência de integração estão em `crm/README.md`.
+- CRM é demo/dev interno em Odoo; provisionamento local e SSO estão descritos em `crm/README.md`. Não liberar acesso externo nem tratá-lo como multi-tenant.
 - Revisar este guia sempre que mudar Nginx, Keycloak, grupos, Compose, cadastro ou política de tenant.
 
 ## Referências

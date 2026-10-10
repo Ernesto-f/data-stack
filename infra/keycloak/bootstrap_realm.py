@@ -248,6 +248,8 @@ def main() -> int:
         "SAMIA_OIDC_CLIENT_SECRET",
         "AIRFLOW_OIDC_CLIENT_ID",
         "AIRFLOW_OIDC_CLIENT_SECRET",
+        "ODOO_OIDC_CLIENT_ID",
+        "ODOO_OIDC_CLIENT_SECRET",
     )
     missing = [key for key in required if not env.get(key) or env[key].startswith("replace_")]
     if missing:
@@ -292,6 +294,13 @@ def main() -> int:
             "redirectUris": ["https://automation.izatacore.com/auth/oauth-authorized/keycloak"],
             "webOrigins": ["https://automation.izatacore.com"],
         },
+        {
+            "clientId": env["ODOO_OIDC_CLIENT_ID"],
+            "name": "Pulse CRM (Odoo)",
+            "secret": env["ODOO_OIDC_CLIENT_SECRET"],
+            "redirectUris": ["https://crm.izatacore.com/auth_oauth/signin"],
+            "webOrigins": ["https://crm.izatacore.com"],
+        },
     )
     for client in clients:
         ensure_client(admin, client, groups_scope_id)
@@ -309,11 +318,12 @@ def main() -> int:
         "pulse/home/analytics",
         "pulse/home/analytics-admin",
         "pulse/home/archive",
+        "pulse/home/crm",
         "pulse/tenants",
     )
     for group in groups:
         ensure_group(admin, group)
-    print("Provisioned shared realm pulse, 5 OIDC clients, and service/tenant groups.")
+    print("Provisioned shared realm pulse, 6 OIDC clients, and service/tenant groups.")
     return 0
 
 
