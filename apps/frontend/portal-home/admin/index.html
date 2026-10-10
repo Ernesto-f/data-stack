@@ -1,0 +1,1053 @@
+
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Pulse Portal</title>
+
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
+
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    referrerpolicy="no-referrer"
+  />
+
+  <style>
+    :root {
+      --bg1: #0b1220;
+      --bg2: #0a1b2e;
+      --card: #0f2138cc;
+      --stroke: #214366;
+      --text: #e8f0ff;
+      --muted: #a8c0dd;
+      --shadow: 0 10px 35px rgba(0, 0, 0, .35);
+      --radius: 18px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-height: 100%;
+    }
+
+    body {
+      margin: 0;
+
+      min-height: 100vh;
+
+      font-family:
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        Segoe UI,
+        Roboto,
+        Arial;
+
+      color: var(--text);
+
+      background:
+        radial-gradient(
+          900px 600px at 20% 10%,
+          #1a4b7a55,
+          transparent 55%
+        ),
+        radial-gradient(
+          900px 600px at 80% 15%,
+          #7a1a5b44,
+          transparent 60%
+        ),
+        linear-gradient(
+          160deg,
+          var(--bg1),
+          var(--bg2)
+        );
+
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+
+      padding: 56px 28px;
+    }
+
+    /* =====================================================
+       CONTAINER PRINCIPAL
+       ===================================================== */
+
+    .shell {
+      width: min(1100px, 100%);
+      margin: 0 auto;
+    }
+
+    /* =====================================================
+       HEADER
+       ===================================================== */
+
+    .app-header {
+      display: flex;
+      align-items: stretch;
+      justify-content: space-between;
+
+      gap: 28px;
+
+      /* Mais respiro entre o cabeçalho e a primeira seção */
+      margin-bottom: 82px;
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+
+      min-width: 0;
+    }
+
+    .eyebrow {
+      margin-bottom: 6px;
+
+      font-size: 11px;
+      font-weight: 700;
+
+      letter-spacing: 1.8px;
+      text-transform: uppercase;
+
+      color: #75aee8;
+    }
+
+    .brand h1 {
+      margin: 0;
+
+      font-size: 32px;
+      line-height: 1.1;
+
+      letter-spacing: -.5px;
+    }
+
+    .subtitle {
+      margin-top: 8px;
+
+      max-width: 520px;
+
+      color: var(--muted);
+
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* =====================================================
+       PAINEL DO USUÁRIO
+       ===================================================== */
+
+    .user-panel {
+      /* Mais discreto e compacto, sem competir com o título */
+      min-width: 410px;
+
+      display: flex;
+      align-items: center;
+
+      gap: 10px;
+
+      padding: 8px 12px;
+
+      border: 1px solid var(--stroke);
+
+      background:
+        linear-gradient(
+          135deg,
+          rgba(18, 46, 78, .68),
+          rgba(15, 33, 56, .72)
+        );
+
+      border-radius: var(--radius);
+
+      box-shadow: var(--shadow);
+
+      backdrop-filter: blur(12px);
+    }
+
+    .user-avatar {
+      width: 42px;
+      height: 42px;
+
+      flex: 0 0 42px;
+
+      display: grid;
+      place-items: center;
+
+      border-radius: 12px;
+
+      background:
+        rgba(0, 145, 255, .12);
+
+      border:
+        1px solid rgba(120, 188, 255, .22);
+
+      box-shadow:
+        inset 0 0 20px rgba(0, 145, 255, .04);
+
+      font-size: 17px;
+
+      color: #a9d4ff;
+    }
+
+    .user-content {
+      min-width: 0;
+
+      display: flex;
+      flex-direction: column;
+
+      flex: 1;
+    }
+
+    .welcome {
+      margin-bottom: 3px;
+
+      color: var(--muted);
+
+      font-size: 10px;
+
+      text-transform: uppercase;
+      letter-spacing: .8px;
+    }
+
+    .username {
+      font-size: 15px;
+      font-weight: 700;
+
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .user-email {
+      margin-top: 2px;
+
+      color: var(--muted);
+
+      font-size: 10px;
+
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .user-divider {
+      width: 1px;
+      height: 36px;
+
+      background:
+        rgba(255, 255, 255, .08);
+
+      flex-shrink: 0;
+    }
+
+    .user-actions {
+      display: flex;
+      flex-direction: column;
+
+      align-items: stretch;
+
+      gap: 5px;
+
+      flex-shrink: 0;
+    }
+
+    .environment {
+      display: flex;
+      align-items: center;
+
+      gap: 6px;
+
+      padding: 4px 7px;
+
+      border-radius: 8px;
+
+      background:
+        rgba(255, 255, 255, .035);
+
+      color: var(--muted);
+
+      font-size: 10px;
+
+      white-space: nowrap;
+    }
+
+    .environment-dot {
+      width: 7px;
+      height: 7px;
+
+      border-radius: 50%;
+
+      background: #41d685;
+
+      box-shadow:
+        0 0 8px rgba(65, 214, 133, .55);
+    }
+
+    .logout {
+      min-height: 28px;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      gap: 7px;
+
+      padding: 5px 9px;
+
+      text-decoration: none;
+
+      color: var(--muted);
+
+      border: 1px solid var(--stroke);
+
+      border-radius: 9px;
+
+      background:
+        rgba(0, 0, 0, .10);
+
+      font-size: 11px;
+      font-weight: 600;
+
+      transition:
+        transform .15s ease,
+        color .15s ease,
+        border-color .15s ease,
+        background .15s ease;
+    }
+
+    .logout:hover {
+      transform: translateY(-1px);
+
+      color: var(--text);
+
+      border-color: #3a77b6;
+
+      background:
+        rgba(18, 46, 78, .85);
+    }
+
+    /* =====================================================
+       SEÇÕES
+       ===================================================== */
+
+    .section {
+      margin-bottom: 32px;
+    }
+
+    .section:last-child {
+      margin-bottom: 0;
+    }
+
+    .section-title {
+      margin: 0 0 12px 4px;
+
+      font-size: 13px;
+      font-weight: 600;
+
+      letter-spacing: 1.6px;
+      text-transform: uppercase;
+
+      color: var(--muted);
+    }
+
+    /* =====================================================
+       GRID
+       ===================================================== */
+
+    .grid {
+      display: grid;
+
+      grid-template-columns:
+        repeat(3, minmax(0, 1fr));
+
+      gap: 14px;
+
+      align-items: stretch;
+    }
+
+    /* =====================================================
+       CARDS
+       ===================================================== */
+
+    a.card {
+      min-width: 0;
+      min-height: 88px;
+
+      text-decoration: none;
+      color: inherit;
+
+      border: 1px solid var(--stroke);
+      background: var(--card);
+
+      border-radius: var(--radius);
+      padding: 18px;
+
+      display: flex;
+      gap: 14px;
+      align-items: center;
+
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+
+      transition:
+        transform .15s ease,
+        border-color .15s ease,
+        background .15s ease;
+    }
+
+    a.card:hover {
+      transform: translateY(-2px);
+
+      border-color: #3a77b6;
+
+      background:
+        rgba(18, 46, 78, .75);
+    }
+
+    .icon {
+      width: 42px;
+      height: 36px;
+
+      flex: 0 0 42px;
+
+      border-radius: 14px;
+
+      display: grid;
+      place-items: center;
+
+      border:
+        1px solid rgba(255, 255, 255, .12);
+
+      background:
+        rgba(0, 0, 0, .18);
+    }
+
+    .icon i {
+      font-size: 22px;
+    }
+
+    .meta {
+      min-width: 0;
+
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+
+      gap: 6px;
+    }
+
+    .name {
+      margin: 0;
+
+      font-weight: 650;
+      font-size: 16px;
+    }
+
+    .desc {
+      margin: 0;
+
+      color: var(--muted);
+
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    /* =====================================================
+       CORES DOS ÍCONES
+       ===================================================== */
+
+    .g .icon {
+      background:
+        rgba(255, 142, 0, .12);
+    }
+
+    .a .icon {
+      background:
+        rgba(65, 214, 133, .12);
+    }
+
+    .n .icon {
+      background:
+        rgba(255, 75, 75, .10);
+    }
+
+    .s .icon {
+      background:
+        rgba(0, 163, 255, .12);
+    }
+
+    .c .icon {
+      background:
+        rgba(0, 145, 255, .12);
+    }
+
+    /* =====================================================
+       RESPONSIVO
+       ===================================================== */
+
+    @media (max-width: 950px) {
+
+      .app-header {
+        flex-direction: column;
+      }
+
+      .user-panel {
+        min-width: 0;
+        width: 100%;
+      }
+
+    }
+
+    @media (max-width: 850px) {
+
+      body {
+        padding-top: 36px;
+      }
+
+      .grid {
+        grid-template-columns:
+          repeat(2, minmax(0, 1fr));
+      }
+
+    }
+
+    @media (max-width: 600px) {
+
+      body {
+        padding: 24px 16px;
+      }
+
+      .app-header {
+        margin-bottom: 52px;
+      }
+
+      .brand h1 {
+        font-size: 28px;
+      }
+
+      .subtitle {
+        font-size: 13px;
+      }
+
+      .user-panel {
+        display: grid;
+
+        grid-template-columns:
+          auto minmax(0, 1fr);
+
+        gap: 10px;
+
+        padding: 10px 12px;
+      }
+
+      .user-avatar {
+        width: 40px;
+        height: 40px;
+
+        flex-basis: 40px;
+      }
+
+      .user-divider {
+        display: none;
+      }
+
+      .user-actions {
+        grid-column: 1 / -1;
+
+        flex-direction: row;
+
+        justify-content: space-between;
+      }
+
+      .environment {
+        flex: 1;
+      }
+
+      .logout {
+        min-width: 82px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .section {
+        margin-bottom: 28px;
+      }
+
+    }
+  </style>
+</head>
+
+<body>
+
+  <main class="shell">
+
+    <!-- =====================================================
+         HEADER
+         ===================================================== -->
+
+    <header class="app-header">
+
+      <div class="brand">
+
+        <div class="eyebrow">
+          Pulse Internal Platform
+        </div>
+
+        <h1>
+          Pulse Portal
+        </h1>
+
+        <div class="subtitle">
+          Acesso centralizado às soluções, dados e ferramentas internas.
+        </div>
+
+      </div>
+
+
+      <!-- =================================================
+           USUÁRIO AUTENTICADO
+           ================================================= -->
+
+      <div class="user-panel">
+
+        <div class="user-avatar">
+          <i class="fa-solid fa-user"></i>
+        </div>
+
+        <div class="user-content">
+
+          <span class="welcome">
+            Bem-vindo de volta
+          </span>
+
+          <span
+            class="username"
+            id="username"
+          >
+            Usuário
+          </span>
+
+          <span
+            class="user-email"
+            id="user-email"
+          >
+            usuário@empresa.com
+          </span>
+
+        </div>
+
+        <div class="user-divider"></div>
+
+        <div class="user-actions">
+
+          <div class="environment">
+
+            <span class="environment-dot"></span>
+
+            Internal
+
+          </div>
+
+          <a
+            href="/oauth2/sign_out"
+            class="logout"
+            title="Sair"
+            aria-label="Sair"
+          >
+
+            <i class="fa-solid fa-right-from-bracket"></i>
+
+            <span>
+              Sair
+            </span>
+
+          </a>
+
+        </div>
+
+      </div>
+
+    </header>
+
+
+    <!-- =====================================================
+         DATA ENGINEERING & VISUALIZATION
+         ===================================================== -->
+
+    <div class="section">
+
+      <div class="section-title">
+        Data Engineering & Visualization
+      </div>
+
+      <section class="grid">
+
+        <!-- Prometheus -->
+
+        <a
+          class="card g"
+          href="/analytics/"
+        >
+
+          <div class="icon">
+            <i class="fa-solid fa-chart-line"></i>
+          </div>
+
+          <div class="meta">
+
+            <p class="name">
+              Prometheus
+            </p>
+
+            <p class="desc">
+              Dashboards e observabilidade.
+            </p>
+
+          </div>
+
+        </a>
+
+
+        <!-- Airflow -->
+
+        <a
+          class="card a"
+          href="/airflow/"
+        >
+
+          <div class="icon">
+            <i class="fa-solid fa-diagram-project"></i>
+          </div>
+
+          <div class="meta">
+
+            <p class="name">
+              Airflow
+            </p>
+
+            <p class="desc">
+              Orquestração de pipelines.
+            </p>
+
+          </div>
+
+        </a>
+
+
+        <!-- Node-RED -->
+
+        <a
+          class="card n"
+          href="/nodered/"
+        >
+
+          <div class="icon">
+            <i class="fa-solid fa-sitemap"></i>
+          </div>
+
+          <div class="meta">
+
+            <p class="name">
+              Node-RED
+            </p>
+
+            <p class="desc">
+              Automação e integrações OT/PLC.
+            </p>
+
+          </div>
+
+        </a>
+
+      </section>
+
+    </div>
+
+
+    <!-- =====================================================
+         DATA ANALYTICS
+         ===================================================== -->
+
+    <div class="section">
+
+      <div class="section-title">
+        Data Analytics
+      </div>
+
+      <section class="grid">
+
+        <!-- Jamovi -->
+
+        <a
+          class="card c"
+          href="/home/"
+        >
+
+          <div class="icon">
+            <i class="fa-solid fa-chart-column"></i>
+          </div>
+
+          <div class="meta">
+
+            <p class="name">
+              Jamovi
+            </p>
+
+            <p class="desc">
+              Ferramenta de estatística.
+            </p>
+
+          </div>
+
+        </a>
+
+      </section>
+
+    </div>
+
+
+    <!-- =====================================================
+         TOOLS
+         ===================================================== -->
+
+    <div class="section">
+
+      <div class="section-title">
+        Tools
+      </div>
+
+      <section class="grid">
+
+        <!-- Data Query -->
+
+        <a
+          class="card s"
+          href="/dataquery/"
+        >
+
+          <div class="icon">
+            <i class="fa-solid fa-database"></i>
+          </div>
+
+          <div class="meta">
+
+            <p class="name">
+              Data Query
+            </p>
+
+            <p class="desc">
+              Gerenciamento de bancos de dados.
+            </p>
+
+          </div>
+
+        </a>
+
+
+        <!-- Remote Access -->
+
+        <a
+          class="card c"
+          href="/remote/"
+        >
+
+          <div class="icon">
+            <i class="fa-solid fa-desktop"></i>
+          </div>
+
+          <div class="meta">
+
+            <p class="name">
+              Remote Access
+            </p>
+
+            <p class="desc">
+              Centralização de todos acessos remotos.
+            </p>
+
+          </div>
+
+        </a>
+
+
+        <!-- Pulse Cloud -->
+
+        <a
+          class="card c"
+          href="/cloud/"
+        >
+
+          <div class="icon">
+            <i class="fa-solid fa-cloud"></i>
+          </div>
+
+          <div class="meta">
+
+            <p class="name">
+              Pulse Cloud
+            </p>
+
+            <p class="desc">
+              Arquivos, colaboração e apps.
+            </p>
+
+          </div>
+
+        </a>
+
+
+        <!-- ADMIN File Upload -->
+
+        <a
+          class="card c"
+          href="/fileupload/admin"
+        >
+
+          <div class="icon">
+            <i class="fa-solid fa-user-gear"></i>
+          </div>
+
+          <div class="meta">
+
+            <p class="name">
+              ADMIN - File Upload
+            </p>
+
+            <p class="desc">
+              Configure as rotas do FileUpload.
+            </p>
+
+          </div>
+
+        </a>
+
+
+        <!-- File Upload -->
+
+        <a
+          class="card c"
+          href="/fileupload/"
+        >
+
+          <div class="icon">
+            <i class="fa-solid fa-upload"></i>
+          </div>
+
+          <div class="meta">
+
+            <p class="name">
+              File Upload
+            </p>
+
+            <p class="desc">
+              Upload arquivos para SQL DW.
+            </p>
+
+          </div>
+
+        </a>
+
+      </section>
+
+    </div>
+
+  </main>
+
+
+  <!-- =====================================================
+       CARREGAMENTO DO USUÁRIO
+
+       Este exemplo espera que exista um endpoint /api/me
+       retornando algo como:
+
+       {
+         "name": "João Silva",
+         "email": "joao.silva@empresa.com"
+       }
+
+       Se ainda não existir, a página continua funcionando
+       normalmente com "Usuário".
+       ===================================================== -->
+
+  <script>
+    async function loadUser() {
+
+      const usernameElement =
+        document.getElementById('username');
+
+      const emailElement =
+        document.getElementById('user-email');
+
+      try {
+
+        const response =
+          await fetch('/api/me', {
+            credentials: 'same-origin',
+            cache: 'no-store'
+          });
+
+        if (!response.ok) {
+          throw new Error(
+            'Não foi possível obter o usuário autenticado.'
+          );
+        }
+
+        const user =
+          await response.json();
+
+        const displayName =
+          user.name ||
+          user.displayName ||
+          user.username ||
+          user.preferred_username ||
+          user.email ||
+          'Usuário';
+
+        usernameElement.textContent =
+          displayName;
+
+        if (user.email) {
+
+          emailElement.textContent =
+            user.email;
+
+          emailElement.style.display =
+            '';
+
+        } else {
+
+          emailElement.style.display =
+            'none';
+
+        }
+
+      } catch (error) {
+
+        /*
+         * Caso /api/me ainda não exista,
+         * não quebra o portal.
+         */
+
+        console.debug(
+          'Informações do usuário não disponíveis:',
+          error.message
+        );
+
+      }
+
+    }
+
+    loadUser();
+  </script>
+
+</body>
+
+</html>

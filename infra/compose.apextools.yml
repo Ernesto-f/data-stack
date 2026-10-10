@@ -1,0 +1,164 @@
+
+name: APEX-TOOLS
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+networks:
+  internal-apextools:
+    driver: bridge
+  nextcloud-net:
+    driver: bridge
+  guacamole:
+    driver: bridge
+  ## rede externa pra autenticação e nginx
+  apextools-edge:
+    external: true
+    name: infra-apextools-edge
+
+
+
+services:
+  # ======================================================================================= #
+  # ===============================  ACESSO REMOTO VNC  =================================== #
+  # ======================================================================================= #
+
+  # BANCO DE DADOS DO GUACAMOLE
+  guacdb:
+    image: apex-tools:guacamole_db
+    pull_policy: never
+    container_name: ACESSO_REMOTO_DB
+    restart: unless-stopped
+    env_file:
+      - .env
+    profiles:
+      - GUACAMOLE_acesso_remoto
+    logging: *default-logging
+    environment:
+      POSTGRESQL_DATABASE: ${POSTGRESQL_DATABASE}
+      POSTGRESQL_USERNAME: ${POSTGRESQL_USERNAME}
+      POSTGRESQL_PASSWORD: ${POSTGRESQL_PASSWORD}
+      TZ: "America/Sao_Paulo"
+    volumes:
+      - ./volumes/guacamole/db-data:/var/lib/postgresql/data
+    networks:
+      - guacamole
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U guacamole_user -d guacamole_db -h 127.0.0.1
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+
+
+  # SERVIDOR GUACD
+  guacd:
+    image: apex-tools:guacamole_cd
+    pull_policy: never
+    container_name: ACESSO_REMOTO_GUACD
+    restart: unless-stopped
+    logging: *default-logging
+    profiles:
+      - GUACAMOLE_acesso_remoto
+    environment:
+      LOG_LEVEL: "info"
+      TZ: "America/Sao_Paulo"
+    networks:
+      - guacamole
+
+
+  # INTERFACE WEB DO GUACAMOLE
+  guacamole:
+    image: apex-tools:guacamole_web
+    pull_policy: never
+    container_name: ACESSO_REMOTO_WEB
+    restart: unless-stopped
+    profiles:
+      - GUACAMOLE_acesso_remoto
+    env_file:
+      - .env
+    logging: *default-logging
+    depends_on:
+      guacdb:
+        condition: service_healthy
+      guacd:
+        condition: service_started
+    environment:
+      GUACD_HOSTNAME: "guacd"
+      GUACD_PORT: "4822"
+      POSTGRESQL_ENABLED: "true"
+      POSTGRESQL_HOSTNAME: "guacdb"
+      POSTGRESQL_PORT: "5432"
+      POSTGRESQL_DATABASE: ${POSTGRESQL_DATABASE}
+      POSTGRESQL_USERNAME: ${POSTGRESQL_USERNAME}
+      POSTGRESQL_PASSWORD: ${POSTGRESQL_PASSWORD}
+
+      ## =======================================================
+      ## ==============  SSO ===================================
+      ## =======================================================
+      HTTP_AUTH_ENABLED: "true"
+      HTTP_AUTH_HEADER: "X-User"
+
+
+      REMOTE_IP_VALVE_ENABLED: "true"
+      TOTP_ENABLED: "false"
+      TZ: "America/Sao_Paulo"
+
+    volumes:
+      - ./guacamole/custom:/etc/guacamole/extensions:ro
+
+    networks:
+      - apextools-edge
+      - guacamole
+
+
+
+  # ============================================================================================== #
+  # ==============                                                ================================ #
+  # ==============          GERENCIADOR DE BANCO DE DADOS WEB     ================================ #
+  # ==============                                                ================================ #
+  # ============================================================================================== #
+
+  cloudbeaver:
+    image: datastack-dbeaver
+    container_name: cloudbeaver
+    profiles:
+      - DATAQUERY (Dbeaver-SQLManag)
+    hostname: BRUD-LT8XSY944
+    logging: *default-logging
+    environment:
+      - CLOUDBEAVER_ROOT_URI=/dataquery/
+      - CLOUDBEAVER_CORE_THEMING_THEME=dark
+    volumes:
+      - ./volumes/cloudbeaver_data:/opt/cloudbeaver/workspace
+
+      # ===== BRANDING =====
+      - ./dbeaver/custom/logo.svg:/opt/cloudbeaver/webapp/assets/logo.svg
+      - ./dbeaver/custom/logo-small.svg:/opt/cloudbeaver/webapp/assets/logo-small.svg
+      - ./dbeaver/custom/logo_sm.svg:/opt/cloudbeaver/web/icons/logo_sm.svg
+      - ./dbeaver/custom/favicon.ico:/opt/cloudbeaver/webapp/favicon.ico
+      - ./dbeaver/custom/index.html:/opt/cloudbeaver/web/index.html
+      - ./dbeaver/custom/custom.css:/opt/cloudbeaver/web/custom.css
+
+       # favicons / app icons
+      - ./dbeaver/custom/favicon.png:/opt/cloudbeaver/web/favicon.png
+      - ./dbeaver/custom/favicon-32x32.png:/opt/cloudbeaver/web/favicon-32x32.png
+      - ./dbeaver/custom/favicon.svg:/opt/cloudbeaver/web/favicon.svg
+      - ./dbeaver/custom/favicon.ico:/opt/cloudbeaver/web/favicon.ico
+      - ./dbeaver/custom/favicon.ico:/opt/cloudbeaver/webapp/favicon.ico
+      - ./dbeaver/custom/apple-touch-icon.png:/opt/cloudbeaver/web/apple-touch-icon.png
+
+       # Configuração do CloudBeaver
+      - ./dbeaver/config/cloudbeaver.runtime.conf:/opt/cloudbeaver/workspace/.data/.cloudbeaver.runtime.conf
+
+    mem_limit: 3G
+    cpus: 2
+    restart: unless-stopped
+    networks:
+      - apextools-edge
