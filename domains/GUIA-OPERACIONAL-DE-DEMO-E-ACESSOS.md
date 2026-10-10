@@ -12,10 +12,10 @@ O princípio operacional é conceder o menor acesso necessário, validar o login
 | --- | --- | --- | --- |
 | Pulse Portal | <https://portal.izatacore.com/> | Keycloak + OAuth2 Proxy; grupo `/pulse/home` | Contém atalhos para os produtos. Não substitui a autorização no produto de destino. |
 | Pulse Archive | <https://archive.izatacore.com> | OIDC nativo do Keycloak; grupo `/pulse/home/archive` para o acesso básico à UI | Conta Paperless e ACL por documento/grupo são distintas. ACL ainda deve ser atribuída e testada; não presumir isolamento entre clientes. |
-| Pulse SmartETL | <https://smartetl.izatacore.com> | OAuth2 Proxy, grupo `/pulse/home/smartetl`; há também configuração legada de Basic Auth no Nginx | Credenciais Basic são segredo operacional da VPS, não conta individual. Confirmar política vigente com o operador antes da demo. |
-| Pulse DataLogger | <https://datalogger.izatacore.com> | A configuração de Nginx inclui Basic Auth legado; regras OAuth2 por grupo também existem na configuração compartilhada | Node-RED inicia em safe mode; flows e integrações de escrita não devem ser ativados sem revisão de endpoints e credenciais. |
+| Pulse SmartETL | <https://smartetl.izatacore.com> | OAuth2 Proxy exige `/pulse/home/smartetl` | Cada convidado usa sua própria identidade Pulse. |
+| Pulse DataLogger | <https://datalogger.izatacore.com> | OAuth2 Proxy exige `/pulse/home/datalogger` | Node-RED inicia em safe mode; flows e integrações de escrita não devem ser ativados sem revisão de endpoints e credenciais. |
 | Pulse Automation / Airflow | <https://automation.izatacore.com/airflow/> | OAuth2 Proxy exige `/pulse/home/airflow`; Airflow faz login OIDC nativo | Airflow cria usuário FAB no primeiro login como Viewer. Grupos `/pulse/home/airflow` → User; `/pulse/home/airflow-admin` ou `/pulse/admin` → Admin, conforme `webserver_config.py`. O script interativo de usuário não oferece hoje esses grupos. |
-| Pulse Analytics / Grafana | <https://analytics.izatacore.com> | Login OIDC nativo. Configuração Nginx atual não aplica Basic Auth nem o gate OAuth2 Proxy | Mapeamento Grafana: `/pulse/admin` → Admin; `/pulse/home/analytics-admin` → Editor; demais usuários autenticados → Viewer. `/pulse/home/analytics` existe no provisionador, mas não é exigido pelo Nginx conforme a configuração consultada. Grafana é operacional/interno; não expor dashboards globais a clientes. |
+| Pulse Analytics / Grafana | <https://analytics.izatacore.com> | OAuth2 Proxy exige `/pulse/home/analytics`, seguido de login OIDC nativo | Mapeamento Grafana: `/pulse/admin` → Admin; `/pulse/home/analytics-admin` → Editor; demais usuários autenticados → Viewer. Conceder também o grupo de acesso Analytics a quem necessitar de papel Editor/Admin. Grafana é operacional/interno; não expor dashboards globais a clientes. |
 | Samia / WeKnora | <https://knowledge.izatacore.com> | OIDC nativo; na tela de login, escolher **Pulse** | Cadastro self-service está habilitado no demo/dev. Conta da aplicação é vinculada ao e-mail OIDC e ao tenant interno do WeKnora; confirmar escopo dos dados antes de uma demonstração com conteúdo de cliente. |
 | Pulse Invoice | <https://portal.izatacore.com/pulse-invoice/> | Sessão Pulse via Portal e API com token validado | Só existe tenant/membership interno `pulse-invoice-demo`; não há tenant externo. Não reutilizar o endpoint `fileupload-api` antigo para notas fiscais externas. |
 | CRM | Ainda não existe | Sem URL, client ou grupo definido | Domínio reservado; consultar o roadmap em `crm/README.md`. |
@@ -42,7 +42,7 @@ Grupos permitidos pelo script no estado atual:
 | `/pulse/home` | Portal; requerido pelo fluxo do script |
 | `/pulse/home/smartetl` | Rota SmartETL protegida por OAuth2 Proxy |
 | `/pulse/home/datalogger` | Rota DataLogger protegida por OAuth2 Proxy |
-| `/pulse/home/analytics` | Grupo de visualizador definido no script; a rota Analytics atualmente não exige esse grupo |
+| `/pulse/home/analytics` | Grupo requerido pelo gate OAuth2 Proxy do Analytics |
 | `/pulse/home/analytics-admin` | Papel Editor no Grafana |
 | `/pulse/admin` | Administração Pulse e papel Admin no Grafana; não conceder para demonstração padrão |
 | `/pulse/home/archive` | Acesso básico/grupo OIDC do Archive; ACL de cada documento permanece separada |
@@ -60,7 +60,7 @@ Outros grupos existem no bootstrap e em configuração de serviços — por exem
 7. Teste a URL e a função com a própria identidade criada. Para produtos com autorização interna, complete também a associação/ACL descrita abaixo.
 8. Registre quem aprovou e quando revisar/remover a conta. Ao encerrar a demo, desabilite ou remova a identidade e revogue também acessos e compartilhamentos no produto.
 
-O script cria identidade e associa grupos Keycloak apenas. Não cria a conta local do Paperless, tenant Invoice, ACL documental, credenciais Basic Auth individuais, Connections do Airflow ou dados/roles no CRM.
+O script cria identidade e associa grupos Keycloak apenas. Não cria a conta local do Paperless, tenant Invoice, ACL documental, Connections do Airflow ou dados/roles no CRM.
 
 ## Acesso mínimo e operação por produto
 
@@ -76,11 +76,11 @@ O Archive ativo ainda não deve ser tratado como multi-tenant pronto para client
 
 ### Pulse SmartETL
 
-Se a política OAuth2 atual estiver habilitada, adicionar `/pulse/home/smartetl`; a configuração também documenta Basic Auth legado. Não compartilhar uma senha Basic entre clientes sem controle de expiração/auditoria. Demonstrar com documentos sintéticos ou autorizados; saídas JSON requerem revisão antes de importação para Samia.
+Adicionar `/pulse/home/smartetl` e testar o redirecionamento/login OIDC. Demonstrar com documentos sintéticos ou autorizados; saídas JSON requerem revisão antes de importação para Samia.
 
 ### Pulse DataLogger
 
-O grupo `/pulse/home/datalogger` consta no provisionador, mas a configuração de Node-RED consultada também usa Basic Auth e tem seção de rota Nginx legada. Verificar a rota efetivamente carregada e o método de login antes de emitir instruções ao convidado. Não conceder edição de flows nem ativar execuções agendadas/escritas em PLC ou banco sem uma revisão operacional explícita. O modo atual é safe mode.
+O grupo `/pulse/home/datalogger` protege a rota OAuth2 Proxy. Não conceder edição de flows nem ativar execuções agendadas/escritas em PLC ou banco sem uma revisão operacional explícita. O modo atual é safe mode.
 
 ### Airflow / Pulse Automation
 
@@ -88,7 +88,7 @@ O grupo de acesso à rota é `/pulse/home/airflow`; dentro do Airflow, o login O
 
 ### Analytics / Grafana
 
-Grafana usa OIDC e mapeia grupos para Viewer, Editor e Admin. Conceder Editor apenas para manutenção aprovada; Admin é acesso operacional. Conforme `infra/nginx/locations-enabled/analytics.conf`, a rota não exige Basic Auth nem grupo OAuth2 atualmente; assim, login OIDC e papel Grafana são a barreira configurada. `pulse/home/analytics` não é um requisito efetivo da rota nem do mapeamento de papéis encontrado. Revisar dashboards/datasources para remover dados ou métricas internas antes de qualquer demonstração externa.
+Grafana usa OIDC e mapeia grupos para Viewer, Editor e Admin. A rota Nginx também exige `/pulse/home/analytics`; conceda esse grupo junto ao papel adicional de Editor/Admin quando necessário. Conceder Editor apenas para manutenção aprovada; Admin é acesso operacional. Revisar dashboards/datasources para remover dados ou métricas internas antes de qualquer demonstração externa.
 
 ### Samia / WeKnora
 
@@ -125,7 +125,7 @@ A API valida token OIDC, deriva o tenant de `sub` por meio de `tenant_membership
 
 ## Limitações conhecidas e próximos passos
 
-- O provisionador interativo não inclui grupos de Airflow; Analytics atualmente aceita qualquer usuário que complete OIDC na rota configurada; SmartETL/DataLogger têm configuração Basic Auth legada. Uniformizar e validar esses fluxos antes de oferecer autoatendimento.
+- O provisionador interativo não inclui grupos de Airflow. Uniformizar e validar esse fluxo antes de oferecer autoatendimento.
 - Archive ainda requer validação de ACL na instância ativa para uso multi-tenant; Invoice não tem cliente externo provisionado.
 - Samia permite cadastro no demo/dev; confirmar isolamento de tenant e conhecimento antes de convidar público externo.
 - CRM não tem produto, URL, client OIDC ou matriz de permissão. A decisão e a sequência de integração estão em `crm/README.md`.
