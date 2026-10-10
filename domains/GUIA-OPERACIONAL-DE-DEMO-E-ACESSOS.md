@@ -18,7 +18,7 @@ O princípio operacional é conceder o menor acesso necessário, validar o login
 | Pulse Analytics / Grafana | <https://analytics.izatacore.com> | OAuth2 Proxy exige `/pulse/home/analytics`, seguido de login OIDC nativo | Mapeamento Grafana: `/pulse/admin` → Admin; `/pulse/home/analytics-admin` → Editor; demais usuários autenticados → Viewer. Conceder também o grupo de acesso Analytics a quem necessitar de papel Editor/Admin. Grafana é operacional/interno; não expor dashboards globais a clientes. |
 | Samia / WeKnora | <https://knowledge.izatacore.com> | OIDC nativo; na tela de login, escolher **Pulse** | Cadastro self-service está habilitado no demo/dev. Conta da aplicação é vinculada ao e-mail OIDC e ao tenant interno do WeKnora; confirmar escopo dos dados antes de uma demonstração com conteúdo de cliente. |
 | Pulse Invoice | <https://portal.izatacore.com/pulse-invoice/> | Sessão Pulse via Portal e API com token validado | Só existe tenant/membership interno `pulse-invoice-demo`; não há tenant externo. Não reutilizar o endpoint `fileupload-api` antigo para notas fiscais externas. |
-| Pulse CRM / Odoo | <https://crm.izatacore.com> | OAuth2 Proxy exige `/pulse/home/crm`; Odoo usa OCA OpenID Connect por Authorization Code + PKCE | Provisionar usuário interno no Odoo com e-mail verificado igual ao Keycloak e grupos locais Sales/CRM. Não há criação automática de contas. |
+| Pulse CRM / Odoo | <https://crm.izatacore.com> | OAuth2 Proxy exige `/pulse/home/crm`; Odoo usa OCA OpenID Connect por Authorization Code + PKCE | Instância single-tenant demo/dev. Não usar com empresas externas até implementar isolamento e entitlements por tenant. |
 
 URLs e políticas podem mudar; antes de uma sessão externa, confronte esta tabela com as configurações Nginx/Compose atuais e faça um login de teste. CloudBeaver, Guacamole e outras ferramentas administrativas não fazem parte do roteiro de cliente: seus grupos e rotas dão acesso a recursos operacionais.
 
@@ -85,7 +85,7 @@ O grupo `/pulse/home/datalogger` protege a rota OAuth2 Proxy. Não conceder edi�
 
 ### Pulse CRM / Odoo
 
-Exigir `/pulse/home/crm` e usar o botão **Entrar com Pulse**. O addon OIDC valida issuer, assinatura/audiência, e-mail verificado e grupo CRM. Um login só pode ser associado a um usuário Odoo interno, ativo e previamente provisionado com o mesmo e-mail; grupos locais do Odoo determinam os acessos a CRM. O ambiente é interno e não tem isolamento multi-tenant.
+Exigir `/pulse/home/crm` e usar o botão **Entrar com Pulse**. O addon OIDC valida issuer, assinatura/audiência, e-mail verificado e grupo CRM. Um login só pode ser associado a um usuário Odoo interno, ativo e previamente provisionado com o mesmo e-mail; grupos locais do Odoo determinam os acessos a CRM. A instância atual é uma única demo e não deve conter dados de várias empresas.
 
 ### Airflow / Pulse Automation
 

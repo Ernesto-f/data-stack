@@ -1,6 +1,24 @@
 # Pulse CRM — Odoo Community
 
-O Pulse CRM usa Odoo Community 19.0 com o aplicativo CRM e login OIDC pelo Keycloak Pulse. O ambiente é uma instância demo/dev interna; não é multi-tenant e não deve receber clientes externos.
+O Pulse CRM usa Odoo Community 19.0 com o aplicativo CRM e login OIDC pelo Keycloak Pulse. O Compose atual é **uma única instância demo/dev** para validar Odoo e SSO; não o use com duas empresas nem com dados reais.
+
+## Modelo SaaS multiempresa desejado
+
+Pulse é uma plataforma de módulos contratáveis por empresa. Cada tenant compra produtos (por exemplo CRM ou Knowledge Base); alguns produtos podem ser incluídos para toda a empresa e outros podem ter assentos atribuídos a usuários específicos. Usuários e memberships são identificados pelo `sub` do Keycloak, nunca apenas pelo e-mail.
+
+Para o CRM, a recomendação inicial é provisionar **um serviço Odoo e uma base PostgreSQL por tenant**, com volumes, segredos, backup e URL próprios. A imagem Odoo pode ser compartilhada, mas dados e credenciais ficam separados. Assim, uma falha de regra `company_id` numa instância não permite ler os registros de outra empresa. Para cerca de dez empresas, essa fronteira é direta de operar; o custo é mais containers, atualizações e backups.
+
+O fluxo alvo é:
+
+1. Criar a empresa/tenant no cadastro de assinaturas e habilitar entitlements contratados.
+2. Criar o administrador da empresa no Keycloak e vinculá-lo ao tenant e aos produtos pagos.
+3. O administrador convida/desativa funcionários dentro da própria empresa e aloca assentos permitidos; nunca administra outro tenant.
+4. Provisionar a instância Odoo do tenant e os usuários internos/grupos locais de CRM. O Keycloak continua sendo a identidade global; Odoo aplica as funções comerciais.
+5. Ao contratar Knowledge Base, habilitar o entitlement da empresa e, se o plano for por assento, somente as memberships escolhidas. O gateway e o serviço Knowledge Base verificam o entitlement, não apenas a presença de um card no Portal.
+
+No modelo final, a autorização precisa incluir tenant + produto + usuário/assento. `/pulse/home/crm` é apenas o gate geral desta demo. Instâncias de cliente deverão usar membership/grupo de tenant específico e callback OIDC exato; um client ou grupo global de CRM não pode autorizar acesso entre empresas.
+
+**Ainda não implementado:** cadastro de tenants/planos, convite de funcionários por administrador do cliente, alocação de assentos, criação automatizada de instâncias e memberships tenant-scoped. A instância e o client únicos abaixo são só a prova técnica inicial de Odoo + SSO.
 
 | Item | Configuração |
 | --- | --- |
@@ -46,7 +64,7 @@ O módulo cria o provider **Pulse SSO** desabilitado. No Odoo, entre como admini
 
 O client scope `groups` é adicionado por padrão pelo bootstrap compartilhado Keycloak; a claim com caminhos completos permite que Odoo e Nginx exijam `/pulse/home/crm`.
 
-## Inicialização demo/dev
+## Inicialização da instância demo/dev single-tenant
 
 Na VPS, com o repositório em `/srv/data-stack`:
 
