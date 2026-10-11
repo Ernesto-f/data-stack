@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS product_catalog (
 );
 
 INSERT INTO product_catalog (product_key, display_name, integration_status) VALUES
-    ('crm', 'Pulse CRM', 'ready'),
+    ('crm', 'SALUS CRM', 'ready'),
     ('knowledge', 'Pulse Knowledge Base', 'planned'),
     ('analytics', 'Pulse Analytics', 'planned'),
     ('invoice', 'Pulse Invoice', 'planned')

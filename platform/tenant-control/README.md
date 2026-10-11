@@ -7,7 +7,7 @@ Este serviço implementa a API usada por `/admin/` no Pulse Portal. Mantém o ca
 - **Admin Pulse**: cadastra tenant, registra host/provisionamento e habilita entitlements/assentos após validar contrato e stack.
 - **Admin do tenant**: convida funcionários para a própria empresa e seleciona somente produtos habilitados e assentos disponíveis. Só owner pode nomear outro admin.
 - **Keycloak**: identidade global e claims/grupos tenant-scoped. O backend usa um client service-account privado; as permissões do ator são verificadas em `tenant_memberships` antes de cada operação.
-- **Odoo CRM**: container e banco separados por tenant. No primeiro SSO, cria um usuário local interno somente depois da membership/entitlement autorizada e do e-mail verificado.
+- **SALUS CRM**: Odoo customizado, container e banco separados por tenant. No primeiro SSO, cria um usuário local interno somente depois da membership/entitlement autorizada e do e-mail verificado.
 
 O banco `tenant_control` é apenas o registro comercial de tenants, entitlements, memberships e assentos. Ele não contém dados CRM nem substitui as regras de acesso dos produtos.
 
@@ -41,6 +41,6 @@ O fluxo exige SMTP funcional no realm. Sem SMTP, o endpoint recusa o convite e d
 
 ## Estado de integrações
 
-O CRM é o único produto marcado `ready` nesta versão. Knowledge Base, Analytics e Invoice aparecem no catálogo como `planned`; a API não concede memberships desses produtos até seus backends aplicarem tenant isolation/entitlements.
+O SALUS CRM é o único produto marcado `ready` nesta versão. Knowledge Base, Analytics e Invoice aparecem no catálogo como `planned`; a API não concede memberships desses produtos até seus backends aplicarem tenant isolation/entitlements.
 
 O control plane ainda não conecta a um gateway de billing. A equipe Pulse registra manualmente o produto/seat limit após confirmar a contratação; a integração com cobrança deve atualizar esses entitlements por backend numa etapa posterior.
