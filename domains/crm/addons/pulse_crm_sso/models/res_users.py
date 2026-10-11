@@ -45,6 +45,8 @@ class ResUsers(models.Model):
                 or (user.email or "").strip().casefold() != email.strip().casefold()
             ):
                 raise AccessDenied()
+            user.write({"oauth_access_token": params.get("access_token")})
+            self._sync_crm_role(user, tenant_key, groups)
             return user.login
 
         candidates = users.search(
@@ -55,11 +57,50 @@ class ResUsers(models.Model):
             ],
             limit=2,
         )
-        if len(candidates) != 1:
+        if len(candidates) > 1:
             raise AccessDenied()
-
-        user = candidates
-        if user.oauth_provider_id or user.oauth_uid:
-            raise AccessDenied()
-        user.write({"oauth_provider_id": provider, "oauth_uid": subject})
+        role_group = self._crm_role_group(tenant_key, groups)
+        if candidates:
+            user = candidates
+            if user.oauth_provider_id or user.oauth_uid:
+                raise AccessDenied()
+            user.write(
+                {
+                    "oauth_provider_id": provider,
+                    "oauth_uid": subject,
+                    "oauth_access_token": params.get("access_token"),
+                }
+            )
+        else:
+            name = validation.get("name") or validation.get("preferred_username") or email
+            user = users.with_context(no_reset_password=True).create(
+                {
+                    "name": name,
+                    "login": email,
+                    "email": email,
+                    "active": True,
+                    "oauth_provider_id": provider,
+                    "oauth_uid": subject,
+                    "oauth_access_token": params.get("access_token"),
+                    "groups_id": [(4, role_group.id)],
+                }
+            )
+        self._sync_crm_role(user, tenant_key, groups)
         return user.login
+
+    def _crm_role_group(self, tenant_key, groups):
+        role_xmlid = (
+            "sales_team.group_sale_manager"
+            if f"/pulse/tenants/{tenant_key}/crm-admin" in groups
+            else "sales_team.group_sale_salesman"
+        )
+        return self.env.ref(role_xmlid)
+
+    def _sync_crm_role(self, user, tenant_key, groups):
+        manager = self.env.ref("sales_team.group_sale_manager")
+        all_leads = self.env.ref("sales_team.group_sale_salesman_all_leads")
+        salesperson = self.env.ref("sales_team.group_sale_salesman")
+        desired = self._crm_role_group(tenant_key, groups)
+        commands = [(3, group.id) for group in (manager, all_leads, salesperson)]
+        commands.append((4, desired.id))
+        user.write({"groups_id": commands})

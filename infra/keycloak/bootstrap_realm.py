@@ -233,6 +233,93 @@ def ensure_client(admin: KeycloakAdmin, spec: dict, groups_scope_id: str) -> Non
             admin.request("DELETE", f"{client_mapper_path}/{mapper['id']}")
 
 
+def ensure_tenant_control_client(admin: KeycloakAdmin, client_id: str, secret: str) -> None:
+    """Create the private user/group-management client with limited realm roles."""
+    clients_path = f"/admin/realms/{REALM}/clients"
+    found = admin.get_json(f"{clients_path}?clientId={client_id}") or []
+    representation = {
+        "clientId": client_id,
+        "name": "Pulse Tenant Control Plane",
+        "enabled": True,
+        "protocol": "openid-connect",
+        "publicClient": False,
+        "standardFlowEnabled": False,
+        "implicitFlowEnabled": False,
+        "directAccessGrantsEnabled": False,
+        "serviceAccountsEnabled": True,
+        "authorizationServicesEnabled": False,
+        "clientAuthenticatorType": "client-secret",
+        "secret": secret,
+    }
+    if found:
+        client = found[0]
+        client_uuid = client["id"]
+        admin.request("PUT", f"{clients_path}/{client_uuid}", {**client, **representation})
+    else:
+        admin.request("POST", clients_path, representation)
+        found = admin.get_json(f"{clients_path}?clientId={client_id}") or []
+        if not found:
+            raise RuntimeError("Tenant-control Keycloak client was not created")
+        client_uuid = found[0]["id"]
+
+    service_user = admin.get_json(
+        f"{clients_path}/{client_uuid}/service-account-user"
+    )
+    if not service_user or not service_user.get("id"):
+        raise RuntimeError("Tenant-control service account was not created")
+
+    realm_management = admin.get_json(f"{clients_path}?clientId=realm-management") or []
+    if not realm_management:
+        raise RuntimeError("Keycloak realm-management client was not found")
+    management_uuid = realm_management[0]["id"]
+    roles_path = f"{clients_path}/{management_uuid}/roles"
+    role_defs = {role["name"]: role for role in admin.get_json(roles_path) or []}
+    role_names = ("manage-users", "view-users", "query-users", "view-groups", "query-groups")
+    missing_roles = [name for name in role_names if name not in role_defs]
+    if missing_roles:
+        raise RuntimeError("Keycloak management roles unavailable: " + ", ".join(missing_roles))
+
+    mappings_path = (
+        f"/admin/realms/{REALM}/users/{service_user['id']}"
+        f"/role-mappings/clients/{management_uuid}"
+    )
+    existing_roles = {
+        role["name"] for role in admin.get_json(mappings_path) or [] if role.get("name")
+    }
+    assign = [role_defs[name] for name in role_names if name not in existing_roles]
+    if assign:
+        admin.request("POST", mappings_path, assign)
+
+
+def configure_realm_email(admin: KeycloakAdmin, env: dict[str, str]) -> bool:
+    """Configure verified-email delivery only when a complete SMTP tuple exists."""
+    names = (
+        "KC_SMTP_HOST",
+        "KC_SMTP_PORT",
+        "KC_SMTP_FROM",
+        "KC_SMTP_USER",
+        "KC_SMTP_PASSWORD",
+    )
+    if any(not env.get(name) or env[name].startswith("replace_") for name in names):
+        return False
+
+    realm_path = f"/admin/realms/{REALM}"
+    realm = admin.get_json(realm_path)
+    realm["verifyEmail"] = True
+    realm["smtpServer"] = {
+        "host": env["KC_SMTP_HOST"],
+        "port": env["KC_SMTP_PORT"],
+        "from": env["KC_SMTP_FROM"],
+        "auth": "true",
+        "user": env["KC_SMTP_USER"],
+        "password": env["KC_SMTP_PASSWORD"],
+        "starttls": env.get("KC_SMTP_STARTTLS", "true").lower(),
+        "ssl": env.get("KC_SMTP_SSL", "false").lower(),
+    }
+    admin.request("PUT", realm_path, realm)
+    return True
+
+
 def main() -> int:
     env = read_env(ENV_PATH)
     required = (
@@ -248,6 +335,8 @@ def main() -> int:
         "SAMIA_OIDC_CLIENT_SECRET",
         "AIRFLOW_OIDC_CLIENT_ID",
         "AIRFLOW_OIDC_CLIENT_SECRET",
+        "TENANT_CONTROL_CLIENT_ID",
+        "TENANT_CONTROL_CLIENT_SECRET",
     )
     missing = [key for key in required if not env.get(key) or env[key].startswith("replace_")]
     if missing:
@@ -295,6 +384,12 @@ def main() -> int:
     )
     for client in clients:
         ensure_client(admin, client, groups_scope_id)
+    ensure_tenant_control_client(
+        admin,
+        env["TENANT_CONTROL_CLIENT_ID"],
+        env["TENANT_CONTROL_CLIENT_SECRET"],
+    )
+    configure_realm_email(admin, env)
 
     groups = (
         "pulse/home",
@@ -314,7 +409,7 @@ def main() -> int:
     )
     for group in groups:
         ensure_group(admin, group)
-    print("Provisioned shared realm pulse, 5 shared OIDC clients, and service/tenant groups.")
+    print("Provisioned shared realm pulse, 5 application clients, and the tenant-control service client.")
     return 0
 
 

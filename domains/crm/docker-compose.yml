@@ -32,8 +32,6 @@ services:
       CRM_TENANT_KEY: ${CRM_TENANT_KEY:?Set CRM_TENANT_KEY in tenant .env}
       CRM_PUBLIC_HOST: ${CRM_PUBLIC_HOST:?Set CRM_PUBLIC_HOST in tenant .env}
       CRM_OIDC_CLIENT_ID: ${CRM_OIDC_CLIENT_ID:?Set CRM_OIDC_CLIENT_ID in tenant .env}
-      CRM_OIDC_CLIENT_SECRET: ${CRM_OIDC_CLIENT_SECRET:?Set CRM_OIDC_CLIENT_SECRET in tenant .env}
-      CRM_INITIAL_ADMIN_PASSWORD: ${CRM_INITIAL_ADMIN_PASSWORD:?Set CRM_INITIAL_ADMIN_PASSWORD in tenant .env}
     depends_on:
       crm-db:
         condition: service_healthy

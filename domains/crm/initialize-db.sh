@@ -32,11 +32,11 @@ if [[ "$database_exists" == "1" ]]; then
   exit 1
 fi
 
-crm_compose run --rm --no-deps odoo \
+crm_compose run --rm --no-deps -e CRM_OIDC_CLIENT_SECRET odoo \
   odoo -c /etc/odoo/odoo.conf -d "$CRM_DB_NAME" \
   -i crm,auth_oidc,pulse_crm_sso --without-demo=all --stop-after-init --logfile=-
 
-crm_compose run --rm --no-deps odoo \
+crm_compose run --rm --no-deps -e CRM_INITIAL_ADMIN_PASSWORD odoo \
   odoo shell -c /etc/odoo/odoo.conf -d "$CRM_DB_NAME" --no-http <<'PY'
 import os
 

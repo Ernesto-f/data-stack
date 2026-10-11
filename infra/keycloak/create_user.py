@@ -23,6 +23,8 @@ GROUPS = {
     "pulse/home/archive": "Archive UI (document ACL is separate)",
     "pulse/home/crm": "Pulse CRM (Odoo)",
     "pulse/tenants/demo/crm": "CRM access for demo tenant",
+    "pulse/tenants/demo/crm-admin": "CRM manager role for tenant demo",
+    "pulse/tenants/demo/admin": "Tenant administration for demo",
 }
 TENANT_KEY_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,28}[a-z0-9]$")
 
@@ -37,6 +39,8 @@ def available_groups() -> dict[str, str]:
             tenant_key = tenant_dir.name
             if TENANT_KEY_RE.fullmatch(tenant_key):
                 groups[f"pulse/tenants/{tenant_key}/crm"] = f"CRM access for tenant {tenant_key}"
+                groups[f"pulse/tenants/{tenant_key}/crm-admin"] = f"CRM manager for tenant {tenant_key}"
+                groups[f"pulse/tenants/{tenant_key}/admin"] = f"Tenant administrator for {tenant_key}"
     return groups
 
 
