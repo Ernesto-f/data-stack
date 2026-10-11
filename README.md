@@ -9,7 +9,7 @@ Plataforma self-hosted para desenvolver e demonstrar domínios funcionais indepe
 - `domains/archive/`: Pulse Archive (Paperless-ngx) em `archive.izatacore.com` para armazenar e organizar documentos.
 - `domains/preprocessing/`: Pulse SmartETL em `smartetl.izatacore.com`, para preparar documentos com DeepSeek Flash antes da ingestão no RAG.
 - `domains/rag/`: Samia (WeKnora) em `knowledge.izatacore.com`, com DeepSeek Flash para conversa e BGE-M3 via Ollama para embeddings.
-- `domains/crm/`: Pulse CRM com Odoo Community e SSO Keycloak em `crm.izatacore.com`.
+- `domains/crm/`: Pulse CRM com Odoo Community e SSO Keycloak em `democrm.izatacore.com`.
 - `domains/automation/`: Pulse DataLogger (Node-RED) em `datalogger.izatacore.com`.
 - `apps/`: aplicações existentes ainda aguardando classificação por domínio.
 - `infra/`: autenticação compartilhada, ferramentas mantidas e imagens de suporte.

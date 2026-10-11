@@ -11,7 +11,7 @@ from infra.keycloak.provision_crm_tenant import (
 
 def test_tenant_keys_and_hosts_are_canonical():
     assert validate_tenant_key("demo") == "demo"
-    assert tenant_public_host("demo") == "crm.izatacore.com"
+    assert tenant_public_host("demo") == "democrm.izatacore.com"
     assert tenant_public_host("acme-north") == "acme-north.crm.izatacore.com"
 
     for invalid in ("", "AcmE", "acme.example", "../escape", "a"):

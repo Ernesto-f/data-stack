@@ -39,6 +39,6 @@ def test_platform_admin_is_an_explicit_global_group():
 
 def test_crm_host_is_derived_from_a_validated_tenant_key():
     assert tenant_host("acme") == "acme.crm.izatacore.com"
-    assert tenant_host("demo") == "crm.izatacore.com"
+    assert tenant_host("demo") == "democrm.izatacore.com"
     with pytest.raises(HTTPException):
         tenant_host("acme.example.com")

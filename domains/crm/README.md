@@ -4,7 +4,7 @@ Pulse é uma plataforma SaaS multiempresa. O CRM usa Odoo Community 19.0; o Comp
 
 ## Isolamento e entitlements
 
-Cada empresa recebe seu próprio projeto Compose com um container Odoo, um container PostgreSQL, banco, filestore, volume e segredos exclusivos. As imagens são compartilhadas; os dados persistentes não. Um hostname identifica o tenant (`crm.izatacore.com` para o demo e `<tenant>.crm.izatacore.com` para empresas provisionadas). Backups, restauração e desligamento são feitos por tenant.
+Cada empresa recebe seu próprio projeto Compose com um container Odoo, um container PostgreSQL, banco, filestore, volume e segredos exclusivos. As imagens são compartilhadas; os dados persistentes não. Um hostname identifica o tenant (`democrm.izatacore.com` para o demo e `<tenant>.crm.izatacore.com` para empresas provisionadas). Backups, restauração e desligamento são feitos por tenant.
 
 O Keycloak é compartilhado, mas identidade não equivale a acesso a todos os tenants:
 
@@ -44,7 +44,7 @@ bash ./initialize-db.sh acme
 bash ./deploy.sh acme
 ```
 
-O provisionador cria `tenants/<slug>/.env`, `config/odoo.conf`, o client e grupo Keycloak e um vhost Nginx em `tenants/<slug>/nginx.conf`. Esses arquivos locais têm permissões restritas e são ignorados pelo Git. O tenant `demo` usa `https://crm.izatacore.com`; `acme` usa `https://acme.crm.izatacore.com`.
+O provisionador cria `tenants/<slug>/.env`, `config/odoo.conf`, o client e grupo Keycloak e um vhost Nginx em `tenants/<slug>/nginx.conf`. Esses arquivos locais têm permissões restritas e são ignorados pelo Git. O tenant `demo` usa `https://democrm.izatacore.com`; `acme` usa `https://acme.crm.izatacore.com`.
 
 Instale o vhost gerado no Nginx do host, emita o certificado TLS, execute `nginx -t` e recarregue o serviço. O Odoo escuta somente em loopback e cada Compose project tem rede e volumes próprios. PostgreSQL não publica porta no host.
 
