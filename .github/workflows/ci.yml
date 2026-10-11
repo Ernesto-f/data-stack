@@ -22,9 +22,9 @@ jobs:
           docker compose --env-file domains/data-platform/.env.example -f domains/data-platform/docker-compose.yml config --quiet
           docker compose --env-file domains/data-platform/.env.example -f domains/data-platform/monitoring/docker-compose.monitoring.yml config --quiet
           docker compose --env-file domains/crm/.env.example -f domains/crm/docker-compose.yml config --quiet
-          AUTH_ENV_FILE=.env.auth.example TENANT_CONTROL_ENV_FILE=.env.tenant-control.example docker compose --env-file infra/.env.auth.example --env-file infra/.env.tenant-control.example -f infra/compose.auth.yml config --quiet
+          AUTH_ENV_FILE=.env.auth.example docker compose --env-file infra/.env.auth.example -f infra/compose.auth.yml config --quiet
           docker compose --env-file infra/.env.apextools.example -f infra/compose.apextools.yml config --quiet
-          TENANT_CONTROL_ENV_FILE=.env.tenant-control.example AUTH_ENV_FILE=.env.auth.example docker compose --env-file infra/.env.tenant-control.example --env-file infra/.env.auth.example -f infra/compose.auth.yml --profile tenant-control config --quiet
+          TENANT_CONTROL_ENV_FILE=.env.tenant-control.example AUTH_ENV_FILE=.env.auth.example docker compose --env-file infra/.env.tenant-control.example --env-file infra/.env.auth.example -f infra/compose.auth.yml -f infra/compose.tenant-control.yml --profile tenant-control config --quiet
 
       # Lint Dockerfiles (Airflow/CRM)
       - uses: hadolint/hadolint-action@v3.1.0

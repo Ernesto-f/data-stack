@@ -21,7 +21,7 @@ O banco `tenant_control` é apenas o registro comercial de tenants, entitlements
 ```bash
 cd /srv/data-stack/infra
 docker compose --env-file .env.auth --env-file .env.tenant-control \
-  -f compose.auth.yml --profile tenant-control up -d --build
+  -f compose.auth.yml -f compose.tenant-control.yml --profile tenant-control up -d --build
 ```
 
 5. Instalar `platform/portal/nginx/portal.izatacore.com.conf` no Nginx do host; a API fica presa a `127.0.0.1:18098`. O endpoint `/tenant-admin/api/` recebe um token sobrescrito por Nginx; tokens de browser não são encaminhados como cabeçalho confiável.

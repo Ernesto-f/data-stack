@@ -1,0 +1,58 @@
+services:
+  keycloak-db:
+    profiles: [tenant-control]
+
+  keycloak:
+    profiles: [tenant-control]
+
+  tenant-control-db:
+    image: postgres:16
+    container_name: tenant-control-db
+    profiles: [tenant-control]
+    env_file:
+      - ${TENANT_CONTROL_ENV_FILE:-.env.tenant-control}
+    environment:
+      POSTGRES_DB: ${TENANT_CONTROL_DB_NAME:?Set TENANT_CONTROL_DB_NAME in tenant-control .env}
+      POSTGRES_USER: ${TENANT_CONTROL_DB_USER:?Set TENANT_CONTROL_DB_USER in tenant-control .env}
+      POSTGRES_PASSWORD: ${TENANT_CONTROL_DB_PASSWORD:?Set TENANT_CONTROL_DB_PASSWORD in tenant-control .env}
+    volumes:
+      - ./volumes/tenant_control_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    networks: [tenant-control-internal]
+
+  tenant-control-api:
+    build:
+      context: ../platform/tenant-control
+      dockerfile: Dockerfile
+    image: pulse-tenant-control:local
+    container_name: tenant-control-api
+    profiles: [tenant-control]
+    env_file:
+      - ${TENANT_CONTROL_ENV_FILE:-.env.tenant-control}
+      - ${AUTH_ENV_FILE:-.env.auth}
+    environment:
+      DATABASE_URL: postgresql://${TENANT_CONTROL_DB_USER}:${TENANT_CONTROL_DB_PASSWORD}@tenant-control-db:5432/${TENANT_CONTROL_DB_NAME}
+      OIDC_ISSUER_URL: https://portal.izatacore.com/keylogin/realms/pulse
+      OIDC_JWKS_URL: http://keycloak:8080/keylogin/realms/pulse/protocol/openid-connect/certs
+      OIDC_ALLOWED_AZP: pulse-oauth2-proxy
+      KEYCLOAK_ADMIN_BASE: http://keycloak:8080/keylogin
+      TENANT_CONTROL_CLIENT_ID: ${TENANT_CONTROL_CLIENT_ID:?Set TENANT_CONTROL_CLIENT_ID in .env.auth}
+      TENANT_CONTROL_CLIENT_SECRET: ${TENANT_CONTROL_CLIENT_SECRET:?Set TENANT_CONTROL_CLIENT_SECRET in .env.auth}
+    depends_on:
+      tenant-control-db:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+    ports:
+      - "127.0.0.1:${TENANT_CONTROL_PORT:-18098}:8000"
+    restart: unless-stopped
+    networks: [tenant-control-internal, keycloak]
+
+networks:
+  tenant-control-internal:
+    driver: bridge
