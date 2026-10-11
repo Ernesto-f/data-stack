@@ -29,7 +29,7 @@ READY_PRODUCTS = {"crm"}
 def tenant_host(tenant_key: str) -> str:
     if not TENANT_RE.fullmatch(tenant_key):
         raise HTTPException(422, "Invalid tenant key")
-    return "crm.izatacore.com" if tenant_key == "demo" else f"{tenant_key}.crm.izatacore.com"
+    return "democrm.izatacore.com" if tenant_key == "demo" else f"{tenant_key}.crm.izatacore.com"
 
 
 class ProductEntitlement(BaseModel):

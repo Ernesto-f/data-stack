@@ -29,7 +29,7 @@ def validate_tenant_key(tenant_key: str) -> str:
 
 def tenant_public_host(tenant_key: str) -> str:
     validate_tenant_key(tenant_key)
-    return "crm.izatacore.com" if tenant_key == "demo" else f"{tenant_key}.crm.izatacore.com"
+    return "democrm.izatacore.com" if tenant_key == "demo" else f"{tenant_key}.crm.izatacore.com"
 
 
 def load_optional_env(path: Path) -> dict[str, str]:
@@ -119,7 +119,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("tenant_key", help="Stable tenant slug, e.g. demo or acme.")
     parser.add_argument("--odoo-port", type=int, required=True, help="Unused loopback port for this tenant's Odoo service.")
-    parser.add_argument("--public-host", help="Defaults to crm.izatacore.com for demo, otherwise <tenant>.crm.izatacore.com.")
+    parser.add_argument("--public-host", help="Defaults to democrm.izatacore.com for demo, otherwise <tenant>.crm.izatacore.com.")
     args = parser.parse_args()
 
     try:
