@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#07111f" />
+    <title>Administração de empresas · Pulse</title>
+    <style>
+      :root { color-scheme: dark; --bg:#07111f; --panel:#10243a; --line:#28415b; --text:#eff7ff; --muted:#abc0d2; --cyan:#71ceff; --green:#62dfa4; --red:#ff8c96; }
+      * { box-sizing:border-box; }
+      body { margin:0; min-height:100vh; padding:28px 18px 54px; background:radial-gradient(900px 520px at 5% 0,#14517b55,transparent 60%),linear-gradient(145deg,#050b13,var(--bg) 55%,#11162e); color:var(--text); font:15px/1.5 Inter,system-ui,sans-serif; }
+      main { width:min(1050px,100%); margin:auto; }
+      header { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:28px; }
+      a { color:var(--cyan); }
+      h1 { margin:4px 0; font-size:clamp(26px,4vw,38px); letter-spacing:-.04em; }
+      h2 { margin:0 0 12px; font-size:18px; }
+      p { color:var(--muted); }
+      .eyebrow { color:var(--cyan); font-size:11px; font-weight:800; letter-spacing:.13em; text-transform:uppercase; }
+      .panel { margin:16px 0; padding:20px; border:1px solid var(--line); border-radius:16px; background:#10243add; box-shadow:0 16px 45px #0003; }
+      .toolbar,.row { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+      .fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px; }
+      label { display:grid; gap:6px; color:var(--muted); font-size:12px; font-weight:700; }
+      input,select { width:100%; min-height:42px; padding:9px 11px; border:1px solid #35516c; border-radius:9px; background:#091726; color:var(--text); font:inherit; }
+      button { min-height:40px; padding:9px 14px; border:1px solid #5aa8d4; border-radius:9px; background:#155079; color:white; font:inherit; font-weight:750; cursor:pointer; }
+      button.secondary { border-color:var(--line); background:#0a1726; color:var(--muted); }
+      button.danger { border-color:#86404a; background:#512731; }
+      button:disabled { opacity:.55; cursor:not-allowed; }
+      .muted { color:var(--muted); }
+      .status { padding:8px 11px; border-radius:9px; background:#0a1726; color:var(--muted); }
+      .status.error { color:var(--red); border:1px solid #85404a; }
+      .status.ok { color:var(--green); border:1px solid #326b55; }
+      .checks { display:flex; flex-wrap:wrap; gap:14px; padding:8px 0; }
+      .checks label { display:flex; align-items:center; gap:7px; }
+      .checks input { width:auto; min-height:auto; }
+      table { width:100%; border-collapse:collapse; margin-top:8px; }
+      th,td { padding:10px 8px; border-bottom:1px solid #28415b; text-align:left; vertical-align:top; }
+      th { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
+      td small { display:block; color:var(--muted); }
+      .hidden { display:none !important; }
+      .callout { padding:12px; border-left:3px solid #e7b95c; background:#29231066; color:#e5d8b4; }
+      @media(max-width:620px) { body{padding:18px 12px 40px} .panel{padding:15px} table{font-size:12px} th,td{padding:8px 5px} }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <div class="eyebrow">Pulse · control plane</div>
+          <h1>Administração de empresas</h1>
+          <div class="muted" id="identity">Verificando sua sessão…</div>
+        </div>
+        <a href="/">Voltar ao Portal</a>
+      </header>
+
+      <div id="notice" class="status" role="status" aria-live="polite">Carregando tenants…</div>
+
+      <section class="panel">
+        <h2>Catálogo de produtos</h2>
+        <div id="catalog" class="checks"><span class="muted">Carregando catálogo…</span></div>
+        <p class="muted">Somente produtos com integração pronta podem receber memberships e assentos.</p>
+      </section>
+
+      <section id="platform-panel" class="panel hidden">
+        <h2>Novo tenant</h2>
+        <p class="muted">Registre a empresa e seu plano. Prepare uma stack CRM somente quando o produto estiver contratado; a ativação é uma etapa controlada.</p>
+        <form id="tenant-form">
+          <div class="fields">
+            <label>Identificador (slug)<input name="tenant_key" pattern="[a-z0-9][a-z0-9-]{1,29}[a-z0-9]" required placeholder="acme" /></label>
+            <label>Nome da empresa<input name="display_name" required minlength="2" maxlength="160" /></label>
+            <label>Host CRM<input name="crm_host" required placeholder="acme.crm.izatacore.com" /></label>
+            <label>Acesso CRM<select name="crm_access_mode"><option value="all_members">Todos os funcionários</option><option value="assigned">Assentos escolhidos pelo administrador</option></select></label>
+            <label>Assentos CRM<input name="crm_seat_limit" type="number" min="1" placeholder="Vazio = ilimitado" /></label>
+          </div>
+          <div class="checks"><label><input type="checkbox" name="crm_enabled" checked />CRM contratado</label></div>
+          <button type="submit">Registrar tenant</button>
+        </form>
+        <p class="callout">Se CRM estiver contratado, rode `setup-secrets.sh &lt;tenant&gt; &lt;porta&gt;`, inicialize/deploy a stack e só então ative o tenant aqui. Produtos ainda sem integração não podem ser habilitados. O card não ativa nem provisiona cobrança.</p>
+      </section>
+
+      <section id="tenant-panel" class="panel hidden">
+        <div class="toolbar">
+          <div>
+            <h2 id="tenant-title">Empresa</h2>
+            <div id="tenant-meta" class="muted"></div>
+          </div>
+          <label>Empresa<select id="tenant-select"></select></label>
+          <button id="activate-tenant" class="secondary hidden" type="button">Ativar tenant provisionado</button>
+        </div>
+        <div id="products" class="checks"></div>
+        <section id="plan-panel" class="hidden">
+          <h2>Produtos e assentos</h2>
+          <form id="plan-form">
+            <div class="fields">
+              <label><span><input type="checkbox" name="crm_enabled" /> CRM contratado</span></label>
+              <label>Acesso CRM<select name="crm_access_mode"><option value="all_members">Todos os funcionários</option><option value="assigned">Assentos atribuídos</option></select></label>
+              <label>Limite de assentos CRM<input name="crm_seat_limit" type="number" min="1" placeholder="Vazio = ilimitado" /></label>
+            </div>
+            <button type="submit">Salvar plano</button>
+          </form>
+          <p class="muted">Produtos marcados como integração pendente não podem receber assentos até o backend impor o tenant entitlement.</p>
+        </section>
+        <section id="invite-panel" class="hidden">
+          <h2>Convidar funcionário</h2>
+          <form id="member-form">
+            <div class="fields">
+              <label>Nome completo<input name="display_name" required minlength="2" maxlength="160" /></label>
+              <label>E-mail de trabalho<input name="email" type="email" required maxlength="320" /></label>
+              <label>Função na empresa<select name="tenant_role" id="member-tenant-role"><option value="member">Funcionário</option></select></label>
+              <label>Perfil CRM<select name="crm_role"><option value="user">Vendedor</option><option value="manager">Gerente CRM</option></select></label>
+            </div>
+            <div id="product-choices" class="checks"></div>
+            <button type="submit">Enviar convite</button>
+          </form>
+        </section>
+        <h2>Funcionários</h2>
+        <div class="table-wrap"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Função</th><th>Produtos</th><th>Estado</th><th></th></tr></thead><tbody id="members"></tbody></table></div>
+        <dialog id="edit-member-dialog">
+          <form id="edit-member-form">
+            <h2>Editar acesso</h2>
+            <input type="hidden" name="subject" />
+            <label>Produtos e assentos</label>
+            <div id="edit-product-choices" class="checks"></div>
+            <label>Perfil CRM<select name="crm_role"><option value="user">Vendedor</option><option value="manager">Gerente CRM</option></select></label>
+            <div class="toolbar"><button type="button" id="cancel-edit-member" class="secondary">Cancelar</button><button type="submit">Salvar acesso</button></div>
+          </form>
+        </dialog>
+      </section>
+
+      <section id="empty-panel" class="panel hidden">
+        <h2>Nenhum acesso de administração</h2>
+        <p>Seu usuário do Keycloak ainda não é administrador de uma empresa Pulse. Peça ao administrador da plataforma para associar sua conta a um tenant.</p>
+      </section>
+    </main>
+
+    <script>
+      const api = "/tenant-admin/api/v1";
+      const state = { me: null, tenants: [], catalog: [], selected: null };
+      const notice = document.getElementById("notice");
+      const esc = value => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+
+      function showMessage(message, kind = "") {
+        notice.textContent = message;
+        notice.className = `status ${kind}`;
+      }
+
+      function renderCatalog() {
+        document.getElementById("catalog").innerHTML = state.catalog.map(product =>
+          `<span class="status ${product.integration_status === "ready" ? "ok" : ""}">${esc(product.display_name)} · ${product.integration_status === "ready" ? "pronto" : "planejado"}</span>`
+        ).join("") || "<span class='muted'>Catálogo indisponível.</span>";
+      }
+
+      async function apiCall(path, options = {}) {
+        const response = await fetch(`${api}${path}`, {
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+          ...options,
+        });
+        const body = response.status === 204 ? null : await response.json().catch(() => null);
+        if (!response.ok) throw new Error(body?.detail || `Falha HTTP ${response.status}`);
+        return body;
+      }
+
+      function tenantOptions() {
+        const select = document.getElementById("tenant-select");
+        select.innerHTML = state.tenants.map(t => `<option value="${esc(t.tenant_key)}">${esc(t.display_name)} · ${esc(t.tenant_key)}</option>`).join("");
+        if (state.selected && state.tenants.some(t => t.tenant_key === state.selected)) select.value = state.selected;
+        state.selected = select.value || null;
+      }
+
+      async function loadTenants() {
+        state.tenants = await apiCall("/tenants");
+        if (!state.tenants.length) {
+          document.getElementById("tenant-panel").classList.add("hidden");
+          if (state.me.platform_admin) {
+            document.getElementById("platform-panel").classList.remove("hidden");
+            showMessage("Ainda não há tenants cadastrados.");
+          } else {
+            document.getElementById("empty-panel").classList.remove("hidden");
+            showMessage("Acesso carregado.", "ok");
+          }
+          return;
+        }
+        document.getElementById("empty-panel").classList.add("hidden");
+        document.getElementById("platform-panel").classList.toggle("hidden", !state.me.platform_admin);
+        document.getElementById("tenant-panel").classList.remove("hidden");
+        tenantOptions();
+        await loadSelectedTenant();
+      }
+
+      async function loadSelectedTenant() {
+        const tenant = state.tenants.find(item => item.tenant_key === state.selected);
+        if (!tenant) return;
+        document.getElementById("tenant-title").textContent = tenant.display_name;
+        document.getElementById("tenant-meta").textContent = `${tenant.tenant_key} · ${tenant.crm_host || "CRM não contratado"} · ${tenant.tenant_status}`;
+        const platformAdmin = state.me.platform_admin;
+        const canManage = platformAdmin || ["owner", "admin"].includes(tenant.tenant_role);
+        document.getElementById("plan-panel").classList.toggle("hidden", !platformAdmin);
+        document.getElementById("invite-panel").classList.toggle("hidden", !canManage || tenant.tenant_status !== "active");
+        document.getElementById("activate-tenant").classList.toggle("hidden", !platformAdmin || tenant.tenant_status === "active");
+        const roleSelect = document.getElementById("member-tenant-role");
+        const mayManageAdmins = platformAdmin || tenant.tenant_role === "owner";
+        roleSelect.innerHTML = `<option value="member">Funcionário</option>${mayManageAdmins ? `<option value="admin">Administrador da empresa</option>` : ""}${platformAdmin ? `<option value="owner">Proprietário inicial</option>` : ""}`;
+        const crmPlan = (tenant.products || []).find(product => product.product_key === "crm");
+        const planForm = document.getElementById("plan-form");
+        planForm.elements.crm_enabled.checked = Boolean(crmPlan?.enabled);
+        planForm.elements.crm_access_mode.value = crmPlan?.access_mode || "assigned";
+        planForm.elements.crm_seat_limit.value = crmPlan?.seat_limit ?? "";
+        renderProducts(tenant.products || [], canManage);
+        try {
+          const members = await apiCall(`/tenants/${encodeURIComponent(tenant.tenant_key)}/members`);
+          renderMembers(members, canManage);
+          showMessage("Tenant carregado.", "ok");
+        } catch (error) {
+          renderMembers([], false);
+          showMessage(error.message, "error");
+        }
+      }
+
+      function renderProducts(products, canManage) {
+        const host = document.getElementById("products");
+        host.innerHTML = products.map(p => {
+          const seats = p.seat_limit == null ? "ilimitados" : `${p.seats_used}/${p.seat_limit}`;
+          return `<span class="status ${p.enabled ? "ok" : ""}">${esc(p.display_name)} · ${p.enabled ? "contratado" : "inativo"} · assentos ${esc(seats)} · integração ${esc(p.integration_status)}</span>`;
+        }).join("") || "<span class='muted'>Nenhum produto cadastrado.</span>";
+        const ready = products.filter(p => p.enabled && p.integration_status === "ready");
+        document.getElementById("product-choices").innerHTML = ready.map(p => `<label><input type="checkbox" name="products" value="${esc(p.product_key)}" ${p.access_mode === "all_members" ? "checked disabled" : ""} />${esc(p.display_name)}${p.access_mode === "all_members" ? " (todos os funcionários)" : ""}</label>`).join("");
+      }
+
+      function renderMembers(members, canManage) {
+        const tbody = document.getElementById("members");
+        if (!members.length) {
+          tbody.innerHTML = "<tr><td colspan='6' class='muted'>Nenhum funcionário cadastrado.</td></tr>";
+          return;
+        }
+        const tenant = state.tenants.find(item => item.tenant_key === state.selected);
+        const actorRole = state.me.platform_admin ? "platform_admin" : tenant?.tenant_role;
+        const mayEdit = member => canManage && (member.tenant_role !== "owner" || actorRole === "platform_admin") && (member.tenant_role !== "admin" || ["owner", "platform_admin"].includes(actorRole));
+        tbody.innerHTML = members.map(member => `<tr>
+          <td>${esc(member.display_name)}</td><td>${esc(member.email)}</td>
+          <td>${esc(member.tenant_role)}${member.products?.some(p => p.product_role === "manager") ? " · CRM manager" : ""}</td>
+          <td>${esc((member.products || []).map(p => p.product_key).join(", "))}</td>
+          <td>${esc(member.membership_status)}</td>
+          <td>${mayEdit(member) ? `<button class="secondary" data-edit="${esc(member.keycloak_subject)}">Editar</button> <button class="danger" data-remove="${esc(member.keycloak_subject)}">Desativar</button>` : ""}</td>
+        </tr>`).join("");
+        tbody.querySelectorAll("[data-edit]").forEach(button => button.addEventListener("click", () => {
+          const member = members.find(item => item.keycloak_subject === button.dataset.edit);
+          if (!member) return;
+          const choices = document.getElementById("edit-product-choices");
+          choices.innerHTML = (tenant?.products || []).filter(product => product.enabled && product.integration_status === "ready").map(product => {
+            const assigned = member.products?.some(item => item.product_key === product.product_key);
+            const allMembers = product.access_mode === "all_members";
+            return `<label><input type="checkbox" name="products" value="${esc(product.product_key)}" ${assigned || allMembers ? "checked" : ""} ${allMembers ? "disabled" : ""} />${esc(product.display_name)}${allMembers ? " (todos os funcionários)" : ""}</label>`;
+          }).join("") || "<span class='muted'>Nenhum produto pronto contratado.</span>";
+          const form = document.getElementById("edit-member-form");
+          form.elements.subject.value = member.keycloak_subject;
+          form.elements.crm_role.value = member.products?.find(item => item.product_key === "crm")?.product_role || "user";
+          document.getElementById("edit-member-dialog").showModal();
+        }));
+        tbody.querySelectorAll("[data-remove]").forEach(button => button.addEventListener("click", async () => {
+          if (!confirm("Desativar este acesso neste tenant?")) return;
+          try {
+            await apiCall(`/tenants/${encodeURIComponent(state.selected)}/members/${encodeURIComponent(button.dataset.remove)}`, { method: "DELETE" });
+            await loadSelectedTenant();
+          } catch (error) { showMessage(error.message, "error"); }
+        }));
+      }
+
+      document.getElementById("cancel-edit-member").addEventListener("click", () => document.getElementById("edit-member-dialog").close());
+      document.getElementById("edit-member-form").addEventListener("submit", async event => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const subject = form.elements.subject.value;
+        const products = [...form.querySelectorAll("input[name='products']:checked:not(:disabled)")].map(input => input.value);
+        const allMemberProducts = [...document.querySelectorAll("#edit-product-choices input[name='products']:checked:disabled")].map(input => input.value);
+        try {
+          await apiCall(`/tenants/${encodeURIComponent(state.selected)}/members/${encodeURIComponent(subject)}/products`, {
+            method: "PUT",
+            body: JSON.stringify({ products: [...products, ...allMemberProducts], crm_role: form.elements.crm_role.value }),
+          });
+          document.getElementById("edit-member-dialog").close();
+          await loadSelectedTenant();
+          showMessage("Acesso e assentos atualizados.", "ok");
+        } catch (error) { showMessage(error.message, "error"); }
+      });
+
+      document.getElementById("tenant-select").addEventListener("change", async event => {
+        state.selected = event.target.value;
+        await loadSelectedTenant();
+      });
+
+      document.getElementById("member-form").addEventListener("submit", async event => {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+        const products = [...document.querySelectorAll("#product-choices input[name='products']:checked")].map(input => input.value);
+        try {
+          const result = await apiCall(`/tenants/${encodeURIComponent(state.selected)}/members`, {
+            method: "POST",
+            body: JSON.stringify({ display_name: form.get("display_name"), email: form.get("email"), tenant_role: form.get("tenant_role"), crm_role: form.get("crm_role"), products }),
+          });
+          event.currentTarget.reset();
+          await loadSelectedTenant();
+          showMessage(result.membership_status === "invited" ? "Convite enviado. A pessoa precisa verificar o e-mail antes do primeiro login." : "Acesso habilitado para esta pessoa neste tenant.", "ok");
+        } catch (error) { showMessage(error.message, "error"); }
+      });
+
+      document.getElementById("tenant-form").addEventListener("submit", async event => {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+        const tenantKey = String(form.get("tenant_key")).trim();
+        const products = form.get("crm_enabled") ? [{ product_key: "crm", enabled: true, access_mode: form.get("crm_access_mode"), seat_limit: form.get("crm_seat_limit") || null }] : [];
+        try {
+          await apiCall("/admin/tenants", {
+            method: "POST",
+            body: JSON.stringify({ tenant_key: tenantKey, display_name: form.get("display_name"), crm_host: form.get("crm_host") || null, products }),
+          });
+          event.currentTarget.reset();
+          document.querySelector("#tenant-form [name='crm_host']").required = true;
+          await loadTenants();
+          showMessage(`Tenant ${tenantKey} registrado. Provisionar a stack CRM se contratada e ativar o tenant antes de convidar usuários.`, "ok");
+        } catch (error) { showMessage(error.message, "error"); }
+      });
+
+      document.querySelector("#tenant-form [name='crm_enabled']").addEventListener("change", event => {
+        document.querySelector("#tenant-form [name='crm_host']").required = event.target.checked;
+      });
+
+      document.getElementById("plan-form").addEventListener("submit", async event => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const current = state.tenants.find(tenant => tenant.tenant_key === state.selected);
+        if (!current) return;
+        const products = (current.products || []).filter(product => product.product_key !== "crm").map(product => ({
+          product_key: product.product_key,
+          enabled: product.enabled,
+          seat_limit: product.seat_limit,
+          access_mode: product.access_mode,
+        }));
+        if (form.elements.crm_enabled.checked) {
+          products.push({
+            product_key: "crm",
+            enabled: true,
+            seat_limit: form.elements.crm_seat_limit.value || null,
+            access_mode: form.elements.crm_access_mode.value,
+          });
+        }
+        try {
+          await apiCall(`/admin/tenants/${encodeURIComponent(current.tenant_key)}/products`, {
+            method: "PUT",
+            body: JSON.stringify({ products }),
+          });
+          await loadTenants();
+          showMessage("Plano/assentos atualizados.", "ok");
+        } catch (error) { showMessage(error.message, "error"); }
+      });
+
+      document.getElementById("activate-tenant").addEventListener("click", async () => {
+        const tenant = state.tenants.find(item => item.tenant_key === state.selected);
+        if (!tenant) return;
+        try {
+          await apiCall(`/admin/tenants/${encodeURIComponent(tenant.tenant_key)}`, {
+            method: "PATCH", body: JSON.stringify({ tenant_status: "active", crm_host: tenant.crm_host }),
+          });
+          await loadTenants();
+        } catch (error) { showMessage(error.message, "error"); }
+      });
+
+      async function init() {
+        try {
+          state.me = await apiCall("/me");
+          document.getElementById("identity").textContent = state.me.name || state.me.email || "Sessão Pulse";
+          state.catalog = await apiCall("/catalog");
+          renderCatalog();
+          await loadTenants();
+        } catch (error) { showMessage(error.message, "error"); }
+      }
+      init();
+    </script>
+  </body>
+</html>

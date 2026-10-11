@@ -58,6 +58,9 @@
       .mark svg { width: 38px; height: 38px; }
       .brand-name { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -.04em; }
       .brand-subtitle { margin: 4px 0 0; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; }
+      .header-actions { display: flex; align-items: center; gap: 10px; }
+      .admin-link { padding: 9px 12px; border: 1px solid #6ecbff66; border-radius: 999px; color: var(--cyan); background: #0d2035bb; font-size: 11px; font-weight: 750; text-decoration: none; white-space: nowrap; }
+      .admin-link:hover { border-color: var(--cyan); }
       .environment {
         padding: 9px 12px;
         border: 1px solid var(--line);
@@ -156,7 +159,10 @@
             <p class="brand-subtitle">Seu ecossistema conectado</p>
         </div>
       </div>
-        <span class="environment">Inteligência · Dados · Automação</span>
+        <div class="header-actions">
+          <a class="admin-link" href="/admin/">Administração</a>
+          <span class="environment">Inteligência · Dados · Automação</span>
+        </div>
       </header>
 
       <section class="hero">
