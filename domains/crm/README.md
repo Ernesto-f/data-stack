@@ -13,11 +13,11 @@ O Keycloak é compartilhado, mas identidade não equivale a acesso a todos os te
 - `/pulse/tenants/<tenant_key>/crm` representa a membership específica naquele tenant.
 - Os grupos comerciais locais do Odoo controlam as ações e registros dentro da instância daquela empresa.
 
-O Odoo só aceita o login quando os dois grupos CRM, o `sub`, o issuer Pulse e `email_verified=true` correspondem. No primeiro login, associa o `sub` a um usuário Odoo interno, ativo e previamente cadastrado com o mesmo e-mail verificado. Não cria contas automaticamente. Como cada instância contém dados de uma empresa, uma membership em outro tenant não permite atravessar para este banco.
+O Odoo só aceita o login quando os dois grupos CRM, o `sub`, o issuer Pulse e `email_verified=true` correspondem. No primeiro login autorizado, associa o `sub` a um usuário interno existente com o mesmo e-mail verificado ou cria um usuário CRM local com o perfil concedido pelo entitlement. Como cada instância contém dados de uma empresa, uma membership em outro tenant não permite atravessar para este banco.
 
-O control plane do Portal deverá registrar empresa, módulos contratados, limite de assentos e memberships. O administrador de uma empresa poderá convidar/desativar seus funcionários e distribuir apenas os assentos permitidos. O serviço Knowledge Base deve verificar separadamente o entitlement do tenant e, quando houver plano por assento, a membership do usuário.
+O control plane do Portal registra empresas, módulos contratados, limite de assentos e memberships. O administrador de uma empresa pode convidar/desativar seus funcionários e distribuir apenas os assentos permitidos. O serviço Knowledge Base deve verificar separadamente o entitlement do tenant e, quando houver plano por assento, a membership do usuário.
 
-**Estado de implementação:** o template Odoo/PostgreSQL e o provisionador Keycloak por tenant existem. O Portal atual ainda é um catálogo estático: criação de tenants/assinaturas, billing, convites self-service e alocação de assentos pelo administrador do cliente ainda precisam ser implementados. Até lá, a equipe Pulse opera o provisionador; use somente tenant demo/dados sintéticos.
+**Estado de implementação:** o template Odoo/PostgreSQL, provisionador Keycloak, control plane do Portal, convites e alocação de assentos existem. Billing ainda não está integrado: um Admin Pulse configura manualmente os módulos/limites contratados. Knowledge Base, Analytics e Invoice aparecem no catálogo como `planned` e não podem receber assentos até seus backends implementarem enforcement multi-tenant.
 
 ## SSO por tenant
 
@@ -27,7 +27,7 @@ O código do OCA `server-auth` é baixado por commit fixado no `Dockerfile` e in
 
 ## Provisionar um tenant demo/dev
 
-Pré-requisitos: Keycloak/OAuth2 Proxy operacionais e arquivo `/srv/data-stack/infra/.env.auth` privado com credenciais administrativas do realm. O provisionador usa esse arquivo localmente, cria credenciais aleatórias por tenant e não as imprime.
+Pré-requisitos: Keycloak/OAuth2 Proxy operacionais, arquivo `/srv/data-stack/infra/.env.auth` privado com credenciais administrativas/service-account do realm, e SMTP configurado para enviar verificação/convites. O provisionador usa o arquivo privado localmente, cria credenciais aleatórias por tenant e não as imprime. Se ainda não houver SMTP, o control plane recusa o convite e remove a identidade/grupos recém-criados.
 
 ```bash
 cd /srv/data-stack/domains/crm
@@ -50,11 +50,23 @@ Instale o vhost gerado no Nginx do host, emita o certificado TLS, execute `nginx
 
 `initialize-db.sh <tenant>` instala `crm`, `auth_oidc` e `pulse_crm_sso` numa base nova e define a senha inicial local. Ele recusa uma base existente para não redefinir a senha do administrador. `deploy.sh <tenant>` compila/inicia somente aquele tenant. Não execute `docker compose down -v` sem backup aprovado.
 
+## Subir a administração do Portal
+
+Com SMTP preenchido no arquivo privado `.env.auth` e `bootstrap_realm.py` executado, crie `/srv/data-stack/infra/.env.tenant-control` a partir de `.env.tenant-control.example` e suba a API:
+
+```bash
+cd /srv/data-stack/infra
+docker compose --env-file .env.auth --env-file .env.tenant-control \
+  -f compose.auth.yml --profile tenant-control up -d --build
+```
+
+Instale/recarregue `platform/portal/nginx/portal.izatacore.com.conf` no Nginx do host para publicar o backend somente via `/tenant-admin/api/`. A página de gestão fica em `https://portal.izatacore.com/admin/`.
+
+Fluxo de ativação: um Admin Pulse registra o tenant e o entitlement na página. Se CRM estiver contratado, a equipe Pulse prepara Odoo, PostgreSQL, client e vhost pelo provisionador. O Admin Pulse ativa o tenant e convida o primeiro owner. Esse owner passa a convidar funcionários da empresa e atribuir os assentos que o plano permite. Keycloak envia verificação e troca de senha; Odoo cria o usuário local no primeiro login SSO autorizado. Um tenant sem produto habilitado não precisa de stack CRM até contratar o produto.
+
 ## Usuários de uma empresa
 
-Até existir o Portal de administração de tenants, a equipe Pulse cria as identidades pelo Keycloak e associa os dois grupos aplicáveis: `/pulse/home/crm` e `/pulse/tenants/<tenant_key>/crm`. Por exemplo, para `acme`, `/pulse/tenants/acme/crm`. Em seguida, um administrador daquela instância provisiona o usuário Odoo interno e seus grupos locais CRM. O primeiro login SSO liga a conta pelo e-mail verificado.
-
-O administrador de `acme` não pode convidar usuários para outro tenant nem aumentar seu próprio entitlement. Esse fluxo self-service deverá ser implementado no control plane do Portal, com autorização no backend; não expor credenciais administrativas do Keycloak ao browser ou ao Odoo.
+O Portal é a interface de gestão. O backend confere que o operador tem membership `owner/admin` naquele tenant, valida entitlement/assentos, cria ou localiza a identidade Keycloak e atribui apenas os grupos daquele tenant. O browser nunca recebe token service-account nem credenciais administrativas. Managers Odoo e admins de tenant são funções distintas.
 
 ## Segurança e operação
 

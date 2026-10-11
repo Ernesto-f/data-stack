@@ -22,8 +22,9 @@ jobs:
           docker compose --env-file domains/data-platform/.env.example -f domains/data-platform/docker-compose.yml config --quiet
           docker compose --env-file domains/data-platform/.env.example -f domains/data-platform/monitoring/docker-compose.monitoring.yml config --quiet
           docker compose --env-file domains/crm/.env.example -f domains/crm/docker-compose.yml config --quiet
-          AUTH_ENV_FILE=.env.auth.example docker compose --env-file infra/.env.auth.example -f infra/compose.auth.yml config --quiet
+          AUTH_ENV_FILE=.env.auth.example TENANT_CONTROL_ENV_FILE=.env.tenant-control.example docker compose --env-file infra/.env.auth.example --env-file infra/.env.tenant-control.example -f infra/compose.auth.yml config --quiet
           docker compose --env-file infra/.env.apextools.example -f infra/compose.apextools.yml config --quiet
+          TENANT_CONTROL_ENV_FILE=.env.tenant-control.example AUTH_ENV_FILE=.env.auth.example docker compose --env-file infra/.env.tenant-control.example --env-file infra/.env.auth.example -f infra/compose.auth.yml --profile tenant-control config --quiet
 
       # Lint Dockerfiles (Airflow/CRM)
       - uses: hadolint/hadolint-action@v3.1.0
@@ -36,16 +37,19 @@ jobs:
       # Python: checa os pipelines da plataforma de dados
       - uses: actions/setup-python@v5
         with: { python-version: '3.11' }
-      - run: pip install ruff pytest -r domains/pulse-invoice/api/requirements.txt
-      - run: ruff check --select E4,E7,E9,F infra/keycloak/bootstrap_realm.py infra/keycloak/create_user.py infra/keycloak/provision_crm_tenant.py infra/keycloak/tests domains/crm/addons/pulse_crm_sso
-      - run: python -m compileall -q infra/keycloak/provision_crm_tenant.py infra/keycloak/tests domains/crm/addons/pulse_crm_sso
+      - run: pip install ruff pytest -r domains/pulse-invoice/api/requirements.txt -r platform/tenant-control/requirements.txt
+      - run: ruff check --select E4,E7,E9,F infra/keycloak/bootstrap_realm.py infra/keycloak/create_user.py infra/keycloak/provision_crm_tenant.py infra/keycloak/tests domains/crm/addons/pulse_crm_sso platform/tenant-control/app platform/tenant-control/tests
+      - run: python -m compileall -q infra/keycloak/provision_crm_tenant.py infra/keycloak/tests domains/crm/addons/pulse_crm_sso platform/tenant-control/app platform/tenant-control/tests
       - run: >-
-          PYTHONPATH=.:domains/pulse-invoice/api pytest -q
+          PYTHONPATH=.:domains/pulse-invoice/api:platform/tenant-control pytest -q
           domains/pulse-invoice/tests/test_auth.py
           domains/pulse-invoice/tests/test_archive.py
           domains/pulse-invoice/tests/test_layouts.py
           infra/keycloak/tests/test_provision_crm_tenant.py
+          platform/tenant-control/tests/test_policies.py
 
       # Build do Airflow (garante que a imagem compila)
       - name: Build Airflow image
         run: docker build -t airflow-local:ci infra/airflow
+      - name: Build tenant control API image
+        run: docker build -t pulse-tenant-control:ci platform/tenant-control

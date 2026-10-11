@@ -192,6 +192,10 @@ def main() -> int:
     groups_scope_id = keycloak.ensure_groups_scope(admin)
     keycloak.ensure_group(admin, "pulse/home/crm")
     keycloak.ensure_group(admin, f"pulse/tenants/{tenant_key}/crm")
+    keycloak.ensure_group(admin, f"pulse/tenants/{tenant_key}/crm-admin")
+    keycloak.ensure_group(admin, f"pulse/tenants/{tenant_key}/admin")
+    for product_key in ("knowledge", "analytics", "invoice"):
+        keycloak.ensure_group(admin, f"pulse/tenants/{tenant_key}/{product_key}")
     keycloak.ensure_client(
         admin,
         {
