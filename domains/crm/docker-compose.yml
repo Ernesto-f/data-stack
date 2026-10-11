@@ -1,19 +1,17 @@
-name: pulse-crm
+name: pulse-crm-${CRM_TENANT_KEY:-demo}
 
 services:
   crm-db:
     image: postgres:16
-    container_name: pulse-crm-db
-    env_file: ${CRM_ENV_FILE:-.env}
     environment:
-      POSTGRES_DB: postgres
-      POSTGRES_USER: ${CRM_DB_USER:?Set CRM_DB_USER in .env}
-      POSTGRES_PASSWORD: ${CRM_DB_PASSWORD:?Set CRM_DB_PASSWORD in .env}
+      POSTGRES_DB: ${CRM_DB_NAME:?Set CRM_DB_NAME in tenant .env}
+      POSTGRES_USER: ${CRM_DB_USER:?Set CRM_DB_USER in tenant .env}
+      POSTGRES_PASSWORD: ${CRM_DB_PASSWORD:?Set CRM_DB_PASSWORD in tenant .env}
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - crm-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d postgres"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 24
@@ -26,21 +24,24 @@ services:
       context: .
       dockerfile: Dockerfile
     image: pulse-crm-odoo:19.0
-    container_name: pulse-crm-odoo
-    env_file: ${CRM_ENV_FILE:-.env}
     environment:
       HOST: crm-db
       PORT: 5432
-      USER: ${CRM_DB_USER:?Set CRM_DB_USER in .env}
-      PASSWORD: ${CRM_DB_PASSWORD:?Set CRM_DB_PASSWORD in .env}
+      USER: ${CRM_DB_USER:?Set CRM_DB_USER in tenant .env}
+      PASSWORD: ${CRM_DB_PASSWORD:?Set CRM_DB_PASSWORD in tenant .env}
+      CRM_TENANT_KEY: ${CRM_TENANT_KEY:?Set CRM_TENANT_KEY in tenant .env}
+      CRM_PUBLIC_HOST: ${CRM_PUBLIC_HOST:?Set CRM_PUBLIC_HOST in tenant .env}
+      CRM_OIDC_CLIENT_ID: ${CRM_OIDC_CLIENT_ID:?Set CRM_OIDC_CLIENT_ID in tenant .env}
+      CRM_OIDC_CLIENT_SECRET: ${CRM_OIDC_CLIENT_SECRET:?Set CRM_OIDC_CLIENT_SECRET in tenant .env}
+      CRM_INITIAL_ADMIN_PASSWORD: ${CRM_INITIAL_ADMIN_PASSWORD:?Set CRM_INITIAL_ADMIN_PASSWORD in tenant .env}
     depends_on:
       crm-db:
         condition: service_healthy
     volumes:
       - crm-odoo-data:/var/lib/odoo
-      - ./config/odoo.conf:/etc/odoo/odoo.conf:ro
+      - ${CRM_ODOO_CONFIG:-config/odoo.conf}:/etc/odoo/odoo.conf:ro
     ports:
-      - "127.0.0.1:18095:8069"
+      - "127.0.0.1:${CRM_ODOO_PORT:-18095}:8069"
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8069/web/health', timeout=3)"]
       interval: 15s

@@ -16,12 +16,17 @@ class ResUsers(models.Model):
         subject = validation.get("sub") or validation.get("user_id")
         email = validation.get("email")
         groups = validation.get("groups") or []
+        tenant_key = self.env["ir.config_parameter"].sudo().get_param(
+            "pulse_crm.tenant_key"
+        )
+        tenant_group = f"/pulse/tenants/{tenant_key}/crm" if tenant_key else None
         if (
             not subject
             or not email
             or validation.get("email_verified") is not True
             or not isinstance(groups, list)
             or "/pulse/home/crm" not in groups
+            or tenant_group not in groups
         ):
             raise AccessDenied()
 

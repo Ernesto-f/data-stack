@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import getpass
+import re
 import sys
 from pathlib import Path
 from urllib.parse import urlencode
@@ -21,7 +22,22 @@ GROUPS = {
     "pulse/admin": "Pulse/Grafana administrator",
     "pulse/home/archive": "Archive UI (document ACL is separate)",
     "pulse/home/crm": "Pulse CRM (Odoo)",
+    "pulse/tenants/demo/crm": "CRM access for demo tenant",
 }
+TENANT_KEY_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,28}[a-z0-9]$")
+
+
+def available_groups() -> dict[str, str]:
+    groups = dict(GROUPS)
+    tenants_dir = Path(__file__).resolve().parents[2] / "domains" / "crm" / "tenants"
+    if tenants_dir.is_dir():
+        for tenant_dir in sorted(tenants_dir.iterdir()):
+            if tenant_dir.is_symlink() or not tenant_dir.is_dir() or not (tenant_dir / ".env").is_file():
+                continue
+            tenant_key = tenant_dir.name
+            if TENANT_KEY_RE.fullmatch(tenant_key):
+                groups[f"pulse/tenants/{tenant_key}/crm"] = f"CRM access for tenant {tenant_key}"
+    return groups
 
 
 def prompt(input_stream, output_stream, label: str) -> str:
@@ -49,8 +65,9 @@ def main() -> int:
         ) from None
 
     with terminal_input, terminal_output:
+        groups = available_groups()
         terminal_output.write("Pulse account setup\n")
-        terminal_output.write("Groups: " + ", ".join(f"/{path} ({label})" for path, label in GROUPS.items()) + "\n")
+        terminal_output.write("Groups: " + ", ".join(f"/{path} ({label})" for path, label in groups.items()) + "\n")
         terminal_output.write("Archive group grants UI group sync only; document ACLs are assigned separately.\n\n")
         username = prompt(terminal_input, terminal_output, "Username: ")
         email = prompt(terminal_input, terminal_output, "Email you control: ")
@@ -62,7 +79,7 @@ def main() -> int:
         if "pulse/home" not in selected:
             selected.insert(0, "pulse/home")
         selected = list(dict.fromkeys(selected))
-        unknown = sorted(set(selected) - GROUPS.keys())
+        unknown = sorted(set(selected) - groups.keys())
         if unknown:
             raise SystemExit("Unknown group path(s): " + ", ".join("/" + path for path in unknown))
         if not username or "@" not in email:
