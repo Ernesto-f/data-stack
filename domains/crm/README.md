@@ -57,7 +57,7 @@ Com SMTP preenchido no arquivo privado `.env.auth` e `bootstrap_realm.py` execut
 ```bash
 cd /srv/data-stack/infra
 docker compose --env-file .env.auth --env-file .env.tenant-control \
-  -f compose.auth.yml --profile tenant-control up -d --build
+  -f compose.auth.yml -f compose.tenant-control.yml --profile tenant-control up -d --build
 ```
 
 Instale/recarregue `platform/portal/nginx/portal.izatacore.com.conf` no Nginx do host para publicar o backend somente via `/tenant-admin/api/`. A página de gestão fica em `https://portal.izatacore.com/admin/`.
