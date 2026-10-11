@@ -274,7 +274,7 @@ def ensure_tenant_control_client(admin: KeycloakAdmin, client_id: str, secret: s
     management_uuid = realm_management[0]["id"]
     roles_path = f"{clients_path}/{management_uuid}/roles"
     role_defs = {role["name"]: role for role in admin.get_json(roles_path) or []}
-    role_names = ("manage-users", "view-users", "query-users", "view-groups", "query-groups")
+    role_names = ("manage-users", "view-users", "query-users", "query-groups")
     missing_roles = [name for name in role_names if name not in role_defs]
     if missing_roles:
         raise RuntimeError("Keycloak management roles unavailable: " + ", ".join(missing_roles))
