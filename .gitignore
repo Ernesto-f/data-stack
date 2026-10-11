@@ -29,5 +29,7 @@ domains/archive/data/
 domains/crm/.env
 domains/crm/config/odoo.conf
 domains/crm/data/
+domains/crm/tenants/
+domains/crm/tenants/
 infra/airflow/auth/simple_auth_manager_passwords.json
 infra/airflow/simple_auth_manager_passwords.json.generated

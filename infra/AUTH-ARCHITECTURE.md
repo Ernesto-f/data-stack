@@ -22,10 +22,10 @@ Uma única instância Keycloak será o provedor de identidade compartilhado por 
 
 ## Convenção de clients e grupos
 
-- Um client OAuth/OIDC por aplicação nativa: `pulse-archive`, `pulse-analytics`, `pulse-samia`, `pulse-automation` e `pulse-crm`; redirect URIs restritos ao domínio/callback exato.
-- O Pulse CRM/Odoo usa o módulo OCA `auth_oidc` com Authorization Code + PKCE e cliente confidencial. O endpoint de retorno é `https://crm.izatacore.com/auth_oauth/signin`; não habilitar o fluxo implícito.
+- Um client OAuth/OIDC por aplicação nativa, com redirect URIs restritos ao domínio/callback exato. O provisionador cria um client Odoo por tenant, `pulse-crm-<tenant_key>`.
+- O Pulse CRM/Odoo usa o módulo OCA `auth_oidc` com Authorization Code + PKCE e cliente confidencial. Cada tenant tem callback próprio `https://<tenant-host>/auth_oauth/signin`; não habilitar o fluxo implícito.
 - O OAuth2 Proxy mantém seu próprio client para as rotas autenticadas pelo Nginx.
-- Grupos de autorização de aplicação permanecem separados de grupos de tenant. Exemplo de tenant: `/pulse/tenants/<tenant_key>/invoice`.
+- Grupos de autorização de aplicação permanecem separados de grupos de tenant. Para o CRM, `/pulse/home/crm` identifica entitlement do produto e `/pulse/tenants/<tenant_key>/crm` identifica membership no tenant.
 - Solicitar a claim `groups` apenas aos clients que precisam dela. O backend de Invoice ainda verifica o `sub` validado contra `tenant_memberships` e define o contexto PostgreSQL; nunca confia num `tenant_key` enviado pelo navegador.
 - Paperless recebe grupos OIDC com nomes correspondentes aos grupos Paperless; ACL `view`/`change` é atribuída por documento ao grupo do tenant. A associação ao grupo, sozinha, não altera a ACL dos documentos.
 
@@ -35,4 +35,4 @@ O stack compartilhado original foi implantado na VPS usando Keycloak `26.7.0` e 
 
 O issuer público `https://portal.izatacore.com/keylogin/realms/pulse` responde discovery OIDC. `/keylogin/admin/` retorna 404 externamente; a URL administrativa usa `localhost` e só responde pela porta de loopback `18083`, acessível via túnel SSH. OAuth2 Proxy está limitado ao loopback na porta `4180`, usa cookie Secure compartilhado em `.izatacore.com` e inicia o fluxo OIDC pelo issuer Pulse. O Proxy disponibiliza o access token a `auth_request`; o Nginx bloqueia o endpoint público `/oauth2/auth` para manter esse cabeçalho interno. Portal, SmartETL, DataLogger, Automation e CRM usam grupos de rota específicos. No CRM, o próprio Odoo também exige o grupo no ID token.
 
-O realm atualmente contém os clients `pulse-oauth2-proxy`, `pulse-archive`, `pulse-analytics`, `pulse-samia` e `pulse-automation`. O bootstrap agora também define `pulse-crm` e `/pulse/home/crm`; antes de executá-lo, adicionar `ODOO_OIDC_CLIENT_ID` e `ODOO_OIDC_CLIENT_SECRET` ao arquivo `.env.auth` privado da VPS. WeKnora e Airflow usam OIDC nativo; Odoo usa OCA `auth_oidc`. A primeira autenticação CRM vincula apenas um usuário interno Odoo já existente com e-mail verificado correspondente; novos usuários não são criados automaticamente.
+O realm base contém os clients `pulse-oauth2-proxy`, `pulse-archive`, `pulse-analytics`, `pulse-samia` e `pulse-automation`. O provisionador CRM cria um client confidential e o grupo `/pulse/tenants/<tenant_key>/crm` por tenant; `/pulse/home/crm` é o entitlement geral do produto. Odoo usa OCA `auth_oidc`; cada instância e banco ficam separados por tenant. A conta interna Odoo é local à instância e só é associada a um `sub` com e-mail verificado e membership daquele tenant.
