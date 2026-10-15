@@ -103,11 +103,16 @@ Arquivos da alteração atual:
 - `bd5f52d` — `Add tenant operational dashboard and filters` — métricas e filtros de tenants no `/admin`.
 - `3971f7d` — `Add tenant control administrative audit log` — eventos, endpoint e painel de auditoria admin.
 - `ccd9898` — `Add read-only tenant Keycloak reconciliation` — endpoint/report, UI e detecção de drift.
-- A entrega mais recente `Add confirmed Keycloak drift synchronization` está no commit HEAD deste handoff.
+- `bbc74e3` — `Add confirmed Keycloak drift synchronization` — sincronização corretiva explícita de drift.
 - `70f3b73` — `Harden tenant access synchronization` — primeiro login, rollback de suspensão e erros tipados do Keycloak.
 - `33c7de7` — `Harden entitlement synchronization failures` — validação de desativação e erros 503 explícitos.
 - `538b4d8` — `Make verified login activation retry-safe` — compensação do primeiro login.
 - `8d1bd0b` — `Serialize tenant membership mutations` — locks do tenant/membership e validações sob transação.
+- `a769847` — `Preserve same-role member updates` — mantém atualizações de produtos quando a função não muda.
+- `dacc22b` — `Restore groups after sync failures` — compensação bidirecional do sincronizador Keycloak.
+- `a33fae6` — `Centralize ready product group policy` — bloqueio de grupos para produtos planejados.
+- `9b7adef` — `Rollback complete tenant updates on sync failure` — rollback completo de PATCH combinado.
+- `9f828df` — `Serialize entitlement replacement with memberships` — lock do tenant em alterações de entitlements.
 - Healthcheck Docker da API adicionado em `infra/compose.tenant-control.yml`; `docker compose config`, suíte (**30 testes**), Python, JavaScript, Ruff e `git diff --check` passaram.
 
 ## Cuidados de contexto
