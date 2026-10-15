@@ -1,10 +1,21 @@
-# Pulse CRM — Odoo Community
+# Pulse CRM — SALUS ERP por tenant
 
-Pulse é uma plataforma SaaS multiempresa. O CRM usa Odoo Community 19.0; o Compose é um **template de tenant**, não uma instância compartilhada para várias empresas.
+Pulse é uma plataforma SaaS multiempresa. O CRM usa o **SALUS ERP baseado em Odoo 18**; o Compose é um **template de tenant**, não uma instância compartilhada para várias empresas. O código do SALUS ERP é mantido em um checkout separado em `domains/salus-demo/salus-erp` e as imagens são compartilhadas entre tenants.
+
+O checkout do SALUS ERP deve existir antes do build, com a revisão aprovada do projeto e
+`salus-erp/config/odoo.image.conf`. Esse checkout não contém segredos e não é copiado para
+o repositório do control plane; o `domains/.dockerignore` inclui somente addons e a
+configuração necessários no contexto da imagem.
 
 ## Isolamento e entitlements
 
 Cada empresa recebe seu próprio projeto Compose com um container Odoo, um container PostgreSQL, banco, filestore, volume e segredos exclusivos. As imagens são compartilhadas; os dados persistentes não. Um hostname identifica o tenant (`democrm.izatacore.com` para o demo e `<tenant>.crm.izatacore.com` para empresas provisionadas). Backups, restauração e desligamento são feitos por tenant.
+
+Para provisionar uma instância já cadastrada, use `initialize-db.sh <tenant_key>` uma única
+vez e depois `deploy.sh <tenant_key>`. O `.env` privado precisa estar em
+`tenants/<tenant_key>/.env`; o script de inicialização recusa bases já inicializadas para
+não redefinir a senha administrativa. O primeiro banco PostgreSQL sobe em `postgres`, e o
+Odoo cria o banco exclusivo do tenant durante a inicialização.
 
 O Keycloak é compartilhado, mas identidade não equivale a acesso a todos os tenants:
 
@@ -15,15 +26,15 @@ O Keycloak é compartilhado, mas identidade não equivale a acesso a todos os te
 
 O Odoo só aceita o login quando os dois grupos CRM, o `sub`, o issuer Pulse e `email_verified=true` correspondem. No primeiro login autorizado, associa o `sub` a um usuário interno existente com o mesmo e-mail verificado ou cria um usuário CRM local com o perfil concedido pelo entitlement. Como cada instância contém dados de uma empresa, uma membership em outro tenant não permite atravessar para este banco.
 
-O control plane do Portal registra empresas, módulos contratados, limite de assentos e memberships. O administrador de uma empresa pode convidar/desativar seus funcionários e distribuir apenas os assentos permitidos. O serviço Knowledge Base deve verificar separadamente o entitlement do tenant e, quando houver plano por assento, a membership do usuário.
+O control plane do Portal registra empresas, módulos contratados, capacidade de usuários e memberships. O administrador de uma empresa pode convidar/desativar seus usuários e distribuir apenas a capacidade contratada. O serviço Knowledge Base deve verificar separadamente o entitlement do tenant e, quando houver plano por usuário, a membership do usuário.
 
 **Estado de implementação:** o template Odoo/PostgreSQL, provisionador Keycloak, control plane do Portal, convites e alocação de assentos existem. Billing ainda não está integrado: um Admin Pulse configura manualmente os módulos/limites contratados. Knowledge Base, Analytics e Invoice aparecem no catálogo como `planned` e não podem receber assentos até seus backends implementarem enforcement multi-tenant.
 
 ## SSO por tenant
 
-Para cada tenant, o provisionador cria um client confidencial `pulse-crm-<tenant_key>`, redirect URI exato `https://<tenant-host>/auth_oauth/signin` e grupo `/pulse/tenants/<tenant_key>/crm`. O addon OCA `auth_oidc` usa Authorization Code + PKCE. O addon Pulse valida o issuer do realm, assinatura RS256, audiência, e-mail verificado, entitlement CRM e membership tenant-specific.
+Para cada tenant, o provisionador cria um client confidencial `pulse-crm-<tenant_key>`, redirect URI exato `https://<tenant-host>/auth_oauth/signin` e grupo `/pulse/tenants/<tenant_key>/crm`. O addon OCA `auth_oidc` usa Authorization Code + PKCE. O addon Pulse valida o issuer do realm, assinatura RS256, audiência, e-mail verificado, entitlement CRM e membership tenant-specific. O SALUS ERP e o addon SSO são instalados juntos na imagem de cada tenant.
 
-O código do OCA `server-auth` é baixado por commit fixado no `Dockerfile` e incluído no container com a licença. O módulo `auth_oidc` é Beta e AGPL-3; revise upstream e licença antes de atualizar o pin.
+O código do OCA `server-auth` é baixado por commit fixado no `Dockerfile` e incluído no container com a licença. O módulo `auth_oidc` é Beta e AGPL-3; revise upstream e licença antes de atualizar o pin. O template usa `odoo:18`, compatível com o SALUS ERP atualmente implantado.
 
 ## Provisionar um tenant demo/dev
 

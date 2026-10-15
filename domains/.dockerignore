@@ -1,0 +1,12 @@
+*
+!crm/
+!crm/Dockerfile
+!crm/addons/
+!crm/addons/pulse_crm_sso/
+!crm/addons/pulse_crm_sso/**
+!salus-demo/
+!salus-demo/salus-erp/
+!salus-demo/salus-erp/addons/
+!salus-demo/salus-erp/addons/**
+!salus-demo/salus-erp/config/
+!salus-demo/salus-erp/config/**

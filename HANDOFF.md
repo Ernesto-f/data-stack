@@ -94,6 +94,25 @@ Arquivos da alteração atual:
 - O banco de tenant-control foi consultado anteriormente e estava vazio (`tenants_total = 0`). Reconfirmar antes de mudanças operacionais.
 - Não tocar em configurações secretas, bancos ou stacks de produto durante deploy sem plano de rollback.
 
+### SALUS ERP 18 — tenants de teste
+
+- O template `domains/crm` foi adaptado do Odoo 19 para o SALUS ERP baseado em Odoo 18:
+  addons SALUS, `auth_oidc` da branch OCA 18 e `pulse_crm_sso` são construídos na mesma
+  imagem por tenant.
+- `acme.crm.izatacore.com` está em `127.0.0.1:18101`; `beta.crm.izatacore.com` está em
+  `127.0.0.1:18102`. Cada um possui projeto Compose, banco PostgreSQL, volume de banco,
+  filestore e client/grupo Keycloak próprios.
+- Os dois serviços Odoo e os dois bancos estão saudáveis; `/web/health` respondeu
+  `{"status": "pass"}` nas portas locais. Sem sessão, os hosts públicos retornam `302`
+  para o fluxo de login do Portal, com o grupo tenant-scoped correspondente.
+- Certificados Let's Encrypt e vhosts Nginx foram instalados para os dois hosts; `nginx -t`
+  passou.
+- O banco do control plane ainda contém `0` tenants. As instâncias acima são stacks isoladas
+  de teste, mas ainda não foram registradas no `/admin`; não inserir linhas diretamente no
+  banco, pois o cadastro deve passar pela API/UI e pelo preflight de ativação.
+- Backup operacional dos arquivos privados, configurações e bancos das instâncias:
+  `/srv/backups/tenant-control/crm-tenants/20261015-233600/`.
+
 ## Próximos passos
 
 1. Para próximas entregas, abrir PR, fazer merge e preparar checkout Git na VPS para atualizar por `git pull`.

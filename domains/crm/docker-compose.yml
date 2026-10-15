@@ -4,7 +4,9 @@ services:
   crm-db:
     image: postgres:16
     environment:
-      POSTGRES_DB: ${CRM_DB_NAME:?Set CRM_DB_NAME in tenant .env}
+      # The tenant database is created by Odoo during initialization. Starting
+      # PostgreSQL on it would make every fresh tenant look pre-existing.
+      POSTGRES_DB: postgres
       POSTGRES_USER: ${CRM_DB_USER:?Set CRM_DB_USER in tenant .env}
       POSTGRES_PASSWORD: ${CRM_DB_PASSWORD:?Set CRM_DB_PASSWORD in tenant .env}
       PGDATA: /var/lib/postgresql/data/pgdata
@@ -21,9 +23,9 @@ services:
 
   odoo:
     build:
-      context: .
-      dockerfile: Dockerfile
-    image: pulse-crm-odoo:19.0
+      context: ..
+      dockerfile: crm/Dockerfile
+    image: pulse-salus-erp:18.0
     environment:
       HOST: crm-db
       PORT: 5432

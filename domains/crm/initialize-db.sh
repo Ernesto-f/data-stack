@@ -28,13 +28,20 @@ crm_compose up -d --wait crm-db
 database_exists="$(crm_compose exec -T crm-db psql -U "$CRM_DB_USER" -d postgres -Atqc \
   "SELECT 1 FROM pg_database WHERE datname = '$CRM_DB_NAME'")"
 if [[ "$database_exists" == "1" ]]; then
-  printf 'Database for tenant %s already exists; refusing to reset its admin password.\n' "$tenant_key" >&2
-  exit 1
+  database_initialized="$(crm_compose exec -T crm-db psql -U "$CRM_DB_USER" -d "$CRM_DB_NAME" -Atqc \
+    "SELECT to_regclass('public.ir_module_module') IS NOT NULL")"
+  if [[ "$database_initialized" == "t" ]]; then
+    printf 'Database for tenant %s is already initialized; refusing to reset its admin password.\n' "$tenant_key" >&2
+    exit 1
+  fi
+  printf 'Database for tenant %s exists but is empty; continuing initialization.\n' "$tenant_key"
 fi
 
-crm_compose run --rm --no-deps -e CRM_OIDC_CLIENT_SECRET odoo \
+erp_modules='crm,salus_erp_core,salus_crm,salus_erp_sales,salus_erp_project,salus_whatsapp,auth_oidc,pulse_crm_sso'
+crm_compose run --rm --no-deps \
+  -e CRM_TENANT_KEY -e CRM_OIDC_CLIENT_ID -e CRM_OIDC_CLIENT_SECRET odoo \
   odoo -c /etc/odoo/odoo.conf -d "$CRM_DB_NAME" \
-  -i crm,auth_oidc,pulse_crm_sso --without-demo=all --stop-after-init --logfile=-
+  -i "$erp_modules" -u "$erp_modules" --without-demo=all --stop-after-init --logfile=-
 
 crm_compose run --rm --no-deps -e CRM_INITIAL_ADMIN_PASSWORD odoo \
   odoo shell -c /etc/odoo/odoo.conf -d "$CRM_DB_NAME" --no-http <<'PY'
