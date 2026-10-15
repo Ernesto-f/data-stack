@@ -621,3 +621,62 @@ def test_tenant_member_sync_reports_partial_progress_as_503(monkeypatch):
     assert error.value.status_code == 503
     assert "after 1 memberships" in error.value.detail
     assert calls == ["member-1", "member-2"]
+
+
+class SuspendConnection:
+    def __init__(self):
+        self.statements = []
+
+    def transaction(self):
+        return AsyncNoopContext()
+
+    async def fetchrow(self, query, *_args):
+        assert "FOR UPDATE" in query
+        return {"tenant_role": "member", "membership_status": "active"}
+
+    async def fetch(self, query, *_args):
+        assert "membership_products" in query
+        return [{"product_key": "crm", "product_role": "manager"}]
+
+    async def fetchval(self, *_args):
+        raise AssertionError("Owner count should not be queried for a regular member")
+
+    async def execute(self, query, *_args):
+        self.statements.append(query)
+
+
+class SuspendPool:
+    def __init__(self):
+        self.connection = SuspendConnection()
+
+    def acquire(self):
+        class AcquireContext(AsyncNoopContext):
+            async def __aenter__(inner_self):
+                return self.connection
+
+        return AcquireContext()
+
+
+def test_member_suspension_restores_database_access_when_keycloak_sync_fails(monkeypatch):
+    pool = SuspendPool()
+    calls = 0
+
+    async def sync(_request, _subject):
+        nonlocal calls
+        calls += 1
+        raise KeycloakError("Keycloak unavailable")
+
+    monkeypatch.setattr(main, "sync_subject_groups", sync)
+    async def run_suspend():
+        with pytest.raises(HTTPException) as error:
+            await main.suspend_member(
+                "acme", "member-1", request_for(pool, FakeKeycloak()), identity()
+            )
+        return error.value
+
+    error = asyncio.run(run_suspend())
+    assert error.status_code == 503
+    assert calls == 2
+    assert any("membership_status='suspended'" in query for query in pool.connection.statements)
+    assert any("membership_status=$3" in query for query in pool.connection.statements)
+    assert any("INSERT INTO membership_products" in query for query in pool.connection.statements)

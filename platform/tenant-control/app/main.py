@@ -681,6 +681,34 @@ async def replace_entitlements(
     keys = [item.product_key for item in body.products]
     if len(set(keys)) != len(keys):
         raise HTTPException(422, "Duplicate product entitlement")
+    tenant_exists = await request.app.state.pool.fetchval(
+        "SELECT EXISTS (SELECT 1 FROM tenants WHERE tenant_key=$1)", tenant_key
+    )
+    if not tenant_exists:
+        raise HTTPException(404, "Tenant not found")
+    for item in body.products:
+        catalog = await request.app.state.pool.fetchrow(
+            "SELECT integration_status FROM product_catalog WHERE product_key=$1",
+            item.product_key,
+        )
+        if catalog is None:
+            raise HTTPException(422, f"Unknown product: {item.product_key}")
+        if item.enabled and (
+            item.product_key not in READY_PRODUCTS or catalog["integration_status"] != "ready"
+        ):
+            raise HTTPException(409, f"{item.product_key} integration is not ready")
+        if item.enabled and item.product_key in READY_PRODUCTS:
+            try:
+                await request.app.state.keycloak.group_id(
+                    f"pulse/tenants/{tenant_key}/{item.product_key}"
+                )
+            except KeycloakGroupMissingError as error:
+                raise HTTPException(
+                    409,
+                    f"Provision the tenant Keycloak groups for {item.product_key} first",
+                ) from error
+            except KeycloakError as error:
+                raise HTTPException(503, "Keycloak is unavailable; entitlement was not changed") from error
     async with request.app.state.pool.acquire() as connection:
         async with connection.transaction():
             exists = await connection.fetchval(
@@ -729,18 +757,6 @@ async def replace_entitlements(
                     )
                     if used:
                         raise HTTPException(409, f"Revoke {item.product_key} memberships before disabling its entitlement")
-                if item.enabled and item.product_key in READY_PRODUCTS:
-                    try:
-                        await request.app.state.keycloak.group_id(
-                            f"pulse/tenants/{tenant_key}/{item.product_key}"
-                        )
-                    except KeycloakGroupMissingError as error:
-                        raise HTTPException(
-                            409,
-                            f"Provision the tenant Keycloak groups for {item.product_key} first",
-                        ) from error
-                    except KeycloakError as error:
-                        raise HTTPException(503, "Keycloak is unavailable; entitlement was not changed") from error
                 await connection.execute(
                     """INSERT INTO tenant_products
                        (tenant_key,product_key,enabled,seat_limit,access_mode)
@@ -1145,64 +1161,69 @@ async def suspend_member(
     identity: Identity = Depends(current_identity),
 ) -> None:
     actor_role = await require_tenant_admin(request, identity, tenant_key)
-    member = await request.app.state.pool.fetchrow(
-        "SELECT tenant_role,membership_status FROM tenant_memberships WHERE tenant_key=$1 AND keycloak_subject=$2",
-        tenant_key,
-        subject,
-    )
-    if member is None:
-        raise HTTPException(404, "Tenant membership not found")
-    if member["membership_status"] == "suspended":
-        return
-    if member["tenant_role"] == "owner" and actor_role != "platform_admin":
-        raise HTTPException(403, "Only a platform administrator can suspend the tenant owner")
-    if member["tenant_role"] == "admin" and actor_role not in {"owner", "platform_admin"}:
-        raise HTTPException(403, "Only the tenant owner can suspend tenant administrators")
-    if member["tenant_role"] == "owner":
-        active_owners = await request.app.state.pool.fetchval(
-            """SELECT count(*) FROM tenant_memberships
-               WHERE tenant_key=$1 AND tenant_role='owner'
-                 AND membership_status='active' AND keycloak_subject<>$2""",
-            tenant_key,
-            subject,
-        )
-        if not active_owners:
-            raise HTTPException(409, "Assign another active owner before suspending the current owner")
-    previous_products = await request.app.state.pool.fetch(
-        """SELECT product_key,product_role FROM membership_products
-           WHERE tenant_key=$1 AND keycloak_subject=$2""",
-        tenant_key,
-        subject,
-    )
-    await request.app.state.pool.execute(
-        "UPDATE tenant_memberships SET membership_status='suspended' WHERE tenant_key=$1 AND keycloak_subject=$2",
-        tenant_key,
-        subject,
-    )
-    await request.app.state.pool.execute(
-        "DELETE FROM membership_products WHERE tenant_key=$1 AND keycloak_subject=$2",
-        tenant_key,
-        subject,
-    )
+    async with request.app.state.pool.acquire() as connection:
+        async with connection.transaction():
+            member = await connection.fetchrow(
+                """SELECT tenant_role,membership_status FROM tenant_memberships
+                   WHERE tenant_key=$1 AND keycloak_subject=$2 FOR UPDATE""",
+                tenant_key,
+                subject,
+            )
+            if member is None:
+                raise HTTPException(404, "Tenant membership not found")
+            if member["membership_status"] == "suspended":
+                return
+            if member["tenant_role"] == "owner" and actor_role != "platform_admin":
+                raise HTTPException(403, "Only a platform administrator can suspend the tenant owner")
+            if member["tenant_role"] == "admin" and actor_role not in {"owner", "platform_admin"}:
+                raise HTTPException(403, "Only the tenant owner can suspend tenant administrators")
+            if member["tenant_role"] == "owner":
+                active_owners = await connection.fetchval(
+                    """SELECT count(*) FROM tenant_memberships
+                       WHERE tenant_key=$1 AND tenant_role='owner'
+                         AND membership_status='active' AND keycloak_subject<>$2""",
+                    tenant_key,
+                    subject,
+                )
+                if not active_owners:
+                    raise HTTPException(409, "Assign another active owner before suspending the current owner")
+            previous_products = await connection.fetch(
+                """SELECT product_key,product_role FROM membership_products
+                   WHERE tenant_key=$1 AND keycloak_subject=$2""",
+                tenant_key,
+                subject,
+            )
+            await connection.execute(
+                "UPDATE tenant_memberships SET membership_status='suspended' WHERE tenant_key=$1 AND keycloak_subject=$2",
+                tenant_key,
+                subject,
+            )
+            await connection.execute(
+                "DELETE FROM membership_products WHERE tenant_key=$1 AND keycloak_subject=$2",
+                tenant_key,
+                subject,
+            )
     try:
         await sync_subject_groups(request, subject)
     except KeycloakError as error:
-        await request.app.state.pool.execute(
-            "UPDATE tenant_memberships SET membership_status=$3 WHERE tenant_key=$1 AND keycloak_subject=$2",
-            tenant_key,
-            subject,
-            member["membership_status"],
-        )
-        for product in previous_products:
-            await request.app.state.pool.execute(
-                """INSERT INTO membership_products
-                   (tenant_key,keycloak_subject,product_key,product_role)
-                   VALUES ($1,$2,$3,$4)""",
-                tenant_key,
-                subject,
-                product["product_key"],
-                product["product_role"],
-            )
+        async with request.app.state.pool.acquire() as connection:
+            async with connection.transaction():
+                await connection.execute(
+                    "UPDATE tenant_memberships SET membership_status=$3 WHERE tenant_key=$1 AND keycloak_subject=$2",
+                    tenant_key,
+                    subject,
+                    member["membership_status"],
+                )
+                for product in previous_products:
+                    await connection.execute(
+                        """INSERT INTO membership_products
+                           (tenant_key,keycloak_subject,product_key,product_role)
+                           VALUES ($1,$2,$3,$4)""",
+                        tenant_key,
+                        subject,
+                        product["product_key"],
+                        product["product_role"],
+                    )
         try:
             await sync_subject_groups(request, subject)
         except KeycloakError:
