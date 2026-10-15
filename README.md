@@ -16,6 +16,10 @@ Plataforma self-hosted para desenvolver e demonstrar domínios funcionais indepe
 
 Veja [`domains/README.md`](domains/README.md) para o mapa de componentes e o estágio da reorganização.
 
+## Fluxo de entrega
+
+Mudanças devem seguir o fluxo **branch dedicada → validações → Pull Request → merge → `git pull` na VPS → deploy e validação**. Deploy direto por cópia de arquivos só pode ocorrer em incidente/emergência com autorização explícita, backup e registro no [`HANDOFF.md`](HANDOFF.md). As regras completas estão em [`AGENTS.md`](AGENTS.md).
+
 ## Plataforma de dados
 
 O Compose demo/dev da plataforma está em `domains/data-platform/docker-compose.yml`; monitoramento está em `domains/data-platform/monitoring/docker-compose.monitoring.yml`. DAGs e transformações ficam dentro de `domains/data-platform/`. A implantação usa um `.env` exclusivo, não o arquivo do servidor anterior em `infra/.env`.
