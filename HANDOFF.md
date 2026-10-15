@@ -57,6 +57,7 @@ Melhorias de robustez aplicadas nesta revisão:
 - A política de grupos também aplica `READY_PRODUCTS` na sincronização, evitando conceder grupos de produtos planejados mesmo se o banco/catalogo for alterado indevidamente.
 - Ruff corrigiu imports/estilo seguro e agora passa com as exceções documentadas `B008` (padrão FastAPI `Depends`) e `SIM117` (contextos async aninhados mantidos explícitos); não há outros avisos.
 - A autorização de função preserva o caminho de atualização de produtos quando a função não muda; testes cobrem funções inalteradas sem relaxar mudanças de owner/admin.
+- O sincronizador Keycloak agora compensa também grupos removidos quando uma operação falha no meio; a regressão foi coberta por teste dedicado.
 
 Arquivos da alteração atual:
 
@@ -73,7 +74,7 @@ Arquivos da alteração atual:
 - `python -m py_compile platform/tenant-control/app/main.py platform/tenant-control/app/policies.py` — passou.
 - `node --check` no JavaScript embutido de `platform/portal/admin/index.html` — passou.
 - `git diff --check` nos arquivos da tarefa — passou.
-- Última validação: suíte tenant-control **27 passaram**; compilação Python, sintaxe JS e `git diff --check` passaram.
+- Última validação: suíte tenant-control **28 passaram**; compilação Python, sintaxe JS, Ruff e `git diff --check` passaram.
 - Revisão de autorização e fluxo concluída: preflight/update restritos a platform admins; a ativação exige grupo admin tenant-scoped mesmo sem CRM; suspender/reativar sincroniza grupos sem alterar os grupos de outros tenants.
 - Não foi feita validação visual com sessão Keycloak no navegador.
 - Há divergência conhecida entre `platform/portal/nginx/portal.izatacore.com.conf` (proxy completo da API) e `infra/nginx/locations-enabled/portal-admin.conf` (configuração Docker ativa previamente observada); não alterei essa infraestrutura sem validação do caminho de deployment.

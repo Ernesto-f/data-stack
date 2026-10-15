@@ -136,13 +136,20 @@ class KeycloakAdmin:
     async def set_groups(self, user_id: str, desired: set[str], managed: set[str]) -> list[str]:
         existing = await self.groups_for_user(user_id)
         added: list[str] = []
+        removed: list[str] = []
         try:
             for path in sorted(desired - existing):
                 if await self.add_user_to_group(user_id, path):
                     added.append(path)
             for path in sorted((existing & managed) - desired):
                 await self.remove_user_from_group(user_id, path)
+                removed.append(path)
         except KeycloakError:
+            for group_path in reversed(removed):
+                try:
+                    await self.add_user_to_group(user_id, group_path)
+                except KeycloakError:
+                    continue
             for group_path in added:
                 try:
                     await self.remove_user_from_group(user_id, group_path)
