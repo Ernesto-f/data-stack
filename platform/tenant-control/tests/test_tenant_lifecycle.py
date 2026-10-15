@@ -402,3 +402,52 @@ def test_seat_limit_blocks_extra_assignment_and_allows_available_seat():
     available = SeatLimitConnection(used=0)
     asyncio.run(main.save_product_access(available, "acme", "member-2", ["crm"], "user"))
     assert available.inserted is True
+
+
+class AuditPool:
+    def __init__(self):
+        self.audit_write = None
+        self.limit = None
+
+    async def execute(self, query, *args):
+        self.audit_write = (query, args)
+
+    async def fetch(self, query, limit):
+        assert "tenant_control_audit" in query
+        self.limit = limit
+        return [{"audit_id": 1, "action": "member.suspended", "tenant_key": "acme"}]
+
+
+def test_audit_write_records_actor_action_and_structured_details():
+    pool = AuditPool()
+    asyncio.run(
+        main.record_audit(
+            request_for(pool, FakeKeycloak()),
+            identity(),
+            "acme",
+            "member.suspended",
+            {"subject": "member-1"},
+        )
+    )
+    query, args = pool.audit_write
+    assert "tenant_control_audit" in query
+    assert args[:3] == ("platform-user", "acme", "member.suspended")
+    assert '"subject":"member-1"' in args[3]
+
+
+def test_audit_list_is_platform_admin_only_and_caps_page_size():
+    pool = AuditPool()
+    result = asyncio.run(
+        main.list_admin_audit(request_for(pool, FakeKeycloak()), identity(), limit=1000)
+    )
+    assert result[0]["action"] == "member.suspended"
+    assert pool.limit == 200
+
+    non_admin = Identity("member", "pulse-oauth2-proxy", ("/pulse/home",))
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(
+            main.list_admin_audit(
+                request_for(pool, FakeKeycloak()), non_admin, limit=50
+            )
+        )
+    assert error.value.status_code == 403

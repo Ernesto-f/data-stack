@@ -72,3 +72,17 @@ CREATE TABLE IF NOT EXISTS membership_products (
 
 CREATE INDEX IF NOT EXISTS tenant_memberships_subject_idx
     ON tenant_memberships (keycloak_subject, membership_status);
+
+CREATE TABLE IF NOT EXISTS tenant_control_audit (
+    audit_id bigserial PRIMARY KEY,
+    actor_subject text NOT NULL,
+    tenant_key text,
+    action text NOT NULL,
+    details jsonb NOT NULL DEFAULT '{}'::jsonb,
+    occurred_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS tenant_control_audit_recent_idx
+    ON tenant_control_audit (occurred_at DESC);
+CREATE INDEX IF NOT EXISTS tenant_control_audit_tenant_recent_idx
+    ON tenant_control_audit (tenant_key, occurred_at DESC);

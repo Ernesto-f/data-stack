@@ -85,6 +85,8 @@
           <label>Estado<select id="tenant-status-filter"><option value="">Todos os estados</option><option value="provisioning">Provisionando</option><option value="active">Ativo</option><option value="suspended">Suspenso</option></select></label>
         </div>
         <p id="tenant-filter-summary" class="muted" aria-live="polite"></p>
+        <h3>Atividade administrativa recente</h3>
+        <div class="table-wrap"><table><thead><tr><th>Quando</th><th>Ação</th><th>Empresa</th><th>Ator</th></tr></thead><tbody id="tenant-audit"><tr><td colspan="4" class="muted">Carregando auditoria…</td></tr></tbody></table></div>
       </section>
 
       <section id="tenant-panel" class="panel hidden">
@@ -200,6 +202,19 @@
         ].map(([label, count]) => `<span class="status"><strong>${esc(count)}</strong> ${esc(label)}</span>`).join("");
       }
 
+      async function loadAdminAudit() {
+        const tbody = document.getElementById("tenant-audit");
+        try {
+          const entries = await apiCall("/admin/audit?limit=25");
+          tbody.innerHTML = entries.length ? entries.map(entry => {
+            const date = new Date(entry.occurred_at).toLocaleString("pt-BR");
+            return `<tr><td>${esc(date)}</td><td>${esc(entry.action)}</td><td>${esc(entry.tenant_key || "Plataforma")}</td><td><small>${esc(entry.actor_subject)}</small></td></tr>`;
+          }).join("") : "<tr><td colspan='4' class='muted'>Nenhuma operação registrada.</td></tr>";
+        } catch (error) {
+          tbody.innerHTML = `<tr><td colspan="4" class="muted">Auditoria indisponível: ${esc(error.message)}</td></tr>`;
+        }
+      }
+
       async function apiCall(path, options = {}) {
         const response = await fetch(`${api}${path}`, {
           credentials: "same-origin",
@@ -283,6 +298,7 @@
         planForm.elements.crm_access_mode.value = crmPlan?.access_mode || "assigned";
         planForm.elements.crm_seat_limit.value = crmPlan?.seat_limit ?? "";
         renderProducts(tenant.products || [], canManage);
+        if (platformAdmin) await loadAdminAudit();
         try {
           const members = await apiCall(`/tenants/${encodeURIComponent(tenant.tenant_key)}/members`);
           renderMembers(members, canManage);

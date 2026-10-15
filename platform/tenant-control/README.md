@@ -40,6 +40,7 @@ Para habilitar um administrador do control plane, associe a conta verificada ao 
 6. Admins autorizados podem alterar a função e os produtos/assentos de um membro; somente owner ou platform admin podem nomear administradores e somente platform admin pode alterar o owner. A API impede remover o último owner ativo.
 7. Um membro suspenso pode ser reativado no Portal com nova seleção de produtos; a API valida entitlement/assentos e sincroniza os grupos Keycloak, revertendo a reativação se a sincronização falhar.
 8. Para suspender um funcionário, use o Portal. A API remove os grupos do escopo suspenso e preserva identidades/memberships de outras empresas.
+9. Operações administrativas concluídas são registradas em `tenant_control_audit`; a listagem é exclusiva para platform admins e não armazena e-mail dos membros.
 
 O fluxo exige SMTP funcional no realm. Sem SMTP, o endpoint recusa o convite e desfaz a identidade/grupos recém-criados; ele não retorna senha temporária ao browser.
 

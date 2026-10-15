@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from contextlib import asynccontextmanager
@@ -183,6 +184,30 @@ async def tenant_activation_preflight(request: Request, tenant: dict) -> dict:
     }
 
 
+async def record_audit(
+    request: Request,
+    identity: Identity,
+    tenant_key: str | None,
+    action: str,
+    details: dict,
+) -> None:
+    try:
+        await request.app.state.pool.execute(
+            """INSERT INTO tenant_control_audit
+               (actor_subject,tenant_key,action,details) VALUES ($1,$2,$3,$4::jsonb)""",
+            identity.subject,
+            tenant_key,
+            action,
+            json.dumps(details, separators=(",", ":")),
+        )
+    except Exception:
+        # Audit persistence must not turn a completed access/tenant change into
+        # an apparent API failure that an operator might retry blindly.
+        import logging
+
+        logging.getLogger(__name__).exception("Failed to persist tenant-control audit event: %s", action)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     dsn = os.getenv("DATABASE_URL")
@@ -233,6 +258,23 @@ async def require_tenant_admin(request: Request, identity: Identity, tenant_key:
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/v1/admin/audit")
+async def list_admin_audit(
+    request: Request,
+    identity: Identity = Depends(current_identity),
+    limit: int = 50,
+) -> list[dict]:
+    if not is_platform_admin(identity):
+        raise HTTPException(403, "Platform administrator role required")
+    limit = max(1, min(limit, 200))
+    rows = await request.app.state.pool.fetch(
+        """SELECT audit_id,actor_subject,tenant_key,action,details,occurred_at
+           FROM tenant_control_audit ORDER BY occurred_at DESC,audit_id DESC LIMIT $1""",
+        limit,
+    )
+    return [dict(row) for row in rows]
 
 
 @app.get("/v1/me")
@@ -348,6 +390,13 @@ async def create_tenant(
                     product.seat_limit,
                     product.access_mode,
                 )
+    await record_audit(
+        request,
+        identity,
+        body.tenant_key,
+        "tenant.created",
+        {"products": [item.product_key for item in body.products]},
+    )
     return {"tenant_key": body.tenant_key, "tenant_status": "provisioning"}
 
 
@@ -458,6 +507,13 @@ async def update_tenant(
                 503,
                 "Tenant state was rolled back because Keycloak access synchronization failed; retry the operation.",
             ) from error
+    await record_audit(
+        request,
+        identity,
+        tenant_key,
+        "tenant.updated",
+        {"changes": changes},
+    )
     return dict(row)
 
 
@@ -568,6 +624,13 @@ async def replace_entitlements(
     )
     for member in subjects:
         await sync_subject_groups(request, member["keycloak_subject"])
+    await record_audit(
+        request,
+        identity,
+        tenant_key,
+        "tenant.entitlements_updated",
+        {"products": [item.model_dump(exclude_none=True) for item in body.products]},
+    )
     return {"tenant_key": tenant_key, "products": await entitlement_rows(request, tenant_key)}
 
 
@@ -793,6 +856,13 @@ async def invite_member(
             await request.app.state.keycloak.rollback_user_groups(subject, added_groups, created_user)
         raise
 
+    await record_audit(
+        request,
+        identity,
+        tenant_key,
+        "member.invited",
+        {"subject": subject, "tenant_role": body.tenant_role, "products": products},
+    )
     return {
         "keycloak_subject": subject,
         "email": email,
@@ -893,6 +963,13 @@ async def update_member_products(
             503,
             "Membership changes were rolled back because Keycloak access synchronization failed; retry the operation.",
         ) from error
+    await record_audit(
+        request,
+        identity,
+        tenant_key,
+        "member.access_updated",
+        {"subject": subject, "tenant_role": target_role, "products": products},
+    )
     return {"keycloak_subject": subject, "products": products, "sync_groups_added": len(added_groups)}
 
 
@@ -936,6 +1013,7 @@ async def suspend_member(
         subject,
     )
     await sync_subject_groups(request, subject)
+    await record_audit(request, identity, tenant_key, "member.suspended", {"subject": subject})
 
 
 @app.post("/v1/tenants/{tenant_key}/members/{subject}/reactivate")
@@ -1001,4 +1079,11 @@ async def reactivate_member(
             "Membership was rolled back because Keycloak access synchronization failed; retry the operation.",
         ) from error
 
+    await record_audit(
+        request,
+        identity,
+        tenant_key,
+        "member.reactivated",
+        {"subject": subject, "products": products},
+    )
     return {"keycloak_subject": subject, "membership_status": "active", "products": products}
