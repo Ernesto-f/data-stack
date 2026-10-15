@@ -19,12 +19,12 @@ from app.keycloak import KeycloakAdmin, KeycloakError, KeycloakGroupMissingError
 from app.policies import (
     MANAGED_GLOBAL_GROUPS,
     MANAGED_TENANT_SUFFIXES,
+    READY_PRODUCTS,
     is_platform_admin,
     product_group_paths,
 )
 
 TENANT_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,29}[a-z0-9]$")
-READY_PRODUCTS = {"crm"}
 logger = logging.getLogger(__name__)
 UNSET = object()
 

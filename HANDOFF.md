@@ -54,7 +54,7 @@ Melhorias de robustez aplicadas nesta revisão:
 - Primeiro login verificado agora reverte somente as memberships recém-ativadas se a sincronização falhar, permitindo retry seguro.
 - Nome de membro após trim exige pelo menos dois caracteres; testes cobrem progresso parcial de sync e rollback do primeiro login.
 - PATCH de tenant que corrige `crm_host` e ativa na mesma requisição agora valida o host candidato, sem exigir uma segunda chamada artificial.
-- A política de grupos também aplica `READY_PRODUCTS` na sincronização, evitando conceder grupos de produtos planejados mesmo se o banco/catalogo for alterado indevidamente.
+- A política de grupos centraliza `READY_PRODUCTS` e também aplica a regra no helper reutilizável, evitando conceder grupos de produtos planejados mesmo se outro fluxo for adicionado.
 - Ruff corrigiu imports/estilo seguro e agora passa com as exceções documentadas `B008` (padrão FastAPI `Depends`) e `SIM117` (contextos async aninhados mantidos explícitos); não há outros avisos.
 - A autorização de função preserva o caminho de atualização de produtos quando a função não muda; testes cobrem funções inalteradas sem relaxar mudanças de owner/admin.
 - O sincronizador Keycloak agora compensa também grupos removidos quando uma operação falha no meio; a regressão foi coberta por teste dedicado.
@@ -70,7 +70,7 @@ Arquivos da alteração atual:
 
 ## Validação executada
 
-- `PYTHONPATH=platform/tenant-control /tmp/opencode/tenant-control-venv/bin/pytest -q platform/tenant-control/tests` — **11 passaram**.
+- `PYTHONPATH=platform/tenant-control /tmp/opencode/tenant-control-venv/bin/pytest -q platform/tenant-control/tests` — **28 passaram**.
 - `python -m py_compile platform/tenant-control/app/main.py platform/tenant-control/app/policies.py` — passou.
 - `node --check` no JavaScript embutido de `platform/portal/admin/index.html` — passou.
 - `git diff --check` nos arquivos da tarefa — passou.
@@ -106,7 +106,7 @@ Arquivos da alteração atual:
 - `33c7de7` — `Harden entitlement synchronization failures` — validação de desativação e erros 503 explícitos.
 - `538b4d8` — `Make verified login activation retry-safe` — compensação do primeiro login.
 - `8d1bd0b` — `Serialize tenant membership mutations` — locks do tenant/membership e validações sob transação.
-- Healthcheck Docker da API adicionado em `infra/compose.tenant-control.yml`; `docker compose config`, suíte (**27 testes**), Python, JavaScript e `git diff --check` passaram.
+- Healthcheck Docker da API adicionado em `infra/compose.tenant-control.yml`; `docker compose config`, suíte (**29 testes**), Python, JavaScript, Ruff e `git diff --check` passaram.
 
 ## Cuidados de contexto
 

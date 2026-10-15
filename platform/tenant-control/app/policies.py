@@ -12,6 +12,7 @@ PRODUCT_GROUPS = {
     "analytics": ("pulse/home/analytics", "analytics"),
     "invoice": (None, "invoice"),
 }
+READY_PRODUCTS = frozenset({"crm"})
 MANAGED_TENANT_SUFFIXES = (
     "admin",
     "crm",
@@ -53,5 +54,7 @@ def all_groups_for_membership(
     if tenant_role in {"owner", "admin"}:
         groups.add(tenant_admin_group(tenant_key))
     for product_key, product_role in product_roles:
+        if product_key not in READY_PRODUCTS:
+            continue
         groups.update(product_group_paths(tenant_key, product_key, product_role))
     return groups

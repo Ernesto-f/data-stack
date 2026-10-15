@@ -25,6 +25,11 @@ def test_crm_manager_gets_only_that_tenants_manager_role():
     assert "/pulse/tenants/other/crm-admin" not in groups
 
 
+def test_planned_products_never_grant_access_groups():
+    groups = all_groups_for_membership("acme", "member", [("analytics", "user"), ("knowledge", "user")])
+    assert groups == {"/pulse/home"}
+
+
 def test_tenant_admin_role_does_not_imply_crm_subscription():
     groups = all_groups_for_membership("acme", "admin", [])
     assert "/pulse/tenants/acme/admin" in groups
