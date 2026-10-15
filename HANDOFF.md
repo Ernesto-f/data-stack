@@ -49,6 +49,7 @@ Melhorias de robustez aplicadas nesta revisão:
 - Suspensão de membro restaura status, produtos e grupos se a sincronização falhar; repetição de uma suspensão já concluída é idempotente.
 - Atualização de acesso lê os produtos anteriores dentro do mesmo lock transacional da membership.
 - Erros de grupo ausente no Keycloak têm tipo próprio; indisponibilidade não é reportada como grupo faltante e preflight retorna 503.
+- Atualização de entitlement exige revogar memberships antes de desativar um produto; falhas de sincronização pós-gravação retornam 503 com progresso explícito, em vez de erro 500 genérico.
 
 Arquivos da alteração atual:
 
@@ -65,7 +66,7 @@ Arquivos da alteração atual:
 - `python -m py_compile platform/tenant-control/app/main.py platform/tenant-control/app/policies.py` — passou.
 - `node --check` no JavaScript embutido de `platform/portal/admin/index.html` — passou.
 - `git diff --check` nos arquivos da tarefa — passou.
-- Última validação: suíte tenant-control **23 passaram**; compilação Python, sintaxe JS e `git diff --check` passaram.
+- Última validação: suíte tenant-control **24 passaram**; compilação Python, sintaxe JS e `git diff --check` passaram.
 - Revisão de autorização e fluxo concluída: preflight/update restritos a platform admins; a ativação exige grupo admin tenant-scoped mesmo sem CRM; suspender/reativar sincroniza grupos sem alterar os grupos de outros tenants.
 - Não foi feita validação visual com sessão Keycloak no navegador.
 

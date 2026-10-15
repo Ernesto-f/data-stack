@@ -142,6 +142,23 @@ async def entitlement_rows(request: Request, tenant_key: str) -> list[dict]:
     return [dict(row) for row in rows]
 
 
+async def sync_tenant_members(request: Request, tenant_key: str) -> int:
+    subjects = await request.app.state.pool.fetch(
+        "SELECT keycloak_subject FROM tenant_memberships WHERE tenant_key=$1", tenant_key
+    )
+    synced = 0
+    for member in subjects:
+        try:
+            await sync_subject_groups(request, member["keycloak_subject"])
+            synced += 1
+        except KeycloakError as error:
+            raise HTTPException(
+                503,
+                f"Tenant data was saved, but Keycloak synchronization stopped after {synced} memberships; retry the operation.",
+            ) from error
+    return synced
+
+
 async def tenant_activation_preflight(request: Request, tenant: dict) -> dict:
     """Check the prerequisites that the control plane can verify before activation."""
     tenant_key = tenant["tenant_key"]
@@ -698,16 +715,32 @@ async def replace_entitlements(
                     raise HTTPException(422, f"Unknown product: {item.product_key}")
                 if item.enabled and item.product_key not in READY_PRODUCTS:
                     raise HTTPException(409, f"{item.product_key} integration is not ready")
+                existing = await connection.fetchrow(
+                    "SELECT enabled FROM tenant_products WHERE tenant_key=$1 AND product_key=$2 FOR UPDATE",
+                    tenant_key,
+                    item.product_key,
+                )
+                if existing and existing["enabled"] and not item.enabled:
+                    used = await connection.fetchval(
+                        """SELECT EXISTS (SELECT 1 FROM membership_products
+                           WHERE tenant_key=$1 AND product_key=$2)""",
+                        tenant_key,
+                        item.product_key,
+                    )
+                    if used:
+                        raise HTTPException(409, f"Revoke {item.product_key} memberships before disabling its entitlement")
                 if item.enabled and item.product_key in READY_PRODUCTS:
                     try:
                         await request.app.state.keycloak.group_id(
                             f"pulse/tenants/{tenant_key}/{item.product_key}"
                         )
-                    except KeycloakError as error:
+                    except KeycloakGroupMissingError as error:
                         raise HTTPException(
                             409,
                             f"Provision the tenant Keycloak groups for {item.product_key} first",
                         ) from error
+                    except KeycloakError as error:
+                        raise HTTPException(503, "Keycloak is unavailable; entitlement was not changed") from error
                 await connection.execute(
                     """INSERT INTO tenant_products
                        (tenant_key,product_key,enabled,seat_limit,access_mode)
@@ -754,11 +787,7 @@ async def replace_entitlements(
                         tenant_key,
                         item.product_key,
                     )
-    subjects = await request.app.state.pool.fetch(
-        "SELECT keycloak_subject FROM tenant_memberships WHERE tenant_key=$1", tenant_key
-    )
-    for member in subjects:
-        await sync_subject_groups(request, member["keycloak_subject"])
+    await sync_tenant_members(request, tenant_key)
     await record_audit(
         request,
         identity,

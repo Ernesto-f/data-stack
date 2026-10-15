@@ -599,3 +599,25 @@ def test_preflight_does_not_mislabel_keycloak_outage_as_missing_group():
                 {"tenant_key": "acme", "tenant_status": "provisioning"},
             )
         )
+
+
+def test_tenant_member_sync_reports_partial_progress_as_503(monkeypatch):
+    class MembersPool:
+        async def fetch(self, query, *_args):
+            assert "keycloak_subject" in query
+            return [{"keycloak_subject": "member-1"}, {"keycloak_subject": "member-2"}]
+
+    calls = []
+
+    async def sync(_request, subject):
+        calls.append(subject)
+        if subject == "member-2":
+            raise KeycloakError("Keycloak unavailable")
+        return []
+
+    monkeypatch.setattr(main, "sync_subject_groups", sync)
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(main.sync_tenant_members(request_for(MembersPool(), FakeKeycloak()), "acme"))
+    assert error.value.status_code == 503
+    assert "after 1 memberships" in error.value.detail
+    assert calls == ["member-1", "member-2"]
