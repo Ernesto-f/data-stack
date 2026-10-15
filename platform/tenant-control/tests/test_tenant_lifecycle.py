@@ -388,6 +388,8 @@ def test_member_role_changes_keep_platform_admin_boundaries():
 
     main.authorize_member_role_change("owner", "admin", "member")
     main.authorize_member_role_change("platform_admin", "owner", "member")
+    main.authorize_member_role_change("owner", "owner", "owner")
+    main.authorize_member_role_change("member", "member", "member")
 
 
 class SeatLimitConnection:
