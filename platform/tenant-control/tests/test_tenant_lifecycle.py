@@ -81,6 +81,19 @@ def test_activation_preflight_blocks_wrong_crm_host_and_missing_keycloak_group()
     }
 
 
+def test_activation_preflight_can_validate_a_pending_host_override():
+    pool = PreflightPool(crm_host="old.crm.izatacore.com")
+    keycloak = FakeKeycloak({"pulse/tenants/acme/admin", "pulse/tenants/acme/crm"})
+    result = asyncio.run(
+        main.tenant_activation_preflight(
+            request_for(pool, keycloak),
+            {"tenant_key": "acme", "tenant_status": "provisioning"},
+            "acme.crm.izatacore.com",
+        )
+    )
+    assert result["ready"] is True
+
+
 def test_activation_preflight_does_not_require_crm_but_requires_tenant_admin_group():
     result = asyncio.run(
         main.tenant_activation_preflight(

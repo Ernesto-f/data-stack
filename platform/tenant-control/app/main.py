@@ -27,6 +27,7 @@ from app.policies import (
 TENANT_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,29}[a-z0-9]$")
 READY_PRODUCTS = {"crm"}
 logger = logging.getLogger(__name__)
+UNSET = object()
 
 
 def tenant_host(tenant_key: str) -> str:
@@ -161,7 +162,9 @@ async def sync_tenant_members(request: Request, tenant_key: str) -> int:
     return synced
 
 
-async def tenant_activation_preflight(request: Request, tenant: dict) -> dict:
+async def tenant_activation_preflight(
+    request: Request, tenant: dict, crm_host_override: str | None | object = UNSET
+) -> dict:
     """Check the prerequisites that the control plane can verify before activation."""
     tenant_key = tenant["tenant_key"]
     expected_host = tenant_host(tenant_key)
@@ -176,7 +179,8 @@ async def tenant_activation_preflight(request: Request, tenant: dict) -> dict:
     checks: list[dict[str, str]] = []
     crm_enabled = bool(crm and crm["crm_enabled"])
     if crm_enabled:
-        host_ready = crm["crm_host"] == expected_host
+        effective_crm_host = crm["crm_host"] if crm_host_override is UNSET else crm_host_override
+        host_ready = effective_crm_host == expected_host
         checks.append({
             "key": "crm_host",
             "status": "ready" if host_ready else "blocked",
@@ -625,7 +629,11 @@ async def update_tenant(
             "tenant_status": current["tenant_status"],
         }
         try:
-            readiness = await tenant_activation_preflight(request, tenant_for_check)
+            readiness = await tenant_activation_preflight(
+                request,
+                tenant_for_check,
+                changes.get("crm_host", UNSET),
+            )
         except KeycloakError as error:
             raise HTTPException(503, "Keycloak is unavailable; activation preflight could not be completed") from error
         if not readiness["ready"]:
