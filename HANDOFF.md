@@ -1,7 +1,7 @@
 # Handoff — Pulse Portal `/admin`
 
 **Atualizado:** 2026-10-15  
-**Estado:** Revisão de funcionalidades e boas práticas iniciada; Fases 1, 2, auditoria e reconciliação implementadas localmente; nada publicado na VPS.
+**Estado:** Fases 1, 2, auditoria e reconciliação implementadas; control plane publicado na VPS por exceção autorizada; fluxo normal de PR documentado para as próximas entregas.
 
 ## Objetivo
 
@@ -83,17 +83,18 @@ Arquivos da alteração atual:
 
 ## Produção / deployment
 
-- As alterações acima são somente locais. Não foram enviadas ou aplicadas na VPS.
+- O control plane foi atualizado na VPS em 2026-10-15 a partir do commit local `b2fa816`; a API foi reconstruída no container `732242da03fe` e ficou saudável.
+- Exceção autorizada: como `/srv/data-stack` não possuía checkout Git, a publicação foi feita por staging/transferência controlada, sem alterar Keycloak, PostgreSQL ou stacks de produto.
+- Backup remoto: `/srv/backups/tenant-control/20261015-225800/`, contendo código/configuração, dump PostgreSQL, imagem anterior e configuração Nginx.
+- Validação pós-deploy: `/health` respondeu `{"status":"ok"}`, Compose validado, Nginx permaneceu inalterado e o banco continuou com `0` tenants.
 - O control plane ativo é servido na VPS `portal.izatacore.com` / host SSH com chave validada previamente como `knowledge.izatacore.com`.
 - O banco de tenant-control foi consultado anteriormente e estava vazio (`tenants_total = 0`). Reconfirmar antes de mudanças operacionais.
 - Não tocar em configurações secretas, bancos ou stacks de produto durante deploy sem plano de rollback.
 
 ## Próximos passos
 
-1. Atualizar a documentação dos fluxos finais e revisar lacunas de endpoint/UI.
-2. Aguardar autorização explícita antes de publicar na VPS; deployment não foi solicitado nem executado nesta etapa.
-3. Se autorizado, publicar com backup das imagens e configuração anterior; não alterar dados nem stacks de produto.
-4. Validar login, lista vazia, criação, preflight, ativação, suspensão/retomada, reativação, auditoria e reconciliação no painel implantado.
+1. Para próximas entregas, abrir PR, fazer merge e preparar checkout Git na VPS para atualizar por `git pull`.
+2. Validar login, lista vazia, criação, preflight, ativação, suspensão/retomada, reativação, auditoria e reconciliação no painel implantado.
 
 ## Commits recentes
 
