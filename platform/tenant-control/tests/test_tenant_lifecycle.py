@@ -6,7 +6,7 @@ from fastapi import HTTPException
 
 from app import main
 from app.auth import Identity
-from app.keycloak import KeycloakError
+from app.keycloak import KeycloakError, KeycloakGroupMissingError
 
 
 def identity() -> Identity:
@@ -41,7 +41,7 @@ class FakeKeycloak:
 
     async def group_id(self, group_path):
         if group_path not in self.groups:
-            raise KeycloakError("missing group")
+            raise KeycloakGroupMissingError("missing group")
         return f"id:{group_path}"
 
 
@@ -524,7 +524,7 @@ class ReconciliationGatePool:
 
 class MissingGroupKeycloak:
     async def group_id(self, group_path):
-        raise KeycloakError(f"Required Keycloak group is missing: {group_path}")
+        raise KeycloakGroupMissingError(f"Required Keycloak group is missing: {group_path}")
 
 
 def test_reconciliation_sync_refuses_to_run_until_tenant_groups_are_provisioned():
@@ -538,3 +538,64 @@ def test_reconciliation_sync_refuses_to_run_until_tenant_groups_are_provisioned(
     error = asyncio.run(run_sync())
     assert error.status_code == 409
     assert error.detail["report"]["missing_groups"]
+
+
+class LoginPool:
+    def __init__(self):
+        self.sync_queries = []
+
+    async def fetchval(self, query, *_args):
+        assert "RETURNING keycloak_subject" in query
+        return "member-1"
+
+    async def fetch(self, query, *_args):
+        if "FROM tenant_memberships m JOIN tenants" in query:
+            return [{
+                "tenant_key": "acme",
+                "tenant_role": "member",
+                "membership_status": "active",
+                "tenant_status": "active",
+            }]
+        if "FROM membership_products mp" in query:
+            return [{"product_key": "crm", "product_role": "user"}]
+        if "FROM tenant_memberships m JOIN tenants t" in query:
+            return [{
+                "tenant_key": "acme",
+                "display_name": "Acme",
+                "crm_host": "acme.crm.izatacore.com",
+                "tenant_status": "active",
+                "tenant_role": "member",
+                "membership_status": "active",
+            }]
+        raise AssertionError(f"Unexpected fetch query: {query}")
+
+
+class LoginKeycloak:
+    async def set_groups(self, subject, desired, managed):
+        return []
+
+
+def test_verified_first_login_synchronizes_groups_after_activation():
+    pool = LoginPool()
+    result = asyncio.run(
+        main.current_user(
+            request_for(pool, LoginKeycloak()),
+            Identity("member-1", "pulse-oauth2-proxy", (), email_verified=True),
+        )
+    )
+    assert result["tenants"][0]["tenant_key"] == "acme"
+
+
+class OutageKeycloak:
+    async def group_id(self, _group_path):
+        raise KeycloakError("Keycloak unavailable")
+
+
+def test_preflight_does_not_mislabel_keycloak_outage_as_missing_group():
+    with pytest.raises(KeycloakError, match="unavailable"):
+        asyncio.run(
+            main.tenant_activation_preflight(
+                request_for(PreflightPool(), OutageKeycloak()),
+                {"tenant_key": "acme", "tenant_status": "provisioning"},
+            )
+        )

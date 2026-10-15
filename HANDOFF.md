@@ -1,7 +1,7 @@
 # Handoff — Pulse Portal `/admin`
 
 **Atualizado:** 2026-10-15  
-**Estado:** Fases 1, 2, auditoria e reconciliação (relatório + sincronização explícita) implementadas; nada publicado na VPS.
+**Estado:** Revisão de funcionalidades e boas práticas iniciada; Fases 1, 2, auditoria e reconciliação implementadas localmente; nada publicado na VPS.
 
 ## Objetivo
 
@@ -43,6 +43,13 @@ Reconciliação Keycloak:
 - Indisponibilidade do provedor retorna 503 em vez de falso sucesso.
 - `/pulse/home` passou a ser tratado como grupo gerenciado, para detectar/remover o grupo quando o usuário perde todos os memberships ativos.
 
+Melhorias de robustez aplicadas nesta revisão:
+
+- Login com e-mail verificado agora ativa a membership e sincroniza os grupos antes de concluir `/v1/me`; falha do Keycloak retorna 503.
+- Suspensão de membro restaura status, produtos e grupos se a sincronização falhar; repetição de uma suspensão já concluída é idempotente.
+- Atualização de acesso lê os produtos anteriores dentro do mesmo lock transacional da membership.
+- Erros de grupo ausente no Keycloak têm tipo próprio; indisponibilidade não é reportada como grupo faltante e preflight retorna 503.
+
 Arquivos da alteração atual:
 
 - `platform/portal/admin/index.html`
@@ -58,7 +65,7 @@ Arquivos da alteração atual:
 - `python -m py_compile platform/tenant-control/app/main.py platform/tenant-control/app/policies.py` — passou.
 - `node --check` no JavaScript embutido de `platform/portal/admin/index.html` — passou.
 - `git diff --check` nos arquivos da tarefa — passou.
-- Última validação: suíte tenant-control **21 passaram**; compilação Python, sintaxe JS e `git diff --check` passaram.
+- Última validação: suíte tenant-control **23 passaram**; compilação Python, sintaxe JS e `git diff --check` passaram.
 - Revisão de autorização e fluxo concluída: preflight/update restritos a platform admins; a ativação exige grupo admin tenant-scoped mesmo sem CRM; suspender/reativar sincroniza grupos sem alterar os grupos de outros tenants.
 - Não foi feita validação visual com sessão Keycloak no navegador.
 
@@ -71,7 +78,7 @@ Arquivos da alteração atual:
 
 ## Próximos passos
 
-1. Revisar/commitar a ação corretiva de reconciliação e avaliar lacunas do ciclo operacional.
+1. Commitar as melhorias de robustez e avaliar lacunas transacionais restantes, especialmente atualização de entitlements e suspensão de membro.
 2. Aguardar autorização explícita antes de publicar na VPS; deployment não foi solicitado nem executado nesta etapa.
 3. Se autorizado, publicar com backup das imagens e configuração anterior; não alterar dados nem stacks de produto.
 4. Validar login, lista vazia, criação, preflight, ativação, suspensão/retomada, reativação, auditoria e reconciliação no painel implantado.

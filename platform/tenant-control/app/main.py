@@ -14,7 +14,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from app.auth import Identity, build_verifier, current_identity
-from app.keycloak import KeycloakAdmin, KeycloakError
+from app.keycloak import KeycloakAdmin, KeycloakError, KeycloakGroupMissingError
 from app.policies import (
     MANAGED_GLOBAL_GROUPS,
     MANAGED_TENANT_SUFFIXES,
@@ -187,7 +187,7 @@ async def tenant_activation_preflight(request: Request, tenant: dict) -> dict:
         try:
             await request.app.state.keycloak.group_id(group_path)
             checks.append({"key": f"group:{group_path}", "status": "ready", "detail": f"/{group_path}"})
-        except KeycloakError:
+        except KeycloakGroupMissingError:
             checks.append({"key": f"group:{group_path}", "status": "blocked", "detail": f"Grupo /{group_path} não encontrado no Keycloak."})
 
     return {
@@ -335,11 +335,8 @@ async def reconcile_keycloak_state(
             for group_path in sorted(required):
                 try:
                     await request.app.state.keycloak.group_id(group_path)
-                except KeycloakError as error:
-                    if str(error).startswith("Required Keycloak group is missing:"):
-                        missing_groups.append({"tenant_key": tenant_key, "group_path": f"/{group_path}"})
-                    else:
-                        raise
+                except KeycloakGroupMissingError:
+                    missing_groups.append({"tenant_key": tenant_key, "group_path": f"/{group_path}"})
 
         for row in memberships:
             subject = row["keycloak_subject"]
@@ -408,11 +405,17 @@ async def current_user(
     request: Request, identity: Identity = Depends(current_identity)
 ) -> dict:
     if identity.email_verified:
-        await request.app.state.pool.execute(
+        activated_subject = await request.app.state.pool.fetchval(
             """UPDATE tenant_memberships SET membership_status='active'
-               WHERE keycloak_subject=$1 AND membership_status='invited'""",
+               WHERE keycloak_subject=$1 AND membership_status='invited'
+               RETURNING keycloak_subject""",
             identity.subject,
         )
+        if activated_subject:
+            try:
+                await sync_subject_groups(request, identity.subject)
+            except KeycloakError as error:
+                raise HTTPException(503, "Identity access synchronization is temporarily unavailable") from error
     memberships = await request.app.state.pool.fetch(
         """SELECT t.tenant_key,t.display_name,t.crm_host,t.tenant_status,
                   m.tenant_role,m.membership_status
@@ -539,7 +542,10 @@ async def get_tenant_activation_preflight(
     )
     if tenant is None:
         raise HTTPException(404, "Tenant not found")
-    return await tenant_activation_preflight(request, tenant)
+    try:
+        return await tenant_activation_preflight(request, tenant)
+    except KeycloakError as error:
+        raise HTTPException(503, "Keycloak is unavailable; activation preflight could not be completed") from error
 
 
 @app.patch("/v1/admin/tenants/{tenant_key}")
@@ -589,7 +595,10 @@ async def update_tenant(
             "tenant_key": tenant_key,
             "tenant_status": current["tenant_status"],
         }
-        readiness = await tenant_activation_preflight(request, tenant_for_check)
+        try:
+            readiness = await tenant_activation_preflight(request, tenant_for_check)
+        except KeycloakError as error:
+            raise HTTPException(503, "Keycloak is unavailable; activation preflight could not be completed") from error
         if not readiness["ready"]:
             raise HTTPException(
                 409,
@@ -1015,12 +1024,6 @@ async def update_member_products(
         raise HTTPException(404, "Tenant membership not found")
     target_role = body.tenant_role or membership["tenant_role"]
     authorize_member_role_change(actor_role, membership["tenant_role"], target_role)
-    previous_products = await request.app.state.pool.fetch(
-        """SELECT product_key,product_role FROM membership_products
-           WHERE tenant_key=$1 AND keycloak_subject=$2""",
-        tenant_key,
-        subject,
-    )
     async with request.app.state.pool.acquire() as connection:
         async with connection.transaction():
             locked_membership = await connection.fetchrow(
@@ -1032,6 +1035,12 @@ async def update_member_products(
             if locked_membership is None or locked_membership["membership_status"] == "suspended":
                 raise HTTPException(404, "Tenant membership not found")
             authorize_member_role_change(actor_role, locked_membership["tenant_role"], target_role)
+            previous_products = await connection.fetch(
+                """SELECT product_key,product_role FROM membership_products
+                   WHERE tenant_key=$1 AND keycloak_subject=$2""",
+                tenant_key,
+                subject,
+            )
             if locked_membership["tenant_role"] == "owner" and target_role != "owner":
                 other_owners = await connection.fetchval(
                     """SELECT count(*) FROM tenant_memberships
@@ -1108,12 +1117,14 @@ async def suspend_member(
 ) -> None:
     actor_role = await require_tenant_admin(request, identity, tenant_key)
     member = await request.app.state.pool.fetchrow(
-        "SELECT tenant_role FROM tenant_memberships WHERE tenant_key=$1 AND keycloak_subject=$2",
+        "SELECT tenant_role,membership_status FROM tenant_memberships WHERE tenant_key=$1 AND keycloak_subject=$2",
         tenant_key,
         subject,
     )
     if member is None:
         raise HTTPException(404, "Tenant membership not found")
+    if member["membership_status"] == "suspended":
+        return
     if member["tenant_role"] == "owner" and actor_role != "platform_admin":
         raise HTTPException(403, "Only a platform administrator can suspend the tenant owner")
     if member["tenant_role"] == "admin" and actor_role not in {"owner", "platform_admin"}:
@@ -1128,6 +1139,12 @@ async def suspend_member(
         )
         if not active_owners:
             raise HTTPException(409, "Assign another active owner before suspending the current owner")
+    previous_products = await request.app.state.pool.fetch(
+        """SELECT product_key,product_role FROM membership_products
+           WHERE tenant_key=$1 AND keycloak_subject=$2""",
+        tenant_key,
+        subject,
+    )
     await request.app.state.pool.execute(
         "UPDATE tenant_memberships SET membership_status='suspended' WHERE tenant_key=$1 AND keycloak_subject=$2",
         tenant_key,
@@ -1138,7 +1155,33 @@ async def suspend_member(
         tenant_key,
         subject,
     )
-    await sync_subject_groups(request, subject)
+    try:
+        await sync_subject_groups(request, subject)
+    except KeycloakError as error:
+        await request.app.state.pool.execute(
+            "UPDATE tenant_memberships SET membership_status=$3 WHERE tenant_key=$1 AND keycloak_subject=$2",
+            tenant_key,
+            subject,
+            member["membership_status"],
+        )
+        for product in previous_products:
+            await request.app.state.pool.execute(
+                """INSERT INTO membership_products
+                   (tenant_key,keycloak_subject,product_key,product_role)
+                   VALUES ($1,$2,$3,$4)""",
+                tenant_key,
+                subject,
+                product["product_key"],
+                product["product_role"],
+            )
+        try:
+            await sync_subject_groups(request, subject)
+        except KeycloakError:
+            pass
+        raise HTTPException(
+            503,
+            "Membership suspension was rolled back because Keycloak access synchronization failed; retry the operation.",
+        ) from error
     await record_audit(request, identity, tenant_key, "member.suspended", {"subject": subject})
 
 

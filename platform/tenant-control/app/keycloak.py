@@ -12,6 +12,12 @@ class KeycloakError(RuntimeError):
     pass
 
 
+class KeycloakGroupMissingError(KeycloakError):
+    """The requested group path does not exist in the realm."""
+
+    pass
+
+
 class KeycloakAdmin:
     def __init__(self) -> None:
         self.base = os.getenv("KEYCLOAK_ADMIN_BASE", "http://keycloak:8080/keylogin").rstrip("/")
@@ -103,7 +109,7 @@ class KeycloakAdmin:
             )
             matches = [item for item in response.json() if item.get("name") == name]
             if len(matches) != 1:
-                raise KeycloakError(f"Required Keycloak group is missing: {group_path}")
+                raise KeycloakGroupMissingError(f"Required Keycloak group is missing: {group_path}")
             parent_id = matches[0]["id"]
         if not parent_id:
             raise KeycloakError("Invalid empty group path")
