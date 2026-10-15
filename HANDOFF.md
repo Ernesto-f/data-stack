@@ -60,6 +60,7 @@ Melhorias de robustez aplicadas nesta revisão:
 - O sincronizador Keycloak agora compensa também grupos removidos quando uma operação falha no meio; a regressão foi coberta por teste dedicado.
 - Rollback de alteração de tenant restaura nome, host e status anteriores quando a sincronização falha, evitando aplicação parcial em PATCH combinado.
 - Replace de entitlements agora bloqueia a linha do tenant antes de validar remoções, desativações e limites, alinhando a concorrência com mutações de memberships.
+- Interface do `/admin` revisada com linguagem comercial: “usuários contratados”, “usuários utilizados”, “capacidade” e “contratação” substituem “assentos”; cards, métricas, status e ações foram reorganizados para leitura operacional.
 
 Arquivos da alteração atual:
 
@@ -114,7 +115,7 @@ Arquivos da alteração atual:
 - `a33fae6` — `Centralize ready product group policy` — bloqueio de grupos para produtos planejados.
 - `9b7adef` — `Rollback complete tenant updates on sync failure` — rollback completo de PATCH combinado.
 - `9f828df` — `Serialize entitlement replacement with memberships` — lock do tenant em alterações de entitlements.
-- Healthcheck Docker da API adicionado em `infra/compose.tenant-control.yml`; `docker compose config`, suíte (**30 testes**), Python, JavaScript, Ruff e `git diff --check` passaram.
+- Healthcheck Docker da API adicionado em `infra/compose.tenant-control.yml`; `docker compose config`, suíte (**30 testes**), Python, JavaScript, Ruff e `git diff --check` passaram após a revisão visual da interface.
 
 ## Cuidados de contexto
 

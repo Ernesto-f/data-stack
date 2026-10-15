@@ -6,21 +6,26 @@
     <meta name="theme-color" content="#07111f" />
     <title>Administração de empresas · Pulse</title>
     <style>
-      :root { color-scheme: dark; --bg:#07111f; --panel:#10243a; --line:#28415b; --text:#eff7ff; --muted:#abc0d2; --cyan:#71ceff; --green:#62dfa4; --red:#ff8c96; }
+      :root { color-scheme:dark; --bg:#07111f; --panel:#10243aee; --panel-soft:#0d1d30; --line:#28415b; --text:#eff7ff; --muted:#abc0d2; --cyan:#71ceff; --cyan-soft:#173c58; --green:#62dfa4; --red:#ff8c96; --amber:#f4c66d; }
       * { box-sizing:border-box; }
-      body { margin:0; min-height:100vh; padding:28px 18px 54px; background:radial-gradient(900px 520px at 5% 0,#14517b55,transparent 60%),linear-gradient(145deg,#050b13,var(--bg) 55%,#11162e); color:var(--text); font:15px/1.5 Inter,system-ui,sans-serif; }
-      main { width:min(1050px,100%); margin:auto; }
-      header { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:28px; }
+      body { margin:0; min-height:100vh; padding:30px 18px 64px; background:radial-gradient(900px 520px at 5% 0,#14517b55,transparent 60%),linear-gradient(145deg,#050b13,var(--bg) 55%,#11162e); color:var(--text); font:15px/1.5 Inter,system-ui,sans-serif; }
+      main { width:min(1120px,100%); margin:auto; }
+      header { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; margin-bottom:30px; }
       a { color:var(--cyan); }
       h1 { margin:4px 0; font-size:clamp(26px,4vw,38px); letter-spacing:-.04em; }
-      h2 { margin:0 0 12px; font-size:18px; }
+      h2 { margin:0 0 8px; font-size:19px; letter-spacing:-.02em; }
+      h3 { margin:22px 0 10px; font-size:14px; color:var(--text); }
       p { color:var(--muted); }
       .eyebrow { color:var(--cyan); font-size:11px; font-weight:800; letter-spacing:.13em; text-transform:uppercase; }
-      .panel { margin:16px 0; padding:20px; border:1px solid var(--line); border-radius:16px; background:#10243add; box-shadow:0 16px 45px #0003; }
+      .hero-copy { max-width:700px; margin:0; color:var(--muted); }
+      .panel { margin:16px 0; padding:22px; border:1px solid var(--line); border-radius:18px; background:var(--panel); box-shadow:0 16px 45px #0003; }
+      .section-heading { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:16px; }
+      .section-heading p { margin:0; max-width:760px; }
       .toolbar,.row { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
       .fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px; }
       label { display:grid; gap:6px; color:var(--muted); font-size:12px; font-weight:700; }
-      input,select { width:100%; min-height:42px; padding:9px 11px; border:1px solid #35516c; border-radius:9px; background:#091726; color:var(--text); font:inherit; }
+      input,select { width:100%; min-height:42px; padding:9px 11px; border:1px solid #35516c; border-radius:9px; background:#091726; color:var(--text); font:inherit; transition:border-color .15s,box-shadow .15s; }
+      input:focus,select:focus { outline:0; border-color:var(--cyan); box-shadow:0 0 0 3px #71ceff22; }
       button { min-height:40px; padding:9px 14px; border:1px solid #5aa8d4; border-radius:9px; background:#155079; color:white; font:inherit; font-weight:750; cursor:pointer; }
       button.secondary { border-color:var(--line); background:#0a1726; color:var(--muted); }
       button.danger { border-color:#86404a; background:#512731; }
@@ -29,57 +34,69 @@
       .status { padding:8px 11px; border-radius:9px; background:#0a1726; color:var(--muted); }
       .status.error { color:var(--red); border:1px solid #85404a; }
       .status.ok { color:var(--green); border:1px solid #326b55; }
-      .checks { display:flex; flex-wrap:wrap; gap:14px; padding:8px 0; }
+      .checks { display:flex; flex-wrap:wrap; gap:10px; padding:8px 0; }
       .checks label { display:flex; align-items:center; gap:7px; }
       .checks input { width:auto; min-height:auto; }
+      .metric-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:18px 0; }
+      .metric { padding:14px 16px; border:1px solid var(--line); border-radius:13px; background:var(--panel-soft); }
+      .metric-value { display:block; font-size:24px; font-weight:800; letter-spacing:-.04em; }
+      .metric-label { color:var(--muted); font-size:12px; }
+      .product-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; }
+      .product-card { padding:14px; border:1px solid var(--line); border-radius:13px; background:var(--panel-soft); }
+      .product-card strong { display:block; margin-bottom:3px; }
+      .product-card small { display:block; color:var(--muted); }
+      .product-card.ready { border-color:#326b55; }
       table { width:100%; border-collapse:collapse; margin-top:8px; }
       th,td { padding:10px 8px; border-bottom:1px solid #28415b; text-align:left; vertical-align:top; }
       th { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
       td small { display:block; color:var(--muted); }
+      .table-wrap { overflow-x:auto; }
+      dialog { width:min(520px,calc(100% - 24px)); padding:22px; border:1px solid var(--line); border-radius:16px; background:#10243a; color:var(--text); box-shadow:0 24px 80px #0009; }
+      dialog::backdrop { background:#0009; backdrop-filter:blur(3px); }
       .hidden { display:none !important; }
       .callout { padding:12px; border-left:3px solid #e7b95c; background:#29231066; color:#e5d8b4; }
-      @media(max-width:620px) { body{padding:18px 12px 40px} .panel{padding:15px} table{font-size:12px} th,td{padding:8px 5px} }
+      @media(max-width:760px) { .metric-grid{grid-template-columns:repeat(2,1fr)} }
+      @media(max-width:620px) { body{padding:18px 12px 40px} header{display:block} header>a{display:inline-block;margin-top:14px} .panel{padding:15px} table{font-size:12px} th,td{padding:8px 5px} .metric-grid{grid-template-columns:repeat(2,1fr)} }
     </style>
   </head>
   <body>
     <main>
       <header>
         <div>
-          <div class="eyebrow">Pulse · control plane</div>
-          <h1>Administração de empresas</h1>
+          <div class="eyebrow">Pulse · gestão de clientes</div>
+          <h1>Clientes, planos e acessos</h1>
+          <p class="hero-copy">Organize empresas, acompanhe contratações e controle quem pode usar cada produto Pulse.</p>
           <div class="muted" id="identity">Verificando sua sessão…</div>
         </div>
         <a href="/">Voltar ao Portal</a>
       </header>
 
-      <div id="notice" class="status" role="status" aria-live="polite">Carregando tenants…</div>
+      <div id="notice" class="status" role="status" aria-live="polite">Carregando clientes…</div>
 
       <section class="panel">
-        <h2>Catálogo de produtos</h2>
-        <div id="catalog" class="checks"><span class="muted">Carregando catálogo…</span></div>
-        <p class="muted">Somente produtos com integração pronta podem receber memberships e assentos.</p>
+        <div class="section-heading"><div><h2>Produtos disponíveis</h2><p>Confira quais produtos estão prontos para contratação e uso.</p></div></div>
+        <div id="catalog" class="product-grid"><span class="muted">Carregando catálogo…</span></div>
       </section>
 
       <section id="platform-panel" class="panel hidden">
-        <h2>Novo tenant</h2>
-        <p class="muted">Registre a empresa e seu plano. Prepare uma stack CRM somente quando o produto estiver contratado; a ativação é uma etapa controlada.</p>
+        <div class="section-heading"><div><h2>Cadastrar empresa</h2><p>Registre o cliente e a contratação inicial. A ativação acontece depois da preparação técnica.</p></div></div>
         <form id="tenant-form">
           <div class="fields">
             <label>Identificador (slug)<input name="tenant_key" pattern="[a-z0-9][a-z0-9-]{1,29}[a-z0-9]" required placeholder="acme" /></label>
             <label>Nome da empresa<input name="display_name" required minlength="2" maxlength="160" /></label>
             <label>Host CRM<input name="crm_host" placeholder="acme.crm.izatacore.com" /></label>
-            <label>Acesso CRM<select name="crm_access_mode"><option value="all_members">Todos os funcionários</option><option value="assigned">Assentos escolhidos pelo administrador</option></select></label>
-            <label>Assentos CRM<input name="crm_seat_limit" type="number" min="1" placeholder="Vazio = ilimitado" /></label>
+            <label>Modelo de acesso<select name="crm_access_mode"><option value="all_members">Todos os usuários da empresa</option><option value="assigned">Usuários escolhidos pelo administrador</option></select></label>
+            <label>Usuários contratados<input name="crm_seat_limit" type="number" min="1" placeholder="Vazio = sem limite" /></label>
           </div>
-          <div class="checks"><label><input type="checkbox" name="crm_enabled" checked />CRM contratado</label></div>
-          <button type="submit">Registrar tenant</button>
+          <div class="checks"><label><input type="checkbox" name="crm_enabled" checked />CRM incluído na contratação</label></div>
+          <button type="submit">Cadastrar empresa</button>
         </form>
-        <p class="callout">Se CRM estiver contratado, rode `setup-secrets.sh &lt;tenant&gt; &lt;porta&gt;`, inicialize/deploy a stack e só então ative o tenant aqui. Produtos ainda sem integração não podem ser habilitados. O card não ativa nem provisiona cobrança.</p>
+        <p class="callout">Se o CRM estiver contratado, prepare a stack, inicialize o ambiente e só então ative a empresa aqui. Este painel registra a contratação e os acessos; não provisiona cobrança.</p>
       </section>
 
       <section id="tenant-ops" class="panel hidden">
-        <h2>Visão operacional</h2>
-        <div id="tenant-metrics" class="checks" aria-live="polite"></div>
+        <div class="section-heading"><div><h2>Visão geral</h2><p>Acompanhe o ciclo de vida dos clientes e as últimas ações administrativas.</p></div></div>
+        <div id="tenant-metrics" class="metric-grid" aria-live="polite"></div>
         <div class="fields">
           <label>Buscar empresa<input id="tenant-search" type="search" placeholder="Nome ou identificador" /></label>
           <label>Estado<select id="tenant-status-filter"><option value="">Todos os estados</option><option value="provisioning">Provisionando</option><option value="active">Ativo</option><option value="suspended">Suspenso</option></select></label>
@@ -87,8 +104,8 @@
         <p id="tenant-filter-summary" class="muted" aria-live="polite"></p>
         <h3>Atividade administrativa recente</h3>
         <div class="table-wrap"><table><thead><tr><th>Quando</th><th>Ação</th><th>Empresa</th><th>Ator</th></tr></thead><tbody id="tenant-audit"><tr><td colspan="4" class="muted">Carregando auditoria…</td></tr></tbody></table></div>
-        <div class="toolbar" style="margin-top:16px"><h3>Alinhamento Keycloak</h3><div class="toolbar"><button id="run-reconciliation" class="secondary" type="button">Verificar grupos e memberships</button><button id="apply-reconciliation" class="hidden" type="button">Sincronizar divergências</button></div></div>
-        <div id="reconciliation-result" class="muted" aria-live="polite">A verificação é somente leitura; ela não altera os grupos.</div>
+        <div class="toolbar" style="margin-top:16px"><h3>Sincronização de acessos</h3><div class="toolbar"><button id="run-reconciliation" class="secondary" type="button">Verificar acessos</button><button id="apply-reconciliation" class="hidden" type="button">Corrigir divergências</button></div></div>
+        <div id="reconciliation-result" class="muted" aria-live="polite">A verificação é somente leitura e não altera os acessos.</div>
       </section>
 
       <section id="tenant-panel" class="panel hidden">
@@ -100,9 +117,9 @@
           <label>Empresa<select id="tenant-select"></select></label>
           <div class="toolbar">
             <button id="preflight-tenant" class="secondary hidden" type="button">Verificar ativação</button>
-            <button id="activate-tenant" class="hidden" type="button">Ativar tenant</button>
-            <button id="suspend-tenant" class="danger hidden" type="button">Suspender tenant</button>
-            <button id="resume-tenant" class="hidden" type="button">Reativar tenant</button>
+            <button id="activate-tenant" class="hidden" type="button">Ativar empresa</button>
+            <button id="suspend-tenant" class="danger hidden" type="button">Suspender empresa</button>
+            <button id="resume-tenant" class="hidden" type="button">Reativar empresa</button>
           </div>
         </div>
         <div id="tenant-detail">
@@ -119,38 +136,38 @@
         <section id="preflight-panel" class="hidden" aria-live="polite"></section>
         <div id="products" class="checks"></div>
         <section id="plan-panel" class="hidden">
-          <h2>Produtos e assentos</h2>
+          <h2>Contratação e capacidade</h2>
           <form id="plan-form">
             <div class="fields">
               <label><span><input type="checkbox" name="crm_enabled" /> CRM contratado</span></label>
-              <label>Acesso CRM<select name="crm_access_mode"><option value="all_members">Todos os funcionários</option><option value="assigned">Assentos atribuídos</option></select></label>
-              <label>Limite de assentos CRM<input name="crm_seat_limit" type="number" min="1" placeholder="Vazio = ilimitado" /></label>
+              <label>Modelo de acesso<select name="crm_access_mode"><option value="all_members">Todos os usuários da empresa</option><option value="assigned">Usuários escolhidos pelo administrador</option></select></label>
+              <label>Usuários contratados<input name="crm_seat_limit" type="number" min="1" placeholder="Vazio = sem limite" /></label>
             </div>
             <button type="submit">Salvar plano</button>
           </form>
-          <p class="muted">Produtos marcados como integração pendente não podem receber assentos até o backend impor o tenant entitlement.</p>
+          <p class="muted">O número de usuários contratados define quantas pessoas podem utilizar o produto. Usuários suspensos não consomem capacidade.</p>
         </section>
         <section id="invite-panel" class="hidden">
-          <h2>Convidar funcionário</h2>
+          <h2>Adicionar usuário</h2>
           <form id="member-form">
             <div class="fields">
               <label>Nome completo<input name="display_name" required minlength="2" maxlength="160" /></label>
-              <label>E-mail de trabalho<input name="email" type="email" required maxlength="320" /></label>
-              <label>Função na empresa<select name="tenant_role" id="member-tenant-role"><option value="member">Funcionário</option></select></label>
+              <label>E-mail profissional<input name="email" type="email" required maxlength="320" /></label>
+              <label>Perfil na empresa<select name="tenant_role" id="member-tenant-role"><option value="member">Usuário</option></select></label>
               <label>Perfil CRM<select name="crm_role"><option value="user">Vendedor</option><option value="manager">Gerente CRM</option></select></label>
             </div>
             <div id="product-choices" class="checks"></div>
             <button type="submit">Enviar convite</button>
           </form>
         </section>
-        <h2>Funcionários</h2>
-        <div class="table-wrap"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Função</th><th>Produtos</th><th>Estado</th><th></th></tr></thead><tbody id="members"></tbody></table></div>
+        <h2>Usuários da empresa</h2>
+        <div class="table-wrap"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Produtos</th><th>Status</th><th></th></tr></thead><tbody id="members"></tbody></table></div>
         <dialog id="edit-member-dialog">
           <form id="edit-member-form">
-            <h2>Editar acesso</h2>
+            <h2>Editar usuário</h2>
             <input type="hidden" name="subject" />
-            <label class="member-role-field">Função na empresa<select name="tenant_role"></select></label>
-            <label>Produtos e assentos</label>
+           <label class="member-role-field">Perfil na empresa<select name="tenant_role"></select></label>
+           <label>Produtos contratados</label>
             <div id="edit-product-choices" class="checks"></div>
             <label>Perfil CRM<select name="crm_role"><option value="user">Vendedor</option><option value="manager">Gerente CRM</option></select></label>
             <div class="toolbar"><button type="button" id="cancel-edit-member" class="secondary">Cancelar</button><button type="submit">Salvar acesso</button></div>
@@ -160,8 +177,8 @@
       </section>
 
       <section id="empty-panel" class="panel hidden">
-        <h2>Nenhum acesso de administração</h2>
-        <p>Seu usuário do Keycloak ainda não é administrador de uma empresa Pulse. Peça ao administrador da plataforma para associar sua conta a um tenant.</p>
+        <h2>Nenhuma empresa disponível</h2>
+        <p>Seu usuário ainda não está associado como administrador de uma empresa Pulse. Peça ao administrador da plataforma para liberar seu acesso.</p>
       </section>
     </main>
 
@@ -170,6 +187,25 @@
       const state = { me: null, tenants: [], catalog: [], selected: null, memberEditMode: "products" };
       const notice = document.getElementById("notice");
       const esc = value => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+      const tenantStatusLabels = { provisioning: "Em preparação", active: "Ativa", suspended: "Suspensa" };
+      const membershipStatusLabels = { invited: "Convite pendente", active: "Ativo", suspended: "Acesso suspenso" };
+      const roleLabels = { owner: "Proprietário", admin: "Administrador", member: "Usuário" };
+      const actionLabels = {
+        "tenant.created": "Empresa cadastrada", "tenant.updated": "Empresa atualizada",
+        "tenant.entitlements_updated": "Contratação atualizada", "member.invited": "Usuário adicionado",
+        "member.access_updated": "Acesso atualizado", "member.suspended": "Acesso suspenso",
+        "member.reactivated": "Acesso reativado", "keycloak.reconciliation_applied": "Acessos sincronizados",
+        "keycloak.reconciliation_partial": "Sincronização parcial",
+      };
+      const accessModeLabels = { all_members: "Todos os usuários", assigned: "Usuários selecionados" };
+
+      function tenantStatusLabel(status) { return tenantStatusLabels[status] || status; }
+      function membershipStatusLabel(status) { return membershipStatusLabels[status] || status; }
+      function roleLabel(role) { return roleLabels[role] || role; }
+      function productUsage(product) {
+        const used = Number(product.seats_used || 0);
+        return product.seat_limit == null ? `${used} utilizados · sem limite` : `${used} de ${product.seat_limit} usuários contratados`;
+      }
 
       function showMessage(message, kind = "") {
         notice.textContent = message;
@@ -178,7 +214,7 @@
 
       function renderCatalog() {
         document.getElementById("catalog").innerHTML = state.catalog.map(product =>
-          `<span class="status ${product.integration_status === "ready" ? "ok" : ""}">${esc(product.display_name)} · ${product.integration_status === "ready" ? "pronto" : "planejado"}</span>`
+          `<div class="product-card ${product.integration_status === "ready" ? "ready" : ""}"><strong>${esc(product.display_name)}</strong><small>${product.integration_status === "ready" ? "Pronto para contratação" : "Em preparação"}</small></div>`
         ).join("") || "<span class='muted'>Catálogo indisponível.</span>";
       }
 
@@ -197,11 +233,11 @@
           return summary;
         }, {});
         document.getElementById("tenant-metrics").innerHTML = [
-          ["Total", state.tenants.length],
-          ["Ativos", counts.active || 0],
-          ["Provisionando", counts.provisioning || 0],
-          ["Suspensos", counts.suspended || 0],
-        ].map(([label, count]) => `<span class="status"><strong>${esc(count)}</strong> ${esc(label)}</span>`).join("");
+          ["Total de empresas", state.tenants.length],
+          ["Empresas ativas", counts.active || 0],
+          ["Em preparação", counts.provisioning || 0],
+          ["Suspensas", counts.suspended || 0],
+        ].map(([label, count]) => `<div class="metric"><span class="metric-value">${esc(count)}</span><span class="metric-label">${esc(label)}</span></div>`).join("");
       }
 
       async function loadAdminAudit() {
@@ -210,7 +246,7 @@
           const entries = await apiCall("/admin/audit?limit=25");
           tbody.innerHTML = entries.length ? entries.map(entry => {
             const date = new Date(entry.occurred_at).toLocaleString("pt-BR");
-            return `<tr><td>${esc(date)}</td><td>${esc(entry.action)}</td><td>${esc(entry.tenant_key || "Plataforma")}</td><td><small>${esc(entry.actor_subject)}</small></td></tr>`;
+            return `<tr><td>${esc(date)}</td><td>${esc(actionLabels[entry.action] || entry.action)}</td><td>${esc(entry.tenant_key || "Plataforma")}</td><td><small>${esc(entry.actor_subject)}</small></td></tr>`;
           }).join("") : "<tr><td colspan='4' class='muted'>Nenhuma operação registrada.</td></tr>";
         } catch (error) {
           tbody.innerHTML = `<tr><td colspan="4" class="muted">Auditoria indisponível: ${esc(error.message)}</td></tr>`;
@@ -225,12 +261,12 @@
         try {
           const report = await apiCall("/admin/reconciliation");
           const rows = [
-            ...report.missing_groups.map(item => `<li>Grupo ausente em ${esc(item.tenant_key)}: ${esc(item.group_path)}</li>`),
-            ...report.member_group_drift.map(item => `<li>Membership ${esc(item.subject)} · faltando: ${esc(item.missing.join(", ") || "nenhum")} · extras: ${esc(item.extra.join(", ") || "nenhum")}</li>`),
+            ...report.missing_groups.map(item => `<li>Grupo ausente na empresa ${esc(item.tenant_key)}: ${esc(item.group_path)}</li>`),
+            ...report.member_group_drift.map(item => `<li>Usuário ${esc(item.subject)} · faltando: ${esc(item.missing.join(", ") || "nenhum")} · extras: ${esc(item.extra.join(", ") || "nenhum")}</li>`),
           ];
           const applyButton = document.getElementById("apply-reconciliation");
           applyButton.classList.toggle("hidden", !report.member_group_drift.length || report.missing_groups.length > 0);
-          host.innerHTML = `<p class="status ${report.status === "ok" ? "ok" : "error"}">${report.status === "ok" ? "Sem divergências detectadas" : "Divergências encontradas"} · ${esc(report.tenants_checked)} tenants · ${esc(report.members_checked)} memberships</p>${rows.length ? `<ul>${rows.join("")}</ul><p class="muted">Relatório somente leitura. Corrija os grupos no Keycloak e execute novamente.</p>` : ""}`;
+          host.innerHTML = `<p class="status ${report.status === "ok" ? "ok" : "error"}">${report.status === "ok" ? "Todos os acessos estão alinhados" : "Há divergências de acesso"} · ${esc(report.tenants_checked)} empresas · ${esc(report.members_checked)} usuários</p>${rows.length ? `<ul>${rows.join("")}</ul><p class="muted">Esta é uma verificação somente leitura. Corrija os grupos no Keycloak e execute novamente.</p>` : ""}`;
         } catch (error) {
           document.getElementById("apply-reconciliation").classList.add("hidden");
           host.textContent = `Falha na reconciliação: ${error.message}`;
@@ -240,12 +276,12 @@
       }
 
       async function applyReconciliation() {
-        if (!confirm("Aplicar a política atual de memberships aos usuários divergentes? Grupos fora do escopo gerenciado serão preservados.")) return;
+         if (!confirm("Aplicar a política atual de acesso aos usuários divergentes? Grupos fora do escopo gerenciado serão preservados.")) return;
         const button = document.getElementById("apply-reconciliation");
         button.disabled = true;
         try {
           const result = await apiCall("/admin/reconciliation/sync", { method: "POST" });
-          showMessage(`Sincronização concluída para ${result.members_synced} memberships.`, "ok");
+           showMessage(`Sincronização concluída para ${result.members_synced} usuários.`, "ok");
           await loadAdminAudit();
           await runReconciliation();
         } catch (error) {
@@ -275,7 +311,7 @@
         const rows = filteredTenants();
         select.innerHTML = rows.length
           ? rows.map(t => `<option value="${esc(t.tenant_key)}">${esc(t.display_name)} · ${esc(t.tenant_key)}</option>`).join("")
-          : "<option value=''>Nenhum tenant corresponde aos filtros</option>";
+           : "<option value=''>Nenhuma empresa corresponde aos filtros</option>";
         select.disabled = rows.length === 0;
         if (state.selected && rows.some(t => t.tenant_key === state.selected)) select.value = state.selected;
         else if (rows.length) select.value = rows[0].tenant_key;
@@ -291,7 +327,7 @@
             document.getElementById("platform-panel").classList.remove("hidden");
             document.getElementById("tenant-ops").classList.remove("hidden");
             renderTenantMetrics();
-            showMessage("Ainda não há tenants cadastrados.");
+            showMessage("Ainda não há empresas cadastradas.");
           } else {
             document.getElementById("empty-panel").classList.remove("hidden");
             showMessage("Acesso carregado.", "ok");
@@ -313,7 +349,7 @@
         const tenant = state.tenants.find(item => item.tenant_key === state.selected);
         if (!tenant) return;
         document.getElementById("tenant-title").textContent = tenant.display_name;
-        document.getElementById("tenant-meta").textContent = `${tenant.tenant_key} · ${tenant.crm_host || "CRM não contratado"} · ${tenant.tenant_status}`;
+        document.getElementById("tenant-meta").textContent = `${tenant.tenant_key} · ${tenant.crm_host || "CRM não contratado"} · ${tenantStatusLabel(tenant.tenant_status)}`;
         const platformAdmin = state.me.platform_admin;
         const canManage = platformAdmin || ["owner", "admin"].includes(tenant.tenant_role);
         document.getElementById("plan-panel").classList.toggle("hidden", !platformAdmin);
@@ -331,7 +367,7 @@
         document.getElementById("preflight-panel").classList.add("hidden");
         const roleSelect = document.getElementById("member-tenant-role");
         const mayManageAdmins = platformAdmin || tenant.tenant_role === "owner";
-        roleSelect.innerHTML = `<option value="member">Funcionário</option>${mayManageAdmins ? `<option value="admin">Administrador da empresa</option>` : ""}${platformAdmin ? `<option value="owner">Proprietário inicial</option>` : ""}`;
+         roleSelect.innerHTML = `<option value="member">Usuário</option>${mayManageAdmins ? `<option value="admin">Administrador da empresa</option>` : ""}${platformAdmin ? `<option value="owner">Proprietário inicial</option>` : ""}`;
         const crmPlan = (tenant.products || []).find(product => product.product_key === "crm");
         const planForm = document.getElementById("plan-form");
         planForm.elements.crm_enabled.checked = Boolean(crmPlan?.enabled);
@@ -342,7 +378,7 @@
         try {
           const members = await apiCall(`/tenants/${encodeURIComponent(tenant.tenant_key)}/members`);
           renderMembers(members, canManage);
-          showMessage("Tenant carregado.", "ok");
+          showMessage("Empresa carregada.", "ok");
         } catch (error) {
           renderMembers([], false);
           showMessage(error.message, "error");
@@ -352,17 +388,17 @@
       function renderProducts(products, canManage) {
         const host = document.getElementById("products");
         host.innerHTML = products.map(p => {
-          const seats = p.seat_limit == null ? "ilimitados" : `${p.seats_used}/${p.seat_limit}`;
-          return `<span class="status ${p.enabled ? "ok" : ""}">${esc(p.display_name)} · ${p.enabled ? "contratado" : "inativo"} · assentos ${esc(seats)} · integração ${esc(p.integration_status)}</span>`;
+          const status = p.enabled ? "Contratado" : "Não contratado";
+          return `<div class="product-card ${p.enabled ? "ready" : ""}"><strong>${esc(p.display_name)}</strong><small>${status} · ${esc(productUsage(p))}</small><small>${esc(accessModeLabels[p.access_mode] || p.access_mode)} · integração ${p.integration_status === "ready" ? "pronta" : "em preparação"}</small></div>`;
         }).join("") || "<span class='muted'>Nenhum produto cadastrado.</span>";
         const ready = products.filter(p => p.enabled && p.integration_status === "ready");
-        document.getElementById("product-choices").innerHTML = ready.map(p => `<label><input type="checkbox" name="products" value="${esc(p.product_key)}" ${p.access_mode === "all_members" ? "checked disabled" : ""} />${esc(p.display_name)}${p.access_mode === "all_members" ? " (todos os funcionários)" : ""}</label>`).join("");
+        document.getElementById("product-choices").innerHTML = ready.map(p => `<label><input type="checkbox" name="products" value="${esc(p.product_key)}" ${p.access_mode === "all_members" ? "checked disabled" : ""} />${esc(p.display_name)}${p.access_mode === "all_members" ? " (todos os usuários)" : ""}</label>`).join("");
       }
 
       function renderMembers(members, canManage) {
         const tbody = document.getElementById("members");
         if (!members.length) {
-          tbody.innerHTML = "<tr><td colspan='6' class='muted'>Nenhum funcionário cadastrado.</td></tr>";
+          tbody.innerHTML = "<tr><td colspan='6' class='muted'>Nenhum usuário cadastrado.</td></tr>";
           return;
         }
         const tenant = state.tenants.find(item => item.tenant_key === state.selected);
@@ -370,17 +406,17 @@
         const mayEdit = member => canManage && (member.tenant_role !== "owner" || actorRole === "platform_admin") && (member.tenant_role !== "admin" || ["owner", "platform_admin"].includes(actorRole));
         tbody.innerHTML = members.map(member => `<tr>
           <td>${esc(member.display_name)}</td><td>${esc(member.email)}</td>
-          <td>${esc(member.tenant_role)}${member.products?.some(p => p.product_role === "manager") ? " · CRM manager" : ""}</td>
+          <td>${esc(roleLabel(member.tenant_role))}${member.products?.some(p => p.product_role === "manager") ? " · Gerente CRM" : ""}</td>
           <td>${esc((member.products || []).map(p => p.product_key).join(", "))}</td>
-          <td>${esc(member.membership_status)}</td>
-          <td>${mayEdit(member) ? member.membership_status === "suspended" ? `<button class="secondary" data-reactivate="${esc(member.keycloak_subject)}">Reativar</button>` : `<button class="secondary" data-edit="${esc(member.keycloak_subject)}">Editar</button> <button class="danger" data-remove="${esc(member.keycloak_subject)}">Desativar</button>` : ""}</td>
+          <td>${esc(membershipStatusLabel(member.membership_status))}</td>
+          <td>${mayEdit(member) ? member.membership_status === "suspended" ? `<button class="secondary" data-reactivate="${esc(member.keycloak_subject)}">Reativar acesso</button>` : `<button class="secondary" data-edit="${esc(member.keycloak_subject)}">Editar</button> <button class="danger" data-remove="${esc(member.keycloak_subject)}">Suspender</button>` : ""}</td>
         </tr>`).join("");
         tbody.querySelectorAll("[data-edit]").forEach(button => button.addEventListener("click", () => {
           const member = members.find(item => item.keycloak_subject === button.dataset.edit);
           if (!member) return;
           state.memberEditMode = "products";
-          document.querySelector("#edit-member-dialog h2").textContent = "Editar acesso";
-          document.querySelector("#edit-member-form button[type='submit']").textContent = "Salvar acesso";
+           document.querySelector("#edit-member-dialog h2").textContent = "Editar usuário";
+           document.querySelector("#edit-member-form button[type='submit']").textContent = "Salvar alterações";
           const form = document.getElementById("edit-member-form");
           const roleField = document.querySelector(".member-role-field");
           const mayChangeRole = actorRole === "platform_admin" || (actorRole === "owner" && member.tenant_role !== "owner");
@@ -390,14 +426,13 @@
           if (actorRole === "platform_admin") roleOptions.push("owner");
           if (!roleOptions.includes(member.tenant_role)) roleOptions.push(member.tenant_role);
           const roleSelect = roleField.querySelector("select");
-          const roleLabels = { owner: "Proprietário", admin: "Administrador", member: "Funcionário" };
-          roleSelect.innerHTML = roleOptions.map(role => `<option value="${role}">${roleLabels[role]}</option>`).join("");
+           roleSelect.innerHTML = roleOptions.map(role => `<option value="${role}">${roleLabels[role]}</option>`).join("");
           roleSelect.value = member.tenant_role;
           const choices = document.getElementById("edit-product-choices");
           choices.innerHTML = (tenant?.products || []).filter(product => product.enabled && product.integration_status === "ready").map(product => {
             const assigned = member.products?.some(item => item.product_key === product.product_key);
             const allMembers = product.access_mode === "all_members";
-            return `<label><input type="checkbox" name="products" value="${esc(product.product_key)}" ${assigned || allMembers ? "checked" : ""} ${allMembers ? "disabled" : ""} />${esc(product.display_name)}${allMembers ? " (todos os funcionários)" : ""}</label>`;
+             return `<label><input type="checkbox" name="products" value="${esc(product.product_key)}" ${assigned || allMembers ? "checked" : ""} ${allMembers ? "disabled" : ""} />${esc(product.display_name)}${allMembers ? " (todos os usuários)" : ""}</label>`;
           }).join("") || "<span class='muted'>Nenhum produto pronto contratado.</span>";
           form.elements.subject.value = member.keycloak_subject;
           form.elements.crm_role.value = member.products?.find(item => item.product_key === "crm")?.product_role || "user";
@@ -407,13 +442,13 @@
           const member = members.find(item => item.keycloak_subject === button.dataset.reactivate);
           if (!member) return;
           state.memberEditMode = "reactivate";
-          document.querySelector("#edit-member-dialog h2").textContent = "Reativar acesso";
-          document.querySelector("#edit-member-form button[type='submit']").textContent = "Reativar funcionário";
+           document.querySelector("#edit-member-dialog h2").textContent = "Reativar usuário";
+           document.querySelector("#edit-member-form button[type='submit']").textContent = "Reativar acesso";
           document.querySelector(".member-role-field").classList.add("hidden");
           const choices = document.getElementById("edit-product-choices");
           choices.innerHTML = (tenant?.products || []).filter(product => product.enabled && product.integration_status === "ready").map(product => {
             const allMembers = product.access_mode === "all_members";
-            return `<label><input type="checkbox" name="products" value="${esc(product.product_key)}" ${allMembers ? "checked disabled" : ""} />${esc(product.display_name)}${allMembers ? " (todos os funcionários)" : ""}</label>`;
+             return `<label><input type="checkbox" name="products" value="${esc(product.product_key)}" ${allMembers ? "checked disabled" : ""} />${esc(product.display_name)}${allMembers ? " (todos os usuários)" : ""}</label>`;
           }).join("") || "<span class='muted'>Nenhum produto pronto contratado.</span>";
           const form = document.getElementById("edit-member-form");
           form.elements.subject.value = member.keycloak_subject;
@@ -422,7 +457,7 @@
           document.getElementById("edit-member-dialog").showModal();
         }));
         tbody.querySelectorAll("[data-remove]").forEach(button => button.addEventListener("click", async () => {
-          if (!confirm("Desativar este acesso neste tenant?")) return;
+           if (!confirm("Suspender o acesso deste usuário nesta empresa?")) return;
           try {
             await apiCall(`/tenants/${encodeURIComponent(state.selected)}/members/${encodeURIComponent(button.dataset.remove)}`, { method: "DELETE" });
             await loadSelectedTenant();
@@ -451,7 +486,7 @@
           document.getElementById("edit-member-dialog").close();
           state.memberEditMode = "products";
           await loadSelectedTenant();
-          showMessage(editMode === "reactivate" ? "Funcionário reativado e acessos sincronizados." : "Função, acesso e assentos atualizados.", "ok");
+           showMessage(editMode === "reactivate" ? "Usuário reativado e acessos sincronizados." : "Perfil e acessos atualizados.", "ok");
         } catch (error) { showMessage(error.message, "error"); }
       });
 
@@ -484,7 +519,7 @@
           });
           event.currentTarget.reset();
           await loadSelectedTenant();
-          showMessage(result.membership_status === "invited" ? "Convite enviado. A pessoa precisa verificar o e-mail antes do primeiro login." : "Acesso habilitado para esta pessoa neste tenant.", "ok");
+           showMessage(result.membership_status === "invited" ? "Convite enviado. A pessoa precisa confirmar o e-mail antes do primeiro acesso." : "Acesso habilitado para este usuário.", "ok");
         } catch (error) { showMessage(error.message, "error"); }
       });
 
@@ -501,7 +536,7 @@
           event.currentTarget.reset();
           document.querySelector("#tenant-form [name='crm_host']").required = document.querySelector("#tenant-form [name='crm_enabled']").checked;
           await loadTenants();
-          showMessage(`Tenant ${tenantKey} registrado. Provisionar a stack CRM se contratada e ativar o tenant antes de convidar usuários.`, "ok");
+           showMessage(`Empresa ${tenantKey} cadastrada. Prepare o CRM, se contratado, e ative a empresa antes de adicionar usuários.`, "ok");
         } catch (error) { showMessage(error.message, "error"); }
       });
 
@@ -520,7 +555,7 @@
             body: JSON.stringify({ display_name: form.elements.display_name.value, crm_host: form.elements.crm_host.value || null }),
           });
           await loadTenants();
-          showMessage("Dados da empresa atualizados.", "ok");
+           showMessage("Dados da empresa atualizados.", "ok");
         } catch (error) { showMessage(error.message, "error"); }
       });
 
@@ -549,7 +584,7 @@
             body: JSON.stringify({ products }),
           });
           await loadTenants();
-          showMessage("Plano/assentos atualizados.", "ok");
+           showMessage("Contratação e capacidade atualizadas.", "ok");
         } catch (error) { showMessage(error.message, "error"); }
       });
 
@@ -576,25 +611,25 @@
         if (!tenant) return;
         const readiness = await checkTenantActivation();
         if (!readiness?.ready) return;
-        if (!confirm(`Ativar ${tenant.display_name}? Confira também o provisionamento manual da stack antes de confirmar.`)) return;
+         if (!confirm(`Ativar a empresa ${tenant.display_name}? Confira também a preparação técnica antes de confirmar.`)) return;
         try {
           await apiCall(`/admin/tenants/${encodeURIComponent(tenant.tenant_key)}`, {
             method: "PATCH", body: JSON.stringify({ tenant_status: "active" }),
           });
           await loadTenants();
-          showMessage("Tenant ativado e acessos sincronizados.", "ok");
+           showMessage("Empresa ativada e acessos sincronizados.", "ok");
         } catch (error) { showMessage(error.message, "error"); }
       });
 
       document.getElementById("suspend-tenant").addEventListener("click", async () => {
         const tenant = state.tenants.find(item => item.tenant_key === state.selected);
-        if (!tenant || !confirm(`Suspender ${tenant.display_name}? O acesso dos usuários a este tenant será removido.`)) return;
+         if (!tenant || !confirm(`Suspender ${tenant.display_name}? O acesso dos usuários a esta empresa será removido.`)) return;
         try {
           await apiCall(`/admin/tenants/${encodeURIComponent(tenant.tenant_key)}`, {
             method: "PATCH", body: JSON.stringify({ tenant_status: "suspended" }),
           });
           await loadTenants();
-          showMessage("Tenant suspenso; os grupos de acesso foram sincronizados.", "ok");
+           showMessage("Empresa suspensa; os acessos foram atualizados.", "ok");
         } catch (error) { showMessage(error.message, "error"); }
       });
 
@@ -603,13 +638,13 @@
         if (!tenant) return;
         const readiness = await checkTenantActivation();
         if (!readiness?.ready) return;
-        if (!confirm(`Reativar ${tenant.display_name} e restaurar os acessos configurados?`)) return;
+         if (!confirm(`Reativar ${tenant.display_name} e restaurar os acessos contratados?`)) return;
         try {
           await apiCall(`/admin/tenants/${encodeURIComponent(tenant.tenant_key)}`, {
             method: "PATCH", body: JSON.stringify({ tenant_status: "active" }),
           });
           await loadTenants();
-          showMessage("Tenant reativado e acessos sincronizados.", "ok");
+           showMessage("Empresa reativada e acessos sincronizados.", "ok");
         } catch (error) { showMessage(error.message, "error"); }
       });
 
