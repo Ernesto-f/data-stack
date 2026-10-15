@@ -37,7 +37,9 @@ Para habilitar um administrador do control plane, associe a conta verificada ao 
 3. Um Admin Pulse convida o primeiro owner. A API cria a identidade Keycloak com verificação de e-mail; só depois da verificação o owner acessa o tenant.
 4. O owner convida funcionários e seleciona produtos/assentos disponíveis. As inclusões removem/atribuem grupos Keycloak tenant-scoped. A cada primeiro login, Odoo cria a conta interna local no banco daquele tenant.
 5. O Admin do control plane pode suspender/reativar o tenant. A API sincroniza os grupos dos membros para remover/restaurar acesso somente nesse tenant e tenta restaurar o estado anterior caso a sincronização falhe.
-6. Para suspender um funcionário, use o Portal. A API remove os grupos do escopo suspenso e preserva identidades/memberships de outras empresas.
+6. Admins autorizados podem alterar a função e os produtos/assentos de um membro; somente owner ou platform admin podem nomear administradores e somente platform admin pode alterar o owner. A API impede remover o último owner ativo.
+7. Um membro suspenso pode ser reativado no Portal com nova seleção de produtos; a API valida entitlement/assentos e sincroniza os grupos Keycloak, revertendo a reativação se a sincronização falhar.
+8. Para suspender um funcionário, use o Portal. A API remove os grupos do escopo suspenso e preserva identidades/memberships de outras empresas.
 
 O fluxo exige SMTP funcional no realm. Sem SMTP, o endpoint recusa o convite e desfaz a identidade/grupos recém-criados; ele não retorna senha temporária ao browser.
 

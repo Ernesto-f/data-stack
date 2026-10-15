@@ -249,3 +249,128 @@ def test_activation_endpoint_rejects_incomplete_preflight_before_updating_tenant
     assert error.status_code == 409
     assert error.detail["preflight"]["ready"] is False
     assert pool.update is None
+
+
+class AsyncNoopContext:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_args):
+        return False
+
+
+class ReactivationConnection:
+    def __init__(self):
+        self.statements = []
+
+    def transaction(self):
+        return AsyncNoopContext()
+
+    async def fetchrow(self, query, *_args):
+        assert "FOR UPDATE" in query
+        return {"tenant_role": "member", "membership_status": "suspended"}
+
+    async def execute(self, query, *_args):
+        self.statements.append(query)
+
+
+class ReactivationPool:
+    def __init__(self):
+        self.connection = ReactivationConnection()
+        self.rollback_statements = []
+
+    def acquire(self):
+        class AcquireContext(AsyncNoopContext):
+            async def __aenter__(inner_self):
+                return self.connection
+
+        return AcquireContext()
+
+    async def fetchrow(self, query, *_args):
+        assert "tenant_status" in query
+        return {"tenant_status": "active"}
+
+    async def execute(self, query, *_args):
+        self.rollback_statements.append(query)
+
+
+def test_reactivate_member_restores_membership_and_requested_product_groups(monkeypatch):
+    pool = ReactivationPool()
+    sync_calls = []
+    saved_products = []
+
+    async def validate(_request, _tenant_key, products):
+        return products, {}
+
+    async def save(_connection, _tenant_key, _subject, products, _crm_role):
+        saved_products.extend(products)
+
+    async def sync(_request, subject):
+        sync_calls.append(subject)
+        return ["/pulse/tenants/acme/crm"]
+
+    monkeypatch.setattr(main, "validate_products", validate)
+    monkeypatch.setattr(main, "save_product_access", save)
+    monkeypatch.setattr(main, "sync_subject_groups", sync)
+    result = asyncio.run(
+        main.reactivate_member(
+            "acme",
+            "member-1",
+            main.MemberReactivate(products=["crm"], crm_role="manager"),
+            request_for(pool, FakeKeycloak()),
+            identity(),
+        )
+    )
+    assert result == {
+        "keycloak_subject": "member-1",
+        "membership_status": "active",
+        "products": ["crm"],
+    }
+    assert "membership_status='active'" in pool.connection.statements[0]
+    assert saved_products == ["crm"]
+    assert sync_calls == ["member-1"]
+
+
+def test_reactivate_member_rolls_back_when_keycloak_sync_fails(monkeypatch):
+    pool = ReactivationPool()
+    sync_calls = 0
+
+    async def validate(_request, _tenant_key, products):
+        return products, {}
+
+    async def save(*_args):
+        return None
+
+    async def sync(_request, _subject):
+        nonlocal sync_calls
+        sync_calls += 1
+        raise KeycloakError("Keycloak unavailable")
+
+    monkeypatch.setattr(main, "validate_products", validate)
+    monkeypatch.setattr(main, "save_product_access", save)
+    monkeypatch.setattr(main, "sync_subject_groups", sync)
+
+    async def run_reactivation():
+        with pytest.raises(HTTPException) as error:
+            await main.reactivate_member(
+                "acme",
+                "member-1",
+                main.MemberReactivate(products=["crm"]),
+                request_for(pool, FakeKeycloak()),
+                identity(),
+            )
+        return error.value
+
+    error = asyncio.run(run_reactivation())
+    assert error.status_code == 503
+    assert len(pool.rollback_statements) == 2
+    assert sync_calls == 2
+
+
+def test_member_role_changes_keep_platform_admin_boundaries():
+    with pytest.raises(HTTPException) as error:
+        main.authorize_member_role_change("admin", "member", "admin")
+    assert error.value.status_code == 403
+
+    main.authorize_member_role_change("owner", "admin", "member")
+    main.authorize_member_role_change("platform_admin", "owner", "member")

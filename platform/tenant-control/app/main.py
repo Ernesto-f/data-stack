@@ -67,6 +67,12 @@ class MemberCreate(BaseModel):
 class MemberProductsUpdate(BaseModel):
     products: list[str]
     crm_role: Literal["user", "manager"] = "user"
+    tenant_role: Literal["owner", "admin", "member"] | None = None
+
+
+class MemberReactivate(BaseModel):
+    products: list[str] = Field(default_factory=list)
+    crm_role: Literal["user", "manager"] = "user"
 
 
 async def sync_subject_groups(request: Request, subject: str) -> list[str]:
@@ -653,6 +659,19 @@ async def save_product_access(
         )
 
 
+def authorize_member_role_change(actor_role: str, current_role: str, target_role: str) -> None:
+    if current_role == target_role:
+        return
+    if current_role == "owner" or target_role == "owner":
+        if actor_role != "platform_admin":
+            raise HTTPException(403, "Only a platform administrator can change the tenant owner")
+    if (current_role == "admin" or target_role == "admin") and actor_role not in {
+        "owner",
+        "platform_admin",
+    }:
+        raise HTTPException(403, "Only the tenant owner can appoint or change tenant administrators")
+
+
 @app.post("/v1/tenants/{tenant_key}/members", status_code=201)
 async def invite_member(
     tenant_key: str,
@@ -798,19 +817,82 @@ async def update_member_products(
     )
     if membership is None or membership["membership_status"] == "suspended":
         raise HTTPException(404, "Tenant membership not found")
-    if membership["tenant_role"] == "owner" and actor_role != "platform_admin":
-        raise HTTPException(403, "Only a platform administrator can change the tenant owner")
-    if membership["tenant_role"] == "admin" and actor_role not in {"owner", "platform_admin"}:
-        raise HTTPException(403, "Only the tenant owner can change tenant administrators")
+    target_role = body.tenant_role or membership["tenant_role"]
+    authorize_member_role_change(actor_role, membership["tenant_role"], target_role)
+    previous_products = await request.app.state.pool.fetch(
+        """SELECT product_key,product_role FROM membership_products
+           WHERE tenant_key=$1 AND keycloak_subject=$2""",
+        tenant_key,
+        subject,
+    )
     async with request.app.state.pool.acquire() as connection:
         async with connection.transaction():
+            locked_membership = await connection.fetchrow(
+                """SELECT tenant_role,membership_status FROM tenant_memberships
+                   WHERE tenant_key=$1 AND keycloak_subject=$2 FOR UPDATE""",
+                tenant_key,
+                subject,
+            )
+            if locked_membership is None or locked_membership["membership_status"] == "suspended":
+                raise HTTPException(404, "Tenant membership not found")
+            authorize_member_role_change(actor_role, locked_membership["tenant_role"], target_role)
+            if locked_membership["tenant_role"] == "owner" and target_role != "owner":
+                other_owners = await connection.fetchval(
+                    """SELECT count(*) FROM tenant_memberships
+                       WHERE tenant_key=$1 AND tenant_role='owner'
+                         AND membership_status='active' AND keycloak_subject<>$2""",
+                    tenant_key,
+                    subject,
+                )
+                if not other_owners:
+                    raise HTTPException(409, "Assign another active owner before changing the current owner")
             await connection.execute(
                 "DELETE FROM membership_products WHERE tenant_key=$1 AND keycloak_subject=$2",
                 tenant_key,
                 subject,
             )
             await save_product_access(connection, tenant_key, subject, products, body.crm_role)
-    added_groups = await sync_subject_groups(request, subject)
+            if target_role != locked_membership["tenant_role"]:
+                await connection.execute(
+                    "UPDATE tenant_memberships SET tenant_role=$3 WHERE tenant_key=$1 AND keycloak_subject=$2",
+                    tenant_key,
+                    subject,
+                    target_role,
+                )
+    try:
+        added_groups = await sync_subject_groups(request, subject)
+    except KeycloakError as error:
+        async with request.app.state.pool.acquire() as connection:
+            async with connection.transaction():
+                await connection.execute(
+                    "UPDATE tenant_memberships SET tenant_role=$3 WHERE tenant_key=$1 AND keycloak_subject=$2",
+                    tenant_key,
+                    subject,
+                    locked_membership["tenant_role"],
+                )
+                await connection.execute(
+                    "DELETE FROM membership_products WHERE tenant_key=$1 AND keycloak_subject=$2",
+                    tenant_key,
+                    subject,
+                )
+                for product in previous_products:
+                    await connection.execute(
+                        """INSERT INTO membership_products
+                           (tenant_key,keycloak_subject,product_key,product_role)
+                           VALUES ($1,$2,$3,$4)""",
+                        tenant_key,
+                        subject,
+                        product["product_key"],
+                        product["product_role"],
+                    )
+        try:
+            await sync_subject_groups(request, subject)
+        except KeycloakError:
+            pass
+        raise HTTPException(
+            503,
+            "Membership changes were rolled back because Keycloak access synchronization failed; retry the operation.",
+        ) from error
     return {"keycloak_subject": subject, "products": products, "sync_groups_added": len(added_groups)}
 
 
@@ -833,6 +915,16 @@ async def suspend_member(
         raise HTTPException(403, "Only a platform administrator can suspend the tenant owner")
     if member["tenant_role"] == "admin" and actor_role not in {"owner", "platform_admin"}:
         raise HTTPException(403, "Only the tenant owner can suspend tenant administrators")
+    if member["tenant_role"] == "owner":
+        active_owners = await request.app.state.pool.fetchval(
+            """SELECT count(*) FROM tenant_memberships
+               WHERE tenant_key=$1 AND tenant_role='owner'
+                 AND membership_status='active' AND keycloak_subject<>$2""",
+            tenant_key,
+            subject,
+        )
+        if not active_owners:
+            raise HTTPException(409, "Assign another active owner before suspending the current owner")
     await request.app.state.pool.execute(
         "UPDATE tenant_memberships SET membership_status='suspended' WHERE tenant_key=$1 AND keycloak_subject=$2",
         tenant_key,
@@ -844,3 +936,69 @@ async def suspend_member(
         subject,
     )
     await sync_subject_groups(request, subject)
+
+
+@app.post("/v1/tenants/{tenant_key}/members/{subject}/reactivate")
+async def reactivate_member(
+    tenant_key: str,
+    subject: str,
+    body: MemberReactivate,
+    request: Request,
+    identity: Identity = Depends(current_identity),
+) -> dict:
+    actor_role = await require_tenant_admin(request, identity, tenant_key)
+    tenant = await request.app.state.pool.fetchrow(
+        "SELECT tenant_status FROM tenants WHERE tenant_key=$1", tenant_key
+    )
+    if tenant is None:
+        raise HTTPException(404, "Tenant not found")
+    if tenant["tenant_status"] != "active":
+        raise HTTPException(409, "Activate the tenant before reactivating its members")
+
+    products, _entitlements = await validate_products(request, tenant_key, body.products)
+    async with request.app.state.pool.acquire() as connection:
+        async with connection.transaction():
+            member = await connection.fetchrow(
+                """SELECT tenant_role,membership_status FROM tenant_memberships
+                   WHERE tenant_key=$1 AND keycloak_subject=$2 FOR UPDATE""",
+                tenant_key,
+                subject,
+            )
+            if member is None:
+                raise HTTPException(404, "Tenant membership not found")
+            if member["membership_status"] != "suspended":
+                raise HTTPException(409, "Only suspended memberships can be reactivated")
+            if member["tenant_role"] == "owner" and actor_role != "platform_admin":
+                raise HTTPException(403, "Only a platform administrator can reactivate the tenant owner")
+            if member["tenant_role"] == "admin" and actor_role not in {"owner", "platform_admin"}:
+                raise HTTPException(403, "Only the tenant owner can reactivate tenant administrators")
+            await connection.execute(
+                "UPDATE tenant_memberships SET membership_status='active' WHERE tenant_key=$1 AND keycloak_subject=$2",
+                tenant_key,
+                subject,
+            )
+            await save_product_access(connection, tenant_key, subject, products, body.crm_role)
+
+    try:
+        await sync_subject_groups(request, subject)
+    except KeycloakError as error:
+        await request.app.state.pool.execute(
+            "UPDATE tenant_memberships SET membership_status='suspended' WHERE tenant_key=$1 AND keycloak_subject=$2",
+            tenant_key,
+            subject,
+        )
+        await request.app.state.pool.execute(
+            "DELETE FROM membership_products WHERE tenant_key=$1 AND keycloak_subject=$2",
+            tenant_key,
+            subject,
+        )
+        try:
+            await sync_subject_groups(request, subject)
+        except KeycloakError:
+            pass
+        raise HTTPException(
+            503,
+            "Membership was rolled back because Keycloak access synchronization failed; retry the operation.",
+        ) from error
+
+    return {"keycloak_subject": subject, "membership_status": "active", "products": products}

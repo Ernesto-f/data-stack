@@ -1,7 +1,7 @@
 # Handoff — Pulse Portal `/admin`
 
 **Atualizado:** 2026-10-15  
-**Estado:** Fase 1 implementada e revisão local concluída; ainda não publicada na VPS.
+**Estado:** Fase 1 commitada; Fase 2 de memberships em implementação local; nada publicado na VPS.
 
 ## Objetivo
 
@@ -19,11 +19,20 @@ Implementado localmente para a Fase 1 (ciclo de vida de tenants):
 - Testes de endpoint/função cobrem bloqueio de ativação por preflight incompleto, updates parciais e rollback quando a sincronização Keycloak falha.
 - README operacional atualizado.
 
+Fase 2 em andamento (alterações ainda não commitadas):
+
+- A edição de acesso pode mudar a função tenant-scoped; só owner/platform admin podem gerir admins e só platform admin pode alterar o owner.
+- Impede demover/suspender o último owner ativo.
+- Reativação de membership suspensa com seleção de produtos/assentos; valida tenant ativo e entitlement e sincroniza grupos, revertendo se Keycloak falhar.
+- A edição de produtos/função restaura os dados anteriores se a sincronização de grupos falhar.
+- UI mostra ação de reativação e seletor de função conforme as permissões do ator.
+
 Arquivos da alteração atual:
 
 - `platform/portal/admin/index.html`
 - `platform/tenant-control/app/main.py`
 - `platform/tenant-control/tests/test_tenant_lifecycle.py` (novo)
+- `HANDOFF.md`
 - `platform/tenant-control/tests/test_policies.py` (já tinha alteração local para reconhecer `/pulse/tenant-control-admin`)
 - `platform/tenant-control/README.md` (já tinha alteração local documentando o grupo admin dedicado)
 
@@ -33,6 +42,7 @@ Arquivos da alteração atual:
 - `python -m py_compile platform/tenant-control/app/main.py platform/tenant-control/app/policies.py` — passou.
 - `node --check` no JavaScript embutido de `platform/portal/admin/index.html` — passou.
 - `git diff --check` nos arquivos da tarefa — passou.
+- Depois das alterações da Fase 2: suíte tenant-control **14 passaram**; compilação Python, sintaxe JS e `git diff --check` passaram.
 - Revisão de autorização e fluxo concluída: preflight/update restritos a platform admins; a ativação exige grupo admin tenant-scoped mesmo sem CRM; suspender/reativar sincroniza grupos sem alterar os grupos de outros tenants.
 - Não foi feita validação visual com sessão Keycloak no navegador.
 
@@ -45,10 +55,16 @@ Arquivos da alteração atual:
 
 ## Próximos passos
 
-1. Aguardar autorização explícita antes de publicar na VPS; deployment não foi solicitado nem executado nesta etapa.
-2. Se autorizado, publicar com backup das imagens e configuração anterior; não alterar dados nem stacks de produto.
-3. Validar login, lista vazia, criação, preflight, ativação e suspensão/retomada no painel implantado.
-4. Próximas fases planejadas: gestão de memberships (função, reativação, convites e assentos), painel operacional (busca, filtros, métricas) e auditoria/reconciliação Keycloak.
+1. Completar testes de endpoint para as operações de função/reativação e rollback; revisar diff da Fase 2.
+2. Aguardar autorização explícita antes de publicar na VPS; deployment não foi solicitado nem executado nesta etapa.
+3. Se autorizado, publicar com backup das imagens e configuração anterior; não alterar dados nem stacks de produto.
+4. Validar login, lista vazia, criação, preflight, ativação, suspensão/retomada e ciclo de reativação de membership no painel implantado.
+5. Próximas fases planejadas: painel operacional (busca, filtros, métricas) e auditoria/reconciliação Keycloak.
+
+## Commits recentes
+
+- `1a6e3d0` — `Commit pending repository updates` — commitou o working tree inteiro (472 arquivos; 278,799 inserções / 1,850 remoções). A exceção solicitada foi `files/notasficas/NFSe_55083048_6530635.pdf`, que permanece não rastreado junto de `files/`.
+- As alterações da Fase 2 descritas acima foram feitas depois desse commit e ainda estão locais/não commitadas.
 
 ## Cuidados de contexto
 

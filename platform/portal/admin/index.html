@@ -134,6 +134,7 @@
           <form id="edit-member-form">
             <h2>Editar acesso</h2>
             <input type="hidden" name="subject" />
+            <label class="member-role-field">Função na empresa<select name="tenant_role"></select></label>
             <label>Produtos e assentos</label>
             <div id="edit-product-choices" class="checks"></div>
             <label>Perfil CRM<select name="crm_role"><option value="user">Vendedor</option><option value="manager">Gerente CRM</option></select></label>
@@ -150,7 +151,7 @@
 
     <script>
       const api = "/tenant-admin/api/v1";
-      const state = { me: null, tenants: [], catalog: [], selected: null };
+      const state = { me: null, tenants: [], catalog: [], selected: null, memberEditMode: "products" };
       const notice = document.getElementById("notice");
       const esc = value => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
 
@@ -270,20 +271,52 @@
           <td>${esc(member.tenant_role)}${member.products?.some(p => p.product_role === "manager") ? " · CRM manager" : ""}</td>
           <td>${esc((member.products || []).map(p => p.product_key).join(", "))}</td>
           <td>${esc(member.membership_status)}</td>
-          <td>${mayEdit(member) ? `<button class="secondary" data-edit="${esc(member.keycloak_subject)}">Editar</button> <button class="danger" data-remove="${esc(member.keycloak_subject)}">Desativar</button>` : ""}</td>
+          <td>${mayEdit(member) ? member.membership_status === "suspended" ? `<button class="secondary" data-reactivate="${esc(member.keycloak_subject)}">Reativar</button>` : `<button class="secondary" data-edit="${esc(member.keycloak_subject)}">Editar</button> <button class="danger" data-remove="${esc(member.keycloak_subject)}">Desativar</button>` : ""}</td>
         </tr>`).join("");
         tbody.querySelectorAll("[data-edit]").forEach(button => button.addEventListener("click", () => {
           const member = members.find(item => item.keycloak_subject === button.dataset.edit);
           if (!member) return;
+          state.memberEditMode = "products";
+          document.querySelector("#edit-member-dialog h2").textContent = "Editar acesso";
+          document.querySelector("#edit-member-form button[type='submit']").textContent = "Salvar acesso";
+          const form = document.getElementById("edit-member-form");
+          const roleField = document.querySelector(".member-role-field");
+          const mayChangeRole = actorRole === "platform_admin" || (actorRole === "owner" && member.tenant_role !== "owner");
+          roleField.classList.toggle("hidden", !mayChangeRole);
+          const roleOptions = ["member"];
+          if (actorRole === "owner" || actorRole === "platform_admin") roleOptions.push("admin");
+          if (actorRole === "platform_admin") roleOptions.push("owner");
+          if (!roleOptions.includes(member.tenant_role)) roleOptions.push(member.tenant_role);
+          const roleSelect = roleField.querySelector("select");
+          const roleLabels = { owner: "Proprietário", admin: "Administrador", member: "Funcionário" };
+          roleSelect.innerHTML = roleOptions.map(role => `<option value="${role}">${roleLabels[role]}</option>`).join("");
+          roleSelect.value = member.tenant_role;
           const choices = document.getElementById("edit-product-choices");
           choices.innerHTML = (tenant?.products || []).filter(product => product.enabled && product.integration_status === "ready").map(product => {
             const assigned = member.products?.some(item => item.product_key === product.product_key);
             const allMembers = product.access_mode === "all_members";
             return `<label><input type="checkbox" name="products" value="${esc(product.product_key)}" ${assigned || allMembers ? "checked" : ""} ${allMembers ? "disabled" : ""} />${esc(product.display_name)}${allMembers ? " (todos os funcionários)" : ""}</label>`;
           }).join("") || "<span class='muted'>Nenhum produto pronto contratado.</span>";
-          const form = document.getElementById("edit-member-form");
           form.elements.subject.value = member.keycloak_subject;
           form.elements.crm_role.value = member.products?.find(item => item.product_key === "crm")?.product_role || "user";
+          document.getElementById("edit-member-dialog").showModal();
+        }));
+        tbody.querySelectorAll("[data-reactivate]").forEach(button => button.addEventListener("click", () => {
+          const member = members.find(item => item.keycloak_subject === button.dataset.reactivate);
+          if (!member) return;
+          state.memberEditMode = "reactivate";
+          document.querySelector("#edit-member-dialog h2").textContent = "Reativar acesso";
+          document.querySelector("#edit-member-form button[type='submit']").textContent = "Reativar funcionário";
+          document.querySelector(".member-role-field").classList.add("hidden");
+          const choices = document.getElementById("edit-product-choices");
+          choices.innerHTML = (tenant?.products || []).filter(product => product.enabled && product.integration_status === "ready").map(product => {
+            const allMembers = product.access_mode === "all_members";
+            return `<label><input type="checkbox" name="products" value="${esc(product.product_key)}" ${allMembers ? "checked disabled" : ""} />${esc(product.display_name)}${allMembers ? " (todos os funcionários)" : ""}</label>`;
+          }).join("") || "<span class='muted'>Nenhum produto pronto contratado.</span>";
+          const form = document.getElementById("edit-member-form");
+          form.elements.subject.value = member.keycloak_subject;
+          form.elements.tenant_role.value = member.tenant_role;
+          form.elements.crm_role.value = "user";
           document.getElementById("edit-member-dialog").showModal();
         }));
         tbody.querySelectorAll("[data-remove]").forEach(button => button.addEventListener("click", async () => {
@@ -300,16 +333,23 @@
         event.preventDefault();
         const form = event.currentTarget;
         const subject = form.elements.subject.value;
+        const editMode = state.memberEditMode;
         const products = [...form.querySelectorAll("input[name='products']:checked:not(:disabled)")].map(input => input.value);
         const allMemberProducts = [...document.querySelectorAll("#edit-product-choices input[name='products']:checked:disabled")].map(input => input.value);
         try {
-          await apiCall(`/tenants/${encodeURIComponent(state.selected)}/members/${encodeURIComponent(subject)}/products`, {
-            method: "PUT",
-            body: JSON.stringify({ products: [...products, ...allMemberProducts], crm_role: form.elements.crm_role.value }),
+          const memberPath = `/tenants/${encodeURIComponent(state.selected)}/members/${encodeURIComponent(subject)}`;
+          await apiCall(editMode === "reactivate" ? `${memberPath}/reactivate` : `${memberPath}/products`, {
+            method: editMode === "reactivate" ? "POST" : "PUT",
+            body: JSON.stringify({
+              products: [...products, ...allMemberProducts],
+              crm_role: form.elements.crm_role.value,
+              ...(editMode === "products" ? { tenant_role: form.elements.tenant_role.value } : {}),
+            }),
           });
           document.getElementById("edit-member-dialog").close();
+          state.memberEditMode = "products";
           await loadSelectedTenant();
-          showMessage("Acesso e assentos atualizados.", "ok");
+          showMessage(editMode === "reactivate" ? "Funcionário reativado e acessos sincronizados." : "Função, acesso e assentos atualizados.", "ok");
         } catch (error) { showMessage(error.message, "error"); }
       });
 
