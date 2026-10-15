@@ -15,7 +15,6 @@ class KeycloakError(RuntimeError):
 class KeycloakGroupMissingError(KeycloakError):
     """The requested group path does not exist in the realm."""
 
-    pass
 
 
 class KeycloakAdmin:

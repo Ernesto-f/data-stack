@@ -10,7 +10,6 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWKClient, PyJWKClientConnectionError, PyJWKClientError
 
-
 bearer = HTTPBearer(auto_error=False)
 
 

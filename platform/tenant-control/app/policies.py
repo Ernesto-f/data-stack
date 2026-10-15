@@ -6,7 +6,6 @@ from collections.abc import Iterable
 
 from app.auth import Identity
 
-
 PRODUCT_GROUPS = {
     "crm": ("pulse/home/crm", "crm"),
     "knowledge": (None, "knowledge"),

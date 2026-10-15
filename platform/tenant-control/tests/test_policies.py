@@ -1,9 +1,8 @@
 import pytest
-from fastapi import HTTPException
-
 from app.auth import Identity
 from app.main import tenant_host
 from app.policies import all_groups_for_membership, is_platform_admin
+from fastapi import HTTPException
 
 
 def identity(*groups: str) -> Identity:

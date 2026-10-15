@@ -2,11 +2,10 @@ import asyncio
 from types import SimpleNamespace
 
 import pytest
-from fastapi import HTTPException
-
 from app import main
 from app.auth import Identity
 from app.keycloak import KeycloakError, KeycloakGroupMissingError
+from fastapi import HTTPException
 
 
 def identity() -> Identity:

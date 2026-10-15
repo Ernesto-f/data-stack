@@ -55,6 +55,7 @@ Melhorias de robustez aplicadas nesta revisão:
 - Nome de membro após trim exige pelo menos dois caracteres; testes cobrem progresso parcial de sync e rollback do primeiro login.
 - PATCH de tenant que corrige `crm_host` e ativa na mesma requisição agora valida o host candidato, sem exigir uma segunda chamada artificial.
 - A política de grupos também aplica `READY_PRODUCTS` na sincronização, evitando conceder grupos de produtos planejados mesmo se o banco/catalogo for alterado indevidamente.
+- Ruff corrigiu imports/estilo seguro e agora passa com as exceções documentadas `B008` (padrão FastAPI `Depends`) e `SIM117` (contextos async aninhados mantidos explícitos); não há outros avisos.
 
 Arquivos da alteração atual:
 
@@ -103,7 +104,7 @@ Arquivos da alteração atual:
 - `33c7de7` — `Harden entitlement synchronization failures` — validação de desativação e erros 503 explícitos.
 - `538b4d8` — `Make verified login activation retry-safe` — compensação do primeiro login.
 - `8d1bd0b` — `Serialize tenant membership mutations` — locks do tenant/membership e validações sob transação.
-- Healthcheck Docker da API adicionado em `infra/compose.tenant-control.yml`; `docker compose config`, suíte (**26 testes**), Python, JavaScript e `git diff --check` passaram.
+- Healthcheck Docker da API adicionado em `infra/compose.tenant-control.yml`; `docker compose config`, suíte (**27 testes**), Python, JavaScript e `git diff --check` passaram.
 
 ## Cuidados de contexto
 

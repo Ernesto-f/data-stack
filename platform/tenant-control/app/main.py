@@ -23,7 +23,6 @@ from app.policies import (
     product_group_paths,
 )
 
-
 TENANT_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,29}[a-z0-9]$")
 READY_PRODUCTS = {"crm"}
 logger = logging.getLogger(__name__)
@@ -927,9 +926,8 @@ async def save_product_access(
 def authorize_member_role_change(actor_role: str, current_role: str, target_role: str) -> None:
     if current_role == target_role:
         return
-    if current_role == "owner" or target_role == "owner":
-        if actor_role != "platform_admin":
-            raise HTTPException(403, "Only a platform administrator can change the tenant owner")
+    if (current_role == "owner" or target_role == "owner") and actor_role != "platform_admin":
+        raise HTTPException(403, "Only a platform administrator can change the tenant owner")
     if (current_role == "admin" or target_role == "admin") and actor_role not in {
         "owner",
         "platform_admin",
