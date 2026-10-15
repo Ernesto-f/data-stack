@@ -360,6 +360,49 @@ async def reconcile_keycloak_state(
     }
 
 
+@app.post("/v1/admin/reconciliation/sync")
+async def sync_reconciliation_drift(
+    request: Request,
+    identity: Identity = Depends(current_identity),
+) -> dict:
+    if not is_platform_admin(identity):
+        raise HTTPException(403, "Platform administrator role required")
+    report = await reconcile_keycloak_state(request, identity)
+    if report["missing_groups"]:
+        raise HTTPException(
+            409,
+            {"message": "Provision missing tenant groups in Keycloak before syncing memberships", "report": report},
+        )
+
+    subjects = [entry["subject"] for entry in report["member_group_drift"]]
+    synced = 0
+    for subject in subjects:
+        try:
+            await sync_subject_groups(request, subject)
+            synced += 1
+        except KeycloakError as error:
+            await record_audit(
+                request,
+                identity,
+                None,
+                "keycloak.reconciliation_partial",
+                {"members_synced": synced, "members_remaining": len(subjects) - synced},
+            )
+            raise HTTPException(
+                503,
+                f"Keycloak sync stopped after {synced} memberships; rerun reconciliation to finish safely.",
+            ) from error
+
+    await record_audit(
+        request,
+        identity,
+        None,
+        "keycloak.reconciliation_applied",
+        {"members_synced": synced},
+    )
+    return {"members_synced": synced, "status": "ok"}
+
+
 @app.get("/v1/me")
 async def current_user(
     request: Request, identity: Identity = Depends(current_identity)

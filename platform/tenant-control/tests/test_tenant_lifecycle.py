@@ -506,3 +506,35 @@ def test_reconciliation_requires_platform_admin_and_reports_keycloak_outage():
 
     error = asyncio.run(run_reconciliation())
     assert error.status_code == 503
+
+
+class ReconciliationGatePool:
+    async def fetch(self, query, *_args):
+        if "SELECT tenant_key FROM tenants" in query:
+            return [{"tenant_key": "acme"}]
+        if "SELECT DISTINCT keycloak_subject" in query:
+            return []
+        if "SELECT tp.product_key FROM tenant_products" in query:
+            return []
+        raise AssertionError(f"Unexpected fetch query: {query}")
+
+    async def fetchval(self, _query, *_args):
+        return False
+
+
+class MissingGroupKeycloak:
+    async def group_id(self, group_path):
+        raise KeycloakError(f"Required Keycloak group is missing: {group_path}")
+
+
+def test_reconciliation_sync_refuses_to_run_until_tenant_groups_are_provisioned():
+    async def run_sync():
+        with pytest.raises(HTTPException) as error:
+            await main.sync_reconciliation_drift(
+                request_for(ReconciliationGatePool(), MissingGroupKeycloak()), identity()
+            )
+        return error.value
+
+    error = asyncio.run(run_sync())
+    assert error.status_code == 409
+    assert error.detail["report"]["missing_groups"]
