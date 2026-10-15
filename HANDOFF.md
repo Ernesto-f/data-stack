@@ -27,6 +27,7 @@ Fase 2 em andamento (alterações ainda não commitadas):
 - A edição de produtos/função restaura os dados anteriores se a sincronização de grupos falhar.
 - Teste de regressão confirma que assento no limite bloqueia nova atribuição e que assento disponível permite atribuir.
 - UI mostra ação de reativação e seletor de função conforme as permissões do ator.
+- Visão operacional no `/admin`: contagem total/por estado, busca por nome/slug e filtro por estado; lista vazia de resultados esconde o detalhe selecionado.
 
 Arquivos da alteração atual:
 
@@ -66,7 +67,8 @@ Arquivos da alteração atual:
 
 - `1a6e3d0` — `Commit pending repository updates` — commitou o working tree inteiro (472 arquivos; 278,799 inserções / 1,850 remoções). A exceção solicitada foi `files/notasficas/NFSe_55083048_6530635.pdf`, que permanece não rastreado junto de `files/`.
 - `62289e5` — `Add tenant member reactivation and role management` — alterações de reativação/funções e testes.
-- Alteração local posterior: cobertura do limite de assentos, validada junto à suíte (15 passaram); será incluída no próximo commit da entrega de operação.
+- `a4bb48c` — `Test tenant member seat limit enforcement` — cobertura do limite de assentos.
+- Próxima entrega local em andamento: visão operacional e filtros de tenants no `/admin`.
 
 ## Cuidados de contexto
 

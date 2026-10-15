@@ -77,6 +77,16 @@
         <p class="callout">Se CRM estiver contratado, rode `setup-secrets.sh &lt;tenant&gt; &lt;porta&gt;`, inicialize/deploy a stack e só então ative o tenant aqui. Produtos ainda sem integração não podem ser habilitados. O card não ativa nem provisiona cobrança.</p>
       </section>
 
+      <section id="tenant-ops" class="panel hidden">
+        <h2>Visão operacional</h2>
+        <div id="tenant-metrics" class="checks" aria-live="polite"></div>
+        <div class="fields">
+          <label>Buscar empresa<input id="tenant-search" type="search" placeholder="Nome ou identificador" /></label>
+          <label>Estado<select id="tenant-status-filter"><option value="">Todos os estados</option><option value="provisioning">Provisionando</option><option value="active">Ativo</option><option value="suspended">Suspenso</option></select></label>
+        </div>
+        <p id="tenant-filter-summary" class="muted" aria-live="polite"></p>
+      </section>
+
       <section id="tenant-panel" class="panel hidden">
         <div class="toolbar">
           <div>
@@ -91,6 +101,7 @@
             <button id="resume-tenant" class="hidden" type="button">Reativar tenant</button>
           </div>
         </div>
+        <div id="tenant-detail">
         <section id="company-panel" class="hidden">
           <h2>Dados da empresa</h2>
           <form id="company-form">
@@ -141,6 +152,7 @@
             <div class="toolbar"><button type="button" id="cancel-edit-member" class="secondary">Cancelar</button><button type="submit">Salvar acesso</button></div>
           </form>
         </dialog>
+        </div>
       </section>
 
       <section id="empty-panel" class="panel hidden">
@@ -166,6 +178,28 @@
         ).join("") || "<span class='muted'>Catálogo indisponível.</span>";
       }
 
+      function filteredTenants() {
+        const query = document.getElementById("tenant-search").value.trim().toLocaleLowerCase("pt-BR");
+        const status = document.getElementById("tenant-status-filter").value;
+        return state.tenants.filter(tenant => {
+          const matchesQuery = !query || `${tenant.display_name} ${tenant.tenant_key}`.toLocaleLowerCase("pt-BR").includes(query);
+          return matchesQuery && (!status || tenant.tenant_status === status);
+        });
+      }
+
+      function renderTenantMetrics() {
+        const counts = state.tenants.reduce((summary, tenant) => {
+          summary[tenant.tenant_status] = (summary[tenant.tenant_status] || 0) + 1;
+          return summary;
+        }, {});
+        document.getElementById("tenant-metrics").innerHTML = [
+          ["Total", state.tenants.length],
+          ["Ativos", counts.active || 0],
+          ["Provisionando", counts.provisioning || 0],
+          ["Suspensos", counts.suspended || 0],
+        ].map(([label, count]) => `<span class="status"><strong>${esc(count)}</strong> ${esc(label)}</span>`).join("");
+      }
+
       async function apiCall(path, options = {}) {
         const response = await fetch(`${api}${path}`, {
           credentials: "same-origin",
@@ -183,9 +217,15 @@
 
       function tenantOptions() {
         const select = document.getElementById("tenant-select");
-        select.innerHTML = state.tenants.map(t => `<option value="${esc(t.tenant_key)}">${esc(t.display_name)} · ${esc(t.tenant_key)}</option>`).join("");
-        if (state.selected && state.tenants.some(t => t.tenant_key === state.selected)) select.value = state.selected;
+        const rows = filteredTenants();
+        select.innerHTML = rows.length
+          ? rows.map(t => `<option value="${esc(t.tenant_key)}">${esc(t.display_name)} · ${esc(t.tenant_key)}</option>`).join("")
+          : "<option value=''>Nenhum tenant corresponde aos filtros</option>";
+        select.disabled = rows.length === 0;
+        if (state.selected && rows.some(t => t.tenant_key === state.selected)) select.value = state.selected;
+        else if (rows.length) select.value = rows[0].tenant_key;
         state.selected = select.value || null;
+        document.getElementById("tenant-filter-summary").textContent = `${rows.length} de ${state.tenants.length} empresas`;
       }
 
       async function loadTenants() {
@@ -194,6 +234,8 @@
           document.getElementById("tenant-panel").classList.add("hidden");
           if (state.me.platform_admin) {
             document.getElementById("platform-panel").classList.remove("hidden");
+            document.getElementById("tenant-ops").classList.remove("hidden");
+            renderTenantMetrics();
             showMessage("Ainda não há tenants cadastrados.");
           } else {
             document.getElementById("empty-panel").classList.remove("hidden");
@@ -203,9 +245,13 @@
         }
         document.getElementById("empty-panel").classList.add("hidden");
         document.getElementById("platform-panel").classList.toggle("hidden", !state.me.platform_admin);
+        document.getElementById("tenant-ops").classList.toggle("hidden", !state.me.platform_admin);
         document.getElementById("tenant-panel").classList.remove("hidden");
+        renderTenantMetrics();
         tenantOptions();
-        await loadSelectedTenant();
+        document.getElementById("tenant-detail").classList.toggle("hidden", !state.selected);
+        if (state.selected) await loadSelectedTenant();
+        else showMessage("Nenhuma empresa corresponde aos filtros.");
       }
 
       async function loadSelectedTenant() {
@@ -357,6 +403,17 @@
         state.selected = event.target.value;
         await loadSelectedTenant();
       });
+
+      async function applyTenantFilters() {
+        tenantOptions();
+        const hasSelection = Boolean(state.selected);
+        document.getElementById("tenant-detail").classList.toggle("hidden", !hasSelection);
+        if (hasSelection) await loadSelectedTenant();
+        else showMessage("Nenhuma empresa corresponde aos filtros.");
+      }
+
+      document.getElementById("tenant-search").addEventListener("input", applyTenantFilters);
+      document.getElementById("tenant-status-filter").addEventListener("change", applyTenantFilters);
 
       document.getElementById("member-form").addEventListener("submit", async event => {
         event.preventDefault();
