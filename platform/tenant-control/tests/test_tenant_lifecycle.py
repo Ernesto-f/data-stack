@@ -268,6 +268,8 @@ class ReactivationConnection:
 
     async def fetchrow(self, query, *_args):
         assert "FOR UPDATE" in query
+        if "tenant_status" in query:
+            return {"tenant_status": "active"}
         return {"tenant_role": "member", "membership_status": "suspended"}
 
     async def execute(self, query, *_args):

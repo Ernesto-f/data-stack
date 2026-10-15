@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from contextlib import asynccontextmanager
@@ -25,6 +26,7 @@ from app.policies import (
 
 TENANT_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,29}[a-z0-9]$")
 READY_PRODUCTS = {"crm"}
+logger = logging.getLogger(__name__)
 
 
 def tenant_host(tenant_key: str) -> str:
@@ -237,9 +239,7 @@ async def record_audit(
     except Exception:
         # Audit persistence must not turn a completed access/tenant change into
         # an apparent API failure that an operator might retry blindly.
-        import logging
-
-        logging.getLogger(__name__).exception("Failed to persist tenant-control audit event: %s", action)
+        logger.exception("Failed to persist tenant-control audit event: %s", action)
 
 
 @asynccontextmanager
@@ -1072,17 +1072,14 @@ async def update_member_products(
 ) -> dict:
     actor_role = await require_tenant_admin(request, identity, tenant_key)
     products, _entitlements = await validate_products(request, tenant_key, body.products)
-    membership = await request.app.state.pool.fetchrow(
-        "SELECT tenant_role,membership_status FROM tenant_memberships WHERE tenant_key=$1 AND keycloak_subject=$2",
-        tenant_key,
-        subject,
-    )
-    if membership is None or membership["membership_status"] == "suspended":
-        raise HTTPException(404, "Tenant membership not found")
-    target_role = body.tenant_role or membership["tenant_role"]
-    authorize_member_role_change(actor_role, membership["tenant_role"], target_role)
+    previous_role: str
     async with request.app.state.pool.acquire() as connection:
         async with connection.transaction():
+            tenant = await connection.fetchrow(
+                "SELECT tenant_key FROM tenants WHERE tenant_key=$1 FOR UPDATE", tenant_key
+            )
+            if tenant is None:
+                raise HTTPException(404, "Tenant not found")
             locked_membership = await connection.fetchrow(
                 """SELECT tenant_role,membership_status FROM tenant_memberships
                    WHERE tenant_key=$1 AND keycloak_subject=$2 FOR UPDATE""",
@@ -1091,7 +1088,9 @@ async def update_member_products(
             )
             if locked_membership is None or locked_membership["membership_status"] == "suspended":
                 raise HTTPException(404, "Tenant membership not found")
+            target_role = body.tenant_role or locked_membership["tenant_role"]
             authorize_member_role_change(actor_role, locked_membership["tenant_role"], target_role)
+            previous_role = locked_membership["tenant_role"]
             previous_products = await connection.fetch(
                 """SELECT product_key,product_role FROM membership_products
                    WHERE tenant_key=$1 AND keycloak_subject=$2""",
@@ -1130,7 +1129,7 @@ async def update_member_products(
                     "UPDATE tenant_memberships SET tenant_role=$3 WHERE tenant_key=$1 AND keycloak_subject=$2",
                     tenant_key,
                     subject,
-                    locked_membership["tenant_role"],
+                    previous_role,
                 )
                 await connection.execute(
                     "DELETE FROM membership_products WHERE tenant_key=$1 AND keycloak_subject=$2",
@@ -1175,6 +1174,11 @@ async def suspend_member(
     actor_role = await require_tenant_admin(request, identity, tenant_key)
     async with request.app.state.pool.acquire() as connection:
         async with connection.transaction():
+            tenant = await connection.fetchrow(
+                "SELECT tenant_key FROM tenants WHERE tenant_key=$1 FOR UPDATE", tenant_key
+            )
+            if tenant is None:
+                raise HTTPException(404, "Tenant not found")
             member = await connection.fetchrow(
                 """SELECT tenant_role,membership_status FROM tenant_memberships
                    WHERE tenant_key=$1 AND keycloak_subject=$2 FOR UPDATE""",
@@ -1267,6 +1271,13 @@ async def reactivate_member(
     products, _entitlements = await validate_products(request, tenant_key, body.products)
     async with request.app.state.pool.acquire() as connection:
         async with connection.transaction():
+            locked_tenant = await connection.fetchrow(
+                "SELECT tenant_status FROM tenants WHERE tenant_key=$1 FOR UPDATE", tenant_key
+            )
+            if locked_tenant is None:
+                raise HTTPException(404, "Tenant not found")
+            if locked_tenant["tenant_status"] != "active":
+                raise HTTPException(409, "Activate the tenant before reactivating its members")
             member = await connection.fetchrow(
                 """SELECT tenant_role,membership_status FROM tenant_memberships
                    WHERE tenant_key=$1 AND keycloak_subject=$2 FOR UPDATE""",
