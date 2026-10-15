@@ -422,16 +422,28 @@ async def current_user(
     request: Request, identity: Identity = Depends(current_identity)
 ) -> dict:
     if identity.email_verified:
-        activated_subject = await request.app.state.pool.fetchval(
+        activated_memberships = await request.app.state.pool.fetch(
             """UPDATE tenant_memberships SET membership_status='active'
                WHERE keycloak_subject=$1 AND membership_status='invited'
-               RETURNING keycloak_subject""",
+               RETURNING tenant_key""",
             identity.subject,
         )
-        if activated_subject:
+        if activated_memberships:
             try:
                 await sync_subject_groups(request, identity.subject)
             except KeycloakError as error:
+                for membership in activated_memberships:
+                    await request.app.state.pool.execute(
+                        """UPDATE tenant_memberships SET membership_status='invited'
+                           WHERE tenant_key=$1 AND keycloak_subject=$2
+                             AND membership_status='active'""",
+                        membership["tenant_key"],
+                        identity.subject,
+                    )
+                try:
+                    await sync_subject_groups(request, identity.subject)
+                except KeycloakError:
+                    pass
                 raise HTTPException(503, "Identity access synchronization is temporarily unavailable") from error
     memberships = await request.app.state.pool.fetch(
         """SELECT t.tenant_key,t.display_name,t.crm_host,t.tenant_status,
@@ -931,8 +943,8 @@ async def invite_member(
     if len(email) > 320 or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
         raise HTTPException(422, "A valid work email is required")
     display_name = body.display_name.strip()
-    if not display_name:
-        raise HTTPException(422, "A display name is required")
+    if len(display_name) < 2:
+        raise HTTPException(422, "A display name with at least 2 characters is required")
     tenant = await request.app.state.pool.fetchrow(
         "SELECT tenant_status FROM tenants WHERE tenant_key=$1", tenant_key
     )

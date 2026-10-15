@@ -549,6 +549,8 @@ class LoginPool:
         return "member-1"
 
     async def fetch(self, query, *_args):
+        if query.startswith("UPDATE tenant_memberships"):
+            return [{"tenant_key": "acme"}]
         if "FROM tenant_memberships m JOIN tenants" in query:
             return [{
                 "tenant_key": "acme",
@@ -569,6 +571,9 @@ class LoginPool:
             }]
         raise AssertionError(f"Unexpected fetch query: {query}")
 
+    async def execute(self, query, *_args):
+        self.sync_queries.append(query)
+
 
 class LoginKeycloak:
     async def set_groups(self, subject, desired, managed):
@@ -584,6 +589,27 @@ def test_verified_first_login_synchronizes_groups_after_activation():
         )
     )
     assert result["tenants"][0]["tenant_key"] == "acme"
+
+
+class LoginOutageKeycloak:
+    async def set_groups(self, _subject, _desired, _managed):
+        raise KeycloakError("Keycloak unavailable")
+
+
+def test_verified_first_login_reverts_only_newly_activated_membership_on_sync_failure():
+    pool = LoginPool()
+
+    async def run_login():
+        with pytest.raises(HTTPException) as error:
+            await main.current_user(
+                request_for(pool, LoginOutageKeycloak()),
+                Identity("member-1", "pulse-oauth2-proxy", (), email_verified=True),
+            )
+        return error.value
+
+    error = asyncio.run(run_login())
+    assert error.status_code == 503
+    assert any("SET membership_status='invited'" in query for query in pool.sync_queries)
 
 
 class OutageKeycloak:

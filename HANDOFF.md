@@ -51,6 +51,8 @@ Melhorias de robustez aplicadas nesta revisão:
 - Erros de grupo ausente no Keycloak têm tipo próprio; indisponibilidade não é reportada como grupo faltante e preflight retorna 503.
 - Atualização de entitlement exige revogar memberships antes de desativar um produto; falhas de sincronização pós-gravação retornam 503 com progresso explícito, em vez de erro 500 genérico.
 - Leituras críticas de suspensão ficam sob `FOR UPDATE`; chamadas externas do Keycloak não são executadas dentro da transação SQL de entitlement.
+- Primeiro login verificado agora reverte somente as memberships recém-ativadas se a sincronização falhar, permitindo retry seguro.
+- Nome de membro após trim exige pelo menos dois caracteres; testes cobrem progresso parcial de sync e rollback do primeiro login.
 
 Arquivos da alteração atual:
 
@@ -67,7 +69,7 @@ Arquivos da alteração atual:
 - `python -m py_compile platform/tenant-control/app/main.py platform/tenant-control/app/policies.py` — passou.
 - `node --check` no JavaScript embutido de `platform/portal/admin/index.html` — passou.
 - `git diff --check` nos arquivos da tarefa — passou.
-- Última validação: suíte tenant-control **25 passaram**; compilação Python, sintaxe JS e `git diff --check` passaram.
+- Última validação: suíte tenant-control **26 passaram**; compilação Python, sintaxe JS e `git diff --check` passaram.
 - Revisão de autorização e fluxo concluída: preflight/update restritos a platform admins; a ativação exige grupo admin tenant-scoped mesmo sem CRM; suspender/reativar sincroniza grupos sem alterar os grupos de outros tenants.
 - Não foi feita validação visual com sessão Keycloak no navegador.
 
@@ -80,7 +82,7 @@ Arquivos da alteração atual:
 
 ## Próximos passos
 
-1. Commitar os ajustes transacionais de entitlements/suspensão e avaliar lacunas de endpoint e UI restantes.
+1. Commitar a compensação do primeiro login e avaliar lacunas de endpoint e UI restantes.
 2. Aguardar autorização explícita antes de publicar na VPS; deployment não foi solicitado nem executado nesta etapa.
 3. Se autorizado, publicar com backup das imagens e configuração anterior; não alterar dados nem stacks de produto.
 4. Validar login, lista vazia, criação, preflight, ativação, suspensão/retomada, reativação, auditoria e reconciliação no painel implantado.
