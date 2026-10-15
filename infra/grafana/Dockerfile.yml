@@ -1,0 +1,38 @@
+FROM grafana/grafana:12.3.1
+
+USER root
+
+# dependências
+RUN apk add --no-cache curl unzip ca-certificates
+
+# permitir plugins não assinados (alguns da VolkovLabs precisam)
+ENV GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=volkovlabs-echarts-panel,volkovlabs-image-panel
+
+WORKDIR /tmp
+
+# função de instalação versionada (igual ao compose)
+RUN set -eux; \
+  install_plugin() { \
+    plugin=$1; \
+    version=$2; \
+    echo "Installing $plugin @ $version"; \
+    curl -fL "https://grafana.com/api/plugins/${plugin}/versions/${version}/download" -o plugin.zip; \
+    unzip -q plugin.zip -d /var/lib/grafana/plugins; \
+    rm plugin.zip; \
+  }; \
+  \
+  install_plugin grafana-pyroscope-app 1.17.0; \
+  install_plugin marcusolsson-json-datasource 1.3.28; \
+  install_plugin volkovlabs-table-panel 3.6.1; \
+  install_plugin volkovlabs-variable-panel 5.1.1; \
+  install_plugin grafana-exploretraces-app 1.3.2; \
+  install_plugin grafana-lokiexplore-app 1.0.36; \
+  install_plugin grafana-metricsdrilldown-app 1.0.31; \
+  install_plugin grafana-clock-panel 2.1.3; \
+  install_plugin volkovlabs-image-panel 4.0.0; \
+  install_plugin volkovlabs-echarts-panel 7.2.4
+
+# permissões corretas
+RUN chown -R 472:472 /var/lib/grafana/plugins
+
+USER grafana

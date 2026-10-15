@@ -1,0 +1,139 @@
+DOCUMENTAÇÃO TÉCNICA - AJUSTE DE REDE PROXMOX PARA EXPOR APENAS UM MAC
+
+Ambiente:
+- Host: Proxmox VE
+- VM: 106
+- Bridge da rede: vmbr6
+- Interface física vinculada à bridge: enxf8e43b829652
+- MAC físico do PVE: f8:e4:3b:82:96:52
+- MAC da VM 106 na rede vmbr6: BC:24:11:5D:74:5E
+
+Objetivo:
+Garantir que a porta de rede conectada ao Proxmox exponha somente o MAC da VM 106 para a rede, evitando que o switch aprenda também o MAC do host Proxmox.
+
+Problema identificado:
+O Proxmox estava com IP configurado na bridge vmbr6.
+Com isso, tanto o host Proxmox quanto a VM participavam da rede, fazendo o switch enxergar dois MACs na mesma porta:
+- MAC do Proxmox
+- MAC da VM
+
+Correção aplicada:
+Removido o IP da bridge vmbr6 no Proxmox.
+A bridge vmbr6 foi mantida apenas como bridge L2, sem IP no host PVE.
+O IP da rede ficou configurado somente dentro da VM 106.
+
+Configuração esperada no Proxmox:
+A bridge vmbr6 deve estar ativa, porém sem IPv4 e sem IPv6.
+
+Comando de validação:
+
+ip -br addr show vmbr6
+ip -br addr show enxf8e43b829652
+
+Resultado esperado:
+
+vmbr6             UP
+enxf8e43b829652   UP
+
+Não deve aparecer IP IPv4 nem IPv6 nas interfaces acima.
+
+Interface da VM:
+A VM 106 está conectada na bridge vmbr6 através da interface net4.
+
+Comando:
+
+qm config 106 | grep net
+
+Resultado relevante:
+
+net4: virtio=BC:24:11:5D:74:5E,bridge=vmbr6
+
+MAC esperado na rede:
+
+BC:24:11:5D:74:5E
+
+Desabilitação de IPv6 no PVE para evitar tráfego link-local:
+Foi desabilitado IPv6 na bridge vmbr6 e na interface física enxf8e43b829652.
+
+Comandos aplicados:
+
+sysctl -w net.ipv6.conf.vmbr6.disable_ipv6=1
+sysctl -w net.ipv6.conf.enxf8e43b829652.disable_ipv6=1
+
+Para persistir após reboot, criar o arquivo:
+
+/etc/sysctl.d/99-disable-ipv6-vmbr6.conf
+
+Conteúdo do arquivo:
+
+net.ipv6.conf.vmbr6.disable_ipv6=1
+net.ipv6.conf.enxf8e43b829652.disable_ipv6=1
+
+Aplicar configuração:
+
+sysctl --system
+
+TESTES DE VALIDAÇÃO
+
+1. Validar que o PVE não possui IP na bridge:
+
+Comando:
+
+ip -br addr show vmbr6
+ip -br addr show enxf8e43b829652
+
+Resultado esperado:
+
+vmbr6             UP
+enxf8e43b829652   UP
+
+Não deve existir endereço IPv4 ou IPv6 nessas interfaces.
+
+2. Validar que o MAC físico do PVE não transmite tráfego:
+
+Comando:
+
+tcpdump -eni enxf8e43b829652 ether src f8:e4:3b:82:96:52
+
+Resultado esperado:
+Nenhum pacote deve aparecer durante o teste.
+
+3. Validar que o tráfego da rede sai apenas com o MAC da VM:
+
+Comando:
+
+tcpdump -eni enxf8e43b829652 ether src bc:24:11:5d:74:5e
+
+Executar ping a partir da VM 106 para algum dispositivo da rede.
+
+Resultado esperado:
+Devem aparecer pacotes ICMP saindo com o MAC da VM:
+
+bc:24:11:5d:74:5e
+
+4. Validar conectividade pela VM:
+
+Dentro da VM 106:
+
+ping <IP_DE_UM_DISPOSITIVO_DA_REDE>
+
+Resultado esperado:
+O ping deve responder normalmente.
+
+5. Validação no switch:
+
+Solicitar ao time de redes limpar a tabela MAC da porta ou aguardar o aging da tabela MAC.
+
+Após isso, validar a porta onde o Proxmox está conectado.
+
+Resultado esperado:
+A porta deve apresentar somente o MAC da VM:
+
+BC:24:11:5D:74:5E
+
+Observação:
+Caso o switch ainda mostre o MAC f8:e4:3b:82:96:52, verificar novamente com tcpdump:
+
+tcpdump -eni enxf8e43b829652 ether src f8:e4:3b:82:96:52
+
+Se nenhum pacote aparecer, o Proxmox não está transmitindo com esse MAC. Nesse caso, o switch pode estar com entrada antiga/cacheada na tabela MAC.

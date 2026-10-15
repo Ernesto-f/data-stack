@@ -1,0 +1,10 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+COPY api/requirements.txt /app/api-requirements.txt
+COPY tests/requirements-api.txt /app/test-requirements.txt
+RUN pip install --no-cache-dir -r /app/api-requirements.txt -r /app/test-requirements.txt
+COPY api /app/api
+COPY tests/test_api_isolation.py tests/test_auth.py tests/test_archive.py tests/test_layouts.py /app/tests/
+ENV PYTHONPATH=/app/api
+CMD ["pytest", "-q", "/app/tests"]

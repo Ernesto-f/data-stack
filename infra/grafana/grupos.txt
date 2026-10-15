@@ -1,0 +1,7 @@
+public = grupo publico que nao pede login
+
+apex = grupo admin
+
+Scheduling = grupo para o tima do SIM
+
+FMD = grupo pro time do FMD.

@@ -42,6 +42,8 @@ Grupos disponíveis no provisionador atual:
 | `/pulse/home` | Portal; requerido pelo fluxo do script |
 | `/pulse/home/smartetl` | Rota SmartETL protegida por OAuth2 Proxy |
 | `/pulse/home/datalogger` | Rota DataLogger protegida por OAuth2 Proxy |
+| `/pulse/home/tracking` | Rota Pulse Tracking; OAuth2 Proxy e login OIDC nativo do Traccar |
+| `/pulse/home/tracking-admin` | Papel administrador do Traccar via OIDC; implica acesso ao Tracking |
 | `/pulse/home/analytics` | Grupo requerido pelo gate OAuth2 Proxy do Analytics |
 | `/pulse/home/analytics-admin` | Papel Editor no Grafana |
 | `/pulse/admin` | Administração Pulse e papel Admin no Grafana; não conceder para demonstração padrão |

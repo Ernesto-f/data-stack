@@ -1,0 +1,88 @@
+ATIVAR IP FORWARD (CRÍTICO)
+
+Imediato:
+sysctl -w net.ipv4.ip_forward=1
+
+Persistente:
+echo "net.ipv4.ip_forward=1" > /etc/sysctl.d/99-ipforward.conf
+/sbin/sysctl --system
+
+CONFIGURAR NAT (nftables)
+
+Editar arquivo:
+/etc/nftables.conf
+
+Conteúdo do arquivo:
+
+#!/usr/sbin/nft -f
+
+flush ruleset
+
+table ip nat {
+chain postrouting {
+type nat hook postrouting priority 100;
+oifname "ens18" ip saddr 172.10.0.0/24 masquerade
+}
+}
+
+table inet filter {
+chain input {
+type filter hook input priority filter;
+policy accept;
+}
+
+chain forward {
+    type filter hook forward priority filter;
+    policy accept;
+}
+
+chain output {
+    type filter hook output priority filter;
+    policy accept;
+}
+
+}
+
+Ativar:
+systemctl enable nftables
+systemctl restart nftables
+
+CONFIGURAR VM PRODUÇÃO
+
+Rota para rede automação:
+nmcli con modify "ens19" +ipv4.routes "10.113.23.0/24 172.10.0.10"
+nmcli con down "ens19"
+nmcli con up "ens19"
+
+OU via arquivo:
+
+[ipv4]
+method=manual
+address1=172.10.0.5/24
+routes=10.113.23.0/24;172.10.0.10;
+
+VALIDAÇÃO RÁPIDA
+
+Na autobridge:
+ip a
+ip route
+cat /proc/sys/net/ipv4/ip_forward
+nft list ruleset
+
+Na produção:
+ip route
+ping 172.10.0.10
+ping 10.113.23.78
+
+ARQUITETURA FINAL
+
+[ PRODUÇÃO ]
+172.10.0.5
+↓
+via 172.10.0.10
+↓
+[ AUTOBRIDGE ]
+ens19 (LAN) → ens18 (WAN)
+↓ NAT
+[ AUTOMAÇÃO ]
+10.113.23.x

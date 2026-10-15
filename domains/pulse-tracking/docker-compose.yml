@@ -1,0 +1,67 @@
+name: pulse-tracking
+
+services:
+  database:
+    image: timescale/timescaledb:latest-pg17
+    container_name: pulse-tracking-db
+    environment:
+      POSTGRES_DB: traccar
+      POSTGRES_USER: ${TRACCAR_DB_USER:?Set TRACCAR_DB_USER in .env}
+      POSTGRES_PASSWORD: ${TRACCAR_DB_PASSWORD:?Set TRACCAR_DB_PASSWORD in .env}
+      TIMESCALEDB_TELEMETRY: "off"
+    volumes:
+      - database-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d traccar"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - tracking-net
+
+  traccar:
+    image: traccar/traccar:6.16.0
+    container_name: pulse-tracking-server
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      CONFIG_USE_ENVIRONMENT_VARIABLES: "true"
+      DATABASE_DRIVER: org.postgresql.Driver
+      DATABASE_URL: jdbc:postgresql://database:5432/traccar
+      DATABASE_USER: ${TRACCAR_DB_USER:?Set TRACCAR_DB_USER in .env}
+      DATABASE_PASSWORD: ${TRACCAR_DB_PASSWORD:?Set TRACCAR_DB_PASSWORD in .env}
+      WEB_URL: https://tracking.izatacore.com
+      OPENID_CLIENT_ID: ${TRACCAR_OIDC_CLIENT_ID:?Set TRACCAR_OIDC_CLIENT_ID in .env}
+      OPENID_CLIENT_SECRET: ${TRACCAR_OIDC_CLIENT_SECRET:?Set TRACCAR_OIDC_CLIENT_SECRET in .env}
+      OPENID_ISSUER_URL: https://portal.izatacore.com/keylogin/realms/pulse
+      OPENID_FORCE: "true"
+      OPENID_ALLOW_REGISTRATION: "true"
+      OPENID_ALLOW_GROUP: /pulse/home/tracking
+      OPENID_ADMIN_GROUP: /pulse/home/tracking-admin
+      OPENID_GROUPS_CLAIM_NAME: groups
+    ports:
+      - "127.0.0.1:18092:8082"
+      # Interface OsmAnd reservada para testes sintéticos locais.
+      # Não é publicada na internet; protocolo/dispositivo real será definido depois.
+      - "127.0.0.1:15055:5055/tcp"
+    volumes:
+      - server-logs:/opt/traccar/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8082/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 3m
+    restart: unless-stopped
+    networks:
+      - tracking-net
+
+volumes:
+  database-data:
+  server-logs:
+
+networks:
+  tracking-net:

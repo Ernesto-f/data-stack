@@ -1,0 +1,159 @@
+name: APPS
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+
+networks:
+  api-apps:
+    driver: bridge  
+
+  apiapps-edge:
+    external: true
+    name: infra-apiapps-edge
+  
+
+
+
+services:
+
+# =========================================================
+# =========================  API   ========================
+#==========================================================
+
+
+  fmdfiltercount:
+    image: datastack-fastapi
+    container_name: fmdfiltercount
+    profiles:
+      - API-fmdfiltercount
+    working_dir: /app
+    env_file:
+      - /srv/data-stack/apps/services/fmdfiltercount-api/.env
+    volumes:
+      - /srv/data-stack/apps/services/fmdfiltercount-api:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    ports:
+      - "8012:8000"
+    restart: unless-stopped
+    logging: *default-logging
+    networks: 
+      - api-apps
+      - apiapps-edge
+
+
+  app-gsunny:
+    image: datastack-fastapi
+    container_name: api-app-gsunny
+    profiles:
+      -  API-app-gsunny
+    working_dir: /app
+    env_file:
+      - /srv/data-stack/apps/services/app-gsunny/.env
+    volumes:
+      - /srv/data-stack/apps/services/app-gsunny:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    ports:
+      - "8013:8000"
+    expose:
+      - "8013"
+    restart: unless-stopped
+    logging: *default-logging
+    networks: 
+      - api-apps
+      - apiapps-edge
+
+  
+
+  app-gsunnex:
+    build:
+      context: /srv/data-stack/apps/services/app-gsunnex
+      dockerfile: Dockerfile
+    image: app-gsunnex:latest
+    container_name:  api-app-gsunnex
+    profiles:
+      -  API-app-gsunnex
+    working_dir: /app
+    env_file:
+      - /srv/data-stack/apps/services/app-gsunnex/.env
+    volumes:
+      - /srv/data-stack/apps/services/app-gsunnex:/app
+    command: > 
+      uvicorn app.main:app 
+      --host 0.0.0.0 
+      --port 8000 
+      --reload
+
+    healthcheck:
+      test: 
+        [
+        "CMD",
+        "python",
+        "-c",
+        "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    ports:
+      - "8014:8000"
+    restart: unless-stopped
+    logging: *default-logging
+    networks: 
+      - api-apps
+
+  exceptions-chronos:
+      image: datastack-fastapi:latest
+      container_name: exceptions-chronos
+      profiles:
+        - API-exceptions-chronos
+      volumes:
+        - /srv/data-stack/apps/services/exceptions_chronos:/app     
+      working_dir: /app
+      command: >
+        sh -c "uvicorn main:app --host 0.0.0.0 --port 8080"
+      ports:
+        - "8011:8080"
+      env_file:
+        - /srv/data-stack/apps/services/exceptions_chronos/.env
+      networks: 
+        - api-apps
+      restart: unless-stopped
+      logging: *default-logging
+      healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+        interval: 10s
+        timeout: 5s
+        retries: 3
+
+
+# =========================================================
+# =====================  FLUTTER   ========================
+#==========================================================
+
+  flutter:
+    image: apex-tools:flutter_web
+    pull_policy: never
+    container_name: FLUTTER_WEB
+    restart: unless-stopped
+    profiles:
+      - flutter
+    volumes:
+      - ./apps/frontend/app-gsunnex/web:/usr/share/nginx/html:ro ##alterei aqui, antes estava ./volumes/flutter/web:...
+    ports: 
+      - "8015:8080" ## designei uma porta para este serviço
+    networks:
+      - api-apps

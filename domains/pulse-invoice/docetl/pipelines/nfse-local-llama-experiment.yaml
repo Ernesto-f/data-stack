@@ -1,0 +1,97 @@
+# Experimental SmartETL pipeline using Ollama-hosted Llama 3.1 8B.
+# Input JSON should contain one or more records with a `text` field holding
+# locally converted NFS-e Markdown. This pipeline is not the Invoice default.
+datasets:
+  invoices:
+    type: file
+    path: ./invoice_input.json
+
+default_model: ollama/llama3.1:8b
+
+system_prompt:
+  persona: a literal Brazilian NFS-e field extractor
+  dataset_description: locally converted service invoices awaiting human review
+
+operations:
+  - type: map
+    name: extract_nfse_candidates
+    model: ollama/llama3.1:8b
+    prompt: |
+      Extract these NFS-e fields literally from the supplied text. Use every key
+      in the schema. invoice_number is the value next to "Número da Nota".
+      issue_date is the emission date as YYYY-MM-DD. issuer_name and
+      issuer_tax_id come from PRESTADOR; recipient_name and recipient_tax_id
+      come from TOMADOR. Tax IDs should contain digits only. amount_total is the
+      value next to "VALOR TOTAL DO SERVIÇO" as a decimal string with a dot.
+      Do not invent values; use an empty string only when a field is absent.
+
+      Document:
+      {{ input.text }}
+    output:
+      mode: structured_output
+      schema:
+        invoice_number: string
+        issue_date: string
+        issuer_name: string
+        issuer_tax_id: string
+        recipient_name: string
+        recipient_tax_id: string
+        amount_total: string
+    litellm_completion_kwargs:
+      temperature: 0
+      num_predict: 256
+
+  - type: code_map
+    name: normalize_nfse_candidates
+    code: |
+      import re
+      from datetime import datetime
+      from decimal import Decimal, InvalidOperation
+
+      def transform(doc):
+          def digits(value):
+              return re.sub(r"\D", "", str(value or "")) or None
+
+          def normalize_date(value):
+              if not value:
+                  return None
+              text = str(value).strip()
+              for pattern in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
+                  try:
+                      return datetime.strptime(text[:10], pattern).date().isoformat()
+                  except ValueError:
+                      continue
+              return None
+
+          def normalize_money(value):
+              if not value:
+                  return None
+              text = re.sub(r"[^0-9,.+-]", "", str(value))
+              if "," in text:
+                  text = text.replace(".", "").replace(",", ".")
+              try:
+                  return f"{Decimal(text):.2f}"
+              except InvalidOperation:
+                  return None
+
+          return {
+              "invoice_number": digits(doc.get("invoice_number")),
+              "issue_date": normalize_date(doc.get("issue_date")),
+              "issuer_name": str(doc.get("issuer_name") or "").strip() or None,
+              "issuer_tax_id": digits(doc.get("issuer_tax_id")),
+              "recipient_name": str(doc.get("recipient_name") or "").strip() or None,
+              "recipient_tax_id": digits(doc.get("recipient_tax_id")),
+              "amount_total": normalize_money(doc.get("amount_total")),
+          }
+
+pipeline:
+  steps:
+    - name: extract_and_normalize
+      input: invoices
+      operations:
+        - extract_nfse_candidates
+        - normalize_nfse_candidates
+  output:
+    type: file
+    path: ./invoice_extraction_local_llama.json
+    intermediate_dir: ./.docetl/nfse-local-llama

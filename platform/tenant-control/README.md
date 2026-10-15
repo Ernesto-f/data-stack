@@ -4,7 +4,8 @@ Este serviço implementa a API usada por `/admin/` no Pulse Portal. Mantém o ca
 
 ## Responsabilidades
 
-- **Admin Pulse**: cadastra tenant, registra host/provisionamento e habilita entitlements/assentos após validar contrato e stack.
+- **Admin do control plane** (`/pulse/tenant-control-admin`): cadastra tenant, registra host/provisionamento e habilita entitlements/assentos após validar contrato e stack. O grupo é separado dos papéis administrativos do Grafana e Airflow.
+- **Admin Pulse legado** (`/pulse/admin`): continua autorizado no control plane para compatibilidade, mas também concede papel Admin no Grafana e Airflow; não é o grupo recomendado para novos administradores de tenants.
 - **Admin do tenant**: convida funcionários para a própria empresa e seleciona somente produtos habilitados e assentos disponíveis. Só owner pode nomear outro admin.
 - **Keycloak**: identidade global e claims/grupos tenant-scoped. O backend usa um client service-account privado; as permissões do ator são verificadas em `tenant_memberships` antes de cada operação.
 - **SALUS CRM**: Odoo customizado, container e banco separados por tenant. No primeiro SSO, cria um usuário local interno somente depois da membership/entitlement autorizada e do e-mail verificado.
@@ -27,15 +28,16 @@ docker compose --env-file .env.auth --env-file .env.tenant-control \
 5. Instalar `platform/portal/nginx/portal.izatacore.com.conf` no Nginx do host; a API fica presa a `127.0.0.1:18098`. O endpoint `/tenant-admin/api/` recebe um token sobrescrito por Nginx; tokens de browser não são encaminhados como cabeçalho confiável.
 6. Servir `platform/portal/admin/index.html` como `/admin/` e recarregar o Nginx.
 
-Para habilitar o primeiro Admin Pulse, crie uma conta verificada pelo fluxo privado de `infra/keycloak/create_user.py` e inclua o grupo adicional `pulse/admin`. Não conceda esse grupo a owners/admins de clientes.
+Para habilitar um administrador do control plane, associe a conta verificada ao grupo `pulse/tenant-control-admin` no Keycloak. O script privado `infra/keycloak/create_user.py` oferece esse grupo na criação de contas. Não conceda grupos administrativos globais a owners/admins de clientes.
 
 ## Fluxo de ativação
 
-1. Um Admin Pulse registra o tenant e o entitlement/limite de assentos em `/admin/`.
-2. Se CRM estiver contratado, a equipe Pulse prepara o stack isolado (`setup-secrets.sh`, `initialize-db.sh`, `deploy.sh`), client/grupos Keycloak e vhost TLS. Depois o Admin Pulse ativa o tenant; a API confirma o grupo Keycloak CRM antes da ativação.
+1. Um Admin do control plane registra a empresa e o entitlement/limite de assentos em `/admin/`; o tenant começa em `provisioning`.
+2. Se CRM estiver contratado, a equipe Pulse prepara o stack isolado (`setup-secrets.sh`, `initialize-db.sh`, `deploy.sh`), client/grupos Keycloak e vhost TLS. A tela executa o preflight de host e grupos Keycloak; o operador também confirma a disponibilidade da stack antes de ativar.
 3. Um Admin Pulse convida o primeiro owner. A API cria a identidade Keycloak com verificação de e-mail; só depois da verificação o owner acessa o tenant.
 4. O owner convida funcionários e seleciona produtos/assentos disponíveis. As inclusões removem/atribuem grupos Keycloak tenant-scoped. A cada primeiro login, Odoo cria a conta interna local no banco daquele tenant.
-5. Para suspender um funcionário ou tenant, use o Portal. A API remove os grupos do escopo suspenso e preserva identidades/memberships de outras empresas.
+5. O Admin do control plane pode suspender/reativar o tenant. A API sincroniza os grupos dos membros para remover/restaurar acesso somente nesse tenant e tenta restaurar o estado anterior caso a sincronização falhe.
+6. Para suspender um funcionário, use o Portal. A API remove os grupos do escopo suspenso e preserva identidades/memberships de outras empresas.
 
 O fluxo exige SMTP funcional no realm. Sem SMTP, o endpoint recusa o convite e desfaz a identidade/grupos recém-criados; ele não retorna senha temporária ao browser.
 

@@ -1,0 +1,36 @@
+job_name: wm_specification_producao
+description: Ordens, reservas e status de producao SAP
+
+# Filtros e limites ficam explicitos aqui para o Airflow/job ser auditavel.
+# use_config_filters=false evita duplicar os filtros globais do config.py.
+use_config_filters: false
+force_reload: false
+so_ddl: false
+where: ""
+
+tabelas:
+  - name: dbo.SAPECC_AUFK
+    limite: 1000000
+    where: "[WERKS] = 'BRAD'"
+  - name: dbo.SAPECC_AFKO
+    limite: 1000000
+    where: "AUFNR IN (SELECT AUFNR FROM dbo.SAPECC_AFPO WHERE [DWERK] = 'BRAD')"
+  - name: dbo.SAPECC_AFPO
+    limite: 1000000
+    where: "[DWERK] = 'BRAD'"
+  - name: dbo.sv_ecc_resb
+    limite: 1000000
+    where: "[WERKS] = 'BRAD' AND [BDTER] BETWEEN '20260101' AND '20261231'"
+  - name: dbo.SAPECC_JEST
+    limite: 1000000
+    where: "OBJNR IN (SELECT OBJNR FROM dbo.SAPECC_AUFK WHERE [WERKS] = 'BRAD')"
+  - name: dbo.SAPECC_TJ02
+    limite: 1000000
+    where: ""
+  - name: dbo.SAPECC_TJ02T
+    limite: 1000000
+    where: ""
+
+logs_dir: logs
+status_dir: status/wm_specification_producao
+output_dir: output/wm_specification_producao

@@ -1,0 +1,56 @@
+# File Upload Service — Apex Data Stack
+
+Serviço de ingestão de arquivos orientado a Data Engineering.
+
+Permite que usuários façam upload de arquivos (CSV/Excel) através do portal,
+armazenando-os no Object Storage e processando-os assincronamente via Airflow,
+carregando os dados no SQL Server.
+
+---
+
+# Objetivo
+
+Desacoplar:
+
+Upload  ≠  Processamento
+
+para garantir:
+
+- escalabilidade
+- performance
+- retry automático
+- observabilidade
+- tolerância a falhas
+
+---
+
+# Arquitetura
+
+Frontend (Portal)
+      ↓
+FastAPI (Upload API)
+      ↓
+MinIO (raw storage)
+      ↓
+Airflow (ETL DAG)
+      ↓
+SQL Server (DW / tabelas destino)
+      ↓
+Status callback → usuário
+
+---
+
+# Stack Tecnológica
+
+| Camada | Tecnologia |
+|--------|-----------|
+| Proxy | Nginx |
+| API | FastAPI + Uvicorn |
+| Storage | MinIO (S3 compatible) |
+| Orquestração | Apache Airflow |
+| Banco | SQL Server |
+| Containers | Docker Compose |
+
+---
+
+

@@ -1,0 +1,4 @@
+docker run --rm -it \
+  -v /srv/data-stack/infra/nginx/auth:/etc/nginx/auth \
+  datastack-nginx \
+  htpasswd -c /etc/nginx/auth/.htpasswd apex

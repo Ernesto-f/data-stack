@@ -1,0 +1,28 @@
+{
+  "$schema": "https://raw.githubusercontent.com/grafana/grafana/master/docs/sources/developers/plugins/plugin.schema.json",
+  "type": "panel",
+  "name": "Apex Containerscomments Panel",
+  "id": "apex-containerscomments-panel",
+  "skipDataQuery": true,
+  "info": {
+    "description": "Painel Grafana Apex Containerscomments Panel",
+    "author": {
+      "name": "BAT Apex"
+    },
+    "keywords": [
+      "panel",
+      "grafana",
+      "apex-containerscomments-panel"
+    ],
+    "logos": {
+      "small": "img/logo.svg",
+      "large": "img/logo.svg"
+    },
+    "version": "1.0.1",
+    "updated": "2026-07-14"
+  },
+  "dependencies": {
+    "grafanaDependency": ">=10.0.0",
+    "plugins": []
+  }
+}

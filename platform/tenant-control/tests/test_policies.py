@@ -34,7 +34,9 @@ def test_tenant_admin_role_does_not_imply_crm_subscription():
 
 def test_platform_admin_is_an_explicit_global_group():
     assert is_platform_admin(identity("/pulse/admin"))
+    assert is_platform_admin(identity("/pulse/tenant-control-admin"))
     assert not is_platform_admin(identity("/pulse/tenants/acme/admin"))
+    assert not is_platform_admin(identity("/pulse/home/analytics-admin"))
 
 
 def test_crm_host_is_derived_from_a_validated_tenant_key():

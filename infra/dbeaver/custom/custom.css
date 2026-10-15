@@ -1,0 +1,36 @@
+/* ===== APEX THEME OVERRIDE ===== */
+
+/* Header principal */
+header,
+[class*="header"],
+[class*="Header"] {
+  background-color: #111824 !important;
+}
+
+/* Toolbar superior */
+[class*="toolbar"],
+[class*="Toolbar"] {
+  background-color: #111824 !important;
+}
+
+/* Primary buttons */
+button[class*="primary"],
+.MuiButton-containedPrimary {
+  background-color: #2f7dff !important;
+}
+
+/* Links ativos / destaques */
+a,
+[class*="active"] {
+  color: #2f7dff !important;
+}
+
+/* Ajuste geral MUI primary */
+:root {
+  --theme-primary: #2f7dff !important;
+}
+
+
+button#productInfo {
+    display: none !important;
+}

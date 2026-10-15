@@ -1,0 +1,7 @@
+sudo apt install --reinstall ca-certificates
+sudo apt update
+sudo update-ca-certificates
+sudo systemctl restart docker
+
+limpando ssh 
+rm -rf ~/.vscode-server

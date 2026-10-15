@@ -1,0 +1,25 @@
+services:
+  exceptions-api:
+    image: datastack-fastapi:latest
+    container_name: exceptions-api
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: >
+      sh -c "uvicorn main:app --host 0.0.0.0 --port 8080 --reload"
+    ports:
+      - "8011:8080"
+    env_file:
+      - .env
+    networks:
+      - exceptions-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  exceptions-net:
+    external: true

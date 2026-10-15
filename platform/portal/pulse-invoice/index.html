@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#07111f" />
+  <title>Pulse Invoice</title>
+  <link rel="icon" type="image/png" href="/pulse-fav32.png" />
+  <style>
+    :root { color-scheme: dark; --bg:#07111f; --panel:#0d1a2b; --line:#203750; --text:#e7f0fb; --muted:#91a8bd; --accent:#68c7ff; --green:#70dfa5; --amber:#f5c66b; --red:#ff8592; }
+    * { box-sizing:border-box; }
+    body { margin:0; padding:26px; background:radial-gradient(circle at 15% 0,#14304b 0,transparent 38%),var(--bg); color:var(--text); font:15px/1.5 Inter,ui-sans-serif,system-ui,sans-serif; }
+    .shell { max-width:1180px; margin:auto; }
+    header { display:flex; align-items:center; justify-content:space-between; gap:18px; margin-bottom:28px; }
+    .brand { display:flex; align-items:center; gap:15px; }
+    .brand img { width:118px; height:40px; object-fit:contain; object-position:left center; }
+    .brand h1 { margin:0; font-size:21px; letter-spacing:.01em; }
+    .brand p { margin:1px 0 0; color:var(--muted); font-size:12px; }
+    a { color:var(--accent); text-decoration:none; }
+    .back { font-size:13px; }
+    .intro { margin-bottom:22px; }
+    .intro h2 { margin:0 0 6px; font-size:26px; }
+    .intro p { margin:0; color:var(--muted); max-width:720px; }
+    .grid { display:grid; grid-template-columns:minmax(280px,360px) 1fr; gap:18px; align-items:start; }
+    .panel { border:1px solid var(--line); border-radius:16px; padding:20px; background:rgba(13,26,43,.94); box-shadow:0 18px 45px #0003; }
+    .panel h3 { margin:0 0 14px; font-size:16px; }
+    .drop { display:block; padding:18px; border:1px dashed #416583; border-radius:12px; background:#0a1523; color:var(--muted); }
+    input[type=file] { width:100%; margin-top:10px; color:var(--text); }
+    .hint { color:var(--muted); font-size:12px; margin:12px 0 0; }
+    button { border:0; border-radius:9px; padding:10px 15px; background:#167447; color:white; font-weight:700; cursor:pointer; }
+    button:hover { filter:brightness(1.1); }
+    button.secondary { background:#21364c; }
+    button.warn { background:#6e3d35; }
+    .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:15px; }
+    .status { min-height:22px; margin-top:12px; color:var(--muted); font-size:13px; }
+    .status.error { color:var(--red); }
+    .status.ok { color:var(--green); }
+    .tenant { padding:8px 11px; border:1px solid var(--line); border-radius:9px; color:var(--muted); font-size:12px; }
+    .toolbar { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; }
+    .table-wrap { overflow:auto; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th,td { padding:11px 9px; border-bottom:1px solid var(--line); text-align:left; vertical-align:middle; }
+    th { color:var(--muted); font-weight:600; white-space:nowrap; }
+    td.amount { white-space:nowrap; text-align:right; }
+    .badge { display:inline-block; border:1px solid #4a6075; border-radius:20px; padding:3px 8px; color:#c3d3e2; font-size:11px; white-space:nowrap; }
+    .badge.pending_review { color:var(--amber); border-color:#765b2c; }
+    .badge.approved { color:var(--green); border-color:#356a52; }
+    .empty { padding:24px 10px; color:var(--muted); text-align:center; }
+    dialog { width:min(900px,calc(100vw - 28px)); max-height:90vh; overflow:auto; border:1px solid #34516e; border-radius:16px; padding:0; background:var(--panel); color:var(--text); box-shadow:0 30px 90px #000a; }
+    dialog::backdrop { background:#02070dbb; }
+    .dialog-head,.dialog-foot { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 20px; border-bottom:1px solid var(--line); }
+    .dialog-foot { border-top:1px solid var(--line); border-bottom:0; justify-content:flex-end; }
+    .dialog-head h3 { margin:0; }
+    .dialog-body { display:grid; grid-template-columns:1fr 1fr; gap:18px; padding:20px; }
+    .fields { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    label.field { display:flex; flex-direction:column; gap:5px; color:var(--muted); font-size:12px; }
+    .field input { width:100%; border:1px solid #34516e; border-radius:7px; padding:9px; background:#07111f; color:var(--text); font:inherit; }
+    .field.wide { grid-column:1/-1; }
+    .evidence { margin:9px 0 0; padding:10px; border-left:2px solid var(--accent); background:#091522; color:#c2d3e2; font-size:12px; }
+    .original { color:var(--accent); font-size:13px; }
+    .muted { color:var(--muted); font-size:12px; }
+    @media(max-width:840px) { body{padding:17px}.grid{grid-template-columns:1fr}.dialog-body{grid-template-columns:1fr}header{align-items:flex-start;flex-direction:column}.fields{grid-template-columns:1fr 1fr} }
+    @media(max-width:500px) { .fields{grid-template-columns:1fr} .toolbar{align-items:flex-start;flex-direction:column} }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="brand">
+        <img src="/pulse-logo.svg" alt="Pulse" />
+        <div><h1>Pulse Invoice</h1><p>NFS-e · conferência assistida</p></div>
+      </div>
+      <div class="actions"><span id="tenant" class="tenant">Verificando tenant…</span><a class="back" href="/">Voltar ao Portal</a></div>
+    </header>
+
+    <section class="intro">
+      <h2>Notas fiscais</h2>
+      <p>Envie uma NFS-e digital, confira os campos e aprove somente os dados que correspondem ao documento original.</p>
+    </section>
+
+    <div class="grid">
+      <section class="panel">
+        <h3>Enviar uma NFS-e</h3>
+        <form id="upload-form">
+          <label class="drop">Selecione um PDF digital
+            <input id="invoice-file" type="file" accept="application/pdf,.pdf" required />
+          </label>
+          <p class="hint">Nesta versão, PDFs digitalizados sem camada de texto falham fechados. A extração é local; nenhuma chamada a LLM é feita.</p>
+          <div class="actions"><button id="upload-button" type="submit">Enviar e extrair</button></div>
+          <div id="upload-status" class="status" role="status"></div>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="toolbar">
+          <h3 style="margin:0">Fila de conferência</h3>
+          <div class="actions" style="margin:0">
+            <button class="secondary" id="refresh-button" type="button">Atualizar</button>
+            <a class="secondary" id="export-link" href="/pulse-invoice/api/v1/invoices/export.csv">Exportar aprovadas CSV</a>
+          </div>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Número</th><th>Prestador</th><th>Emissão</th><th>Total</th><th>Estado</th><th></th></tr></thead><tbody id="invoice-rows"></tbody></table></div>
+        <div id="list-status" class="status"></div>
+      </section>
+    </div>
+  </main>
+
+  <dialog id="review-dialog">
+    <div class="dialog-head"><h3 id="dialog-title">Conferir nota</h3><button class="secondary" id="close-dialog" type="button">Fechar</button></div>
+    <form id="review-form">
+      <div class="dialog-body">
+        <div>
+          <p id="layout-family" class="muted"></p>
+          <div id="review-fields" class="fields"></div>
+          <div class="actions"><a id="original-link" class="original" target="_blank" rel="noopener noreferrer">Abrir documento original no Archive ↗</a></div>
+          <div id="review-status" class="status"></div>
+        </div>
+        <div><h3>Fonte e sinal heurístico</h3><p class="muted">O score atual não é uma probabilidade calibrada.</p><div id="evidence-list" class="muted">Carregando…</div></div>
+      </div>
+      <div class="dialog-foot">
+        <button class="warn" id="reject-button" type="button">Rejeitar</button>
+        <button class="secondary" id="save-button" type="submit">Salvar correções</button>
+        <button id="approve-button" type="button">Aprovar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    const API = "/pulse-invoice/api/v1";
+    const fieldNames = [
+      ["invoice_number", "Número da nota"], ["series", "Série"],
+      ["issuer_name", "Prestador"], ["issuer_tax_id", "CNPJ/CPF prestador"],
+      ["recipient_name", "Tomador"], ["recipient_tax_id", "CNPJ/CPF tomador"],
+      ["service_code", "Código do serviço"], ["service_description", "Descrição"],
+      ["issue_date", "Emissão"], ["competence_date", "Competência"],
+      ["due_date", "Vencimento"], ["payment_date", "Pagamento"],
+      ["currency", "Moeda"], ["amount_gross", "Valor bruto"],
+      ["amount_deductions", "Deduções"], ["tax_iss", "ISS"], ["iss_rate_percent", "Alíquota ISS (%)"],
+      ["tax_pis", "PIS"], ["tax_cofins", "COFINS"], ["tax_irrf", "IRRF"],
+      ["tax_inss", "INSS"], ["amount_total", "Total"],
+    ];
+    const labels = {pending_review:"Aguardando conferência", approved:"Aprovada", rejected:"Rejeitada", error:"Erro"};
+    const layoutLabels = {
+      municipal_classic_v1:"NFS-e municipal · perfil conhecido",
+      nfse_nacional_candidate_v1:"NFS-e Nacional · perfil candidato, ainda em validação",
+      nfse_nacional_unmapped:"NFS-e Nacional · perfil ainda não validado",
+      unclassified:"Layout não classificado",
+      mixed:"Páginas com layouts diferentes",
+    };
+    let currentInvoice = null;
+    const $ = (id) => document.getElementById(id);
+    const text = (el,value) => { el.textContent = value == null ? "" : String(value); };
+
+    async function api(path, options={}) {
+      const response = await fetch(API + path, {credentials:"same-origin", ...options});
+      const type = response.headers.get("content-type") || "";
+      if (response.redirected || !type.includes("application/json")) {
+        if (response.redirected || /\/(oauth2|keylogin)\//i.test(response.url)) {
+          throw new Error("Sua sessão do Portal expirou. Entre novamente e repita a ação.");
+        }
+        throw new Error(`Resposta inesperada da API (HTTP ${response.status}); a lista não foi carregada.`);
+      }
+      const body = await response.json();
+      if (!response.ok) {
+        const detail = body && body.detail ? body.detail : `HTTP ${response.status}`;
+        throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+      }
+      return body;
+    }
+
+    function currency(amount,currencyCode="BRL") {
+      if (amount == null) return "—";
+      return new Intl.NumberFormat("pt-BR",{style:"currency",currency:currencyCode || "BRL"}).format(Number(amount));
+    }
+
+    async function loadTenant() {
+      try {
+        const data = await api("/me");
+        text($("tenant"), `${data.tenant_name} · ${data.tenant_role}`);
+      } catch (error) {
+        text($("tenant"), "Tenant Invoice não provisionado");
+        $("tenant").title = error.message;
+      }
+    }
+
+    async function loadInvoices() {
+      const body = $("invoice-rows"); body.replaceChildren();
+      try {
+        const invoices = await api("/invoices");
+        if (!Array.isArray(invoices)) throw new Error("A API não retornou uma lista de notas.");
+        if (!invoices.length) {
+          const row=document.createElement("tr"), cell=document.createElement("td");
+          cell.colSpan=6; cell.className="empty"; cell.textContent="Nenhuma NFS-e neste tenant."; row.append(cell); body.append(row);
+        }
+        for (const invoice of invoices) {
+          const row=document.createElement("tr");
+          const values=[invoice.invoice_number || "Sem número",invoice.issuer_name || "Prestador não identificado",invoice.issue_date || "—",currency(invoice.amount_total,invoice.currency)];
+          for (const value of values) { const cell=document.createElement("td"); cell.textContent=String(value); if (value===values[3]) cell.className="amount"; row.append(cell); }
+          const statusCell=document.createElement("td"), badge=document.createElement("span");
+          badge.className=`badge ${invoice.review_status}`; badge.textContent=labels[invoice.review_status] || invoice.review_status; statusCell.append(badge); row.append(statusCell);
+          const action=document.createElement("td"), button=document.createElement("button");
+          button.className="secondary"; button.textContent="Conferir"; button.type="button"; button.addEventListener("click",()=>openInvoice(invoice.invoice_id));
+          action.append(button); row.append(action); body.append(row);
+        }
+        text($("list-status"), `${invoices.length} nota(s)`); $("list-status").className="status ok";
+      } catch (error) {
+        text($("list-status"), error.message); $("list-status").className="status error";
+      }
+    }
+
+    function addField(key,label,value) {
+      const wrapper=document.createElement("label"); wrapper.className="field";
+      const caption=document.createElement("span"); caption.textContent=label; wrapper.append(caption);
+      const input=document.createElement("input"); input.name=key; input.value=value == null ? "" : String(value);
+      if (["issue_date","competence_date","due_date","payment_date"].includes(key)) input.type="date";
+      if (["amount_gross","amount_deductions","tax_iss","iss_rate_percent","tax_pis","tax_cofins","tax_irrf","tax_inss","amount_total"].includes(key)) {input.type="number";input.step="0.01";}
+      wrapper.append(input); return wrapper;
+    }
+
+    async function openInvoice(id) {
+      try {
+        const invoice=await api(`/invoices/${id}`); currentInvoice=invoice;
+        text($("dialog-title"), `Conferir NFS-e ${invoice.invoice_number || "sem número"}`);
+        text($("layout-family"), `Layout: ${layoutLabels[invoice.layout_family] || "não identificado"}`);
+        const fields=$("review-fields"); fields.replaceChildren();
+        for (const [key,label] of fieldNames) fields.append(addField(key,label,invoice[key]));
+        const link=$("original-link"); link.href=`https://archive.izatacore.com/documents/${invoice.source_document_id}/details`;
+        const evidence=$("evidence-list"); evidence.replaceChildren();
+        for (const [key,label] of fieldNames) {
+          const source=(invoice.source_pages || {})[key]; const confidence=(invoice.field_confidence || {})[key];
+          const item=document.createElement("p"); item.className="evidence";
+          const confidenceText=confidence == null || Number(confidence) <= 0 ? "sem evidência" : `sinal heurístico ${Math.round(Number(confidence)*100)}/100 · não calibrado`;
+          item.textContent=`${label}: ${confidenceText}${source?.page ? ` · página ${source.page}` : ""}${source?.text ? ` · ${source.text}` : ""}`;
+          evidence.append(item);
+        }
+        text($("review-status"), labels[invoice.review_status] || invoice.review_status);
+        $("review-dialog").showModal();
+      } catch (error) { alert(error.message); }
+    }
+
+    $("upload-form").addEventListener("submit",async (event)=>{
+      event.preventDefault(); const file=$("invoice-file").files[0]; if(!file)return;
+      const button=$("upload-button"); button.disabled=true;
+      text($("upload-status"),"Enviando para o Archive e executando Docling/DocETL local…"); $("upload-status").className="status";
+      try {
+        const form=new FormData(); form.append("file",file);
+        const result=await api("/invoices",{method:"POST",body:form});
+        if (!Number.isInteger(result?.invoice_id)) throw new Error("O upload não foi confirmado. Entre novamente e selecione o PDF outra vez.");
+        text($("upload-status"),`NFS-e recebida · estado ${labels[result.review_status] || result.review_status}`); $("upload-status").className="status ok";
+        $("upload-form").reset(); await loadInvoices(); await openInvoice(result.invoice_id);
+      } catch(error) { text($("upload-status"),error.message); $("upload-status").className="status error"; }
+      finally { button.disabled=false; }
+    });
+
+    $("review-form").addEventListener("submit",async (event)=>{
+      event.preventDefault(); if(!currentInvoice)return;
+      const body={}; for(const input of $("review-fields").querySelectorAll("input")) body[input.name]=input.value===""?null:input.value;
+      try { await api(`/invoices/${currentInvoice.invoice_id}/review`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); text($("review-status"),"Correções salvas"); await loadInvoices(); }
+      catch(error) { text($("review-status"),error.message); }
+    });
+    $("approve-button").addEventListener("click",async ()=>{
+      if(!currentInvoice)return;
+      try { await api(`/invoices/${currentInvoice.invoice_id}/approve`,{method:"POST"}); $("review-dialog").close(); await loadInvoices(); }
+      catch(error) { text($("review-status"),error.message); }
+    });
+    $("reject-button").addEventListener("click",async ()=>{
+      if(!currentInvoice)return; const reason=prompt("Motivo da rejeição:"); if(!reason)return;
+      try { await api(`/invoices/${currentInvoice.invoice_id}/reject`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({reason})}); $("review-dialog").close(); await loadInvoices(); }
+      catch(error) { text($("review-status"),error.message); }
+    });
+    $("close-dialog").addEventListener("click",()=>$("review-dialog").close());
+    $("refresh-button").addEventListener("click",loadInvoices);
+    loadTenant(); loadInvoices();
+  </script>
+</body>
+</html>

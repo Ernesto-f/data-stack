@@ -1,0 +1,42 @@
+
+
+PROXMOX VIRTUALIZATION
+
+VM PORTAL - PT1ZLM30
+
+Aplicações
+  nextcloud, guacamole, dbeaver
+    
+Rede   
+  INTERNAL	    172.20.0.31/24
+
+=================================================
+
+VM PRODUCAO - DT8PRX26
+    
+Aplicações
+ nodered + airflow + grafana 
+Rede
+  WAN	        10.113.120.120
+  INT-AUT 	    172.10.0.5
+  INTERNAL	    172.20.0.11
+
+=================================================
+
+VM AUTOBRIDGE LT8MVA204
+
+Rede    
+    AUT	        10.113.23.78 /24
+    INT-AUT	    172.10.0.10/24
+
+=================================================
+
+VM AIENABLED
+
+Rede
+    INTERNAL    172.20.0.20/24
+
+
+COMO CONFIGURAR AS REDES = configutacao rede VMs
+COMO CONFIGURAR A VM DE AUTOMACAO = configuracao vm AUTOMACAO
+COMO CONFIGURO AS MAQUINAS DO ZERO= instalacao maquina nova

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://raw.githubusercontent.com/grafana/grafana/master/docs/sources/developers/plugins/plugin.schema.json",
+  "type": "panel",
+  "name": "Exceptions Panel",
+  "id": "bat-exceptions-panel",
+  "skipDataQuery": true,
+  "info": {
+    "description": "Painel para registro de excepções de paradas — BAT Uberlândia",
+    "author": {
+      "name": "BAT Apex"
+    },
+    "keywords": ["panel", "exceptions", "form"],
+    "logos": {
+      "small": "img/logo.svg",
+      "large": "img/logo.svg"
+    },
+    "version": "%VERSION%",
+    "updated": "%TODAY%"
+  },
+  "dependencies": {
+    "grafanaDependency": ">=10.0.0",
+    "plugins": []
+  }
+}

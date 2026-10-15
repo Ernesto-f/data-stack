@@ -1,0 +1,307 @@
+PARA ALTERAR MAPPING
+
+ALTER USER MAPPING FOR usr_apex_prometheus
+SERVER srv_fileupload
+OPTIONS (
+  SET user 'usr_fdw_fileupload',
+  SET password 'Fantasy_fdw'
+);
+
+
+PARA COLOCAR NO MAPPING
+
+
+CREATE USER MAPPING FOR usr_apex_prometheus
+SERVER srv_fileupload
+OPTIONS (
+  user 'usr_fdw_fileupload',
+  password 'Fantasy_fdw'
+);
+
+
+
+-- 1) Permitir acessar o schema onde estão as foreign tables
+GRANT USAGE ON SCHEMA fdw_schema TO leitura;
+
+-- 2) Permitir uso do foreign server
+GRANT USAGE ON FOREIGN SERVER srv_fdw TO leitura;
+
+-- 4) Dar SELECT nas foreign tables
+GRANT SELECT ON ALL TABLES IN SCHEMA fdw_schema TO leitura;
+
+
+
+
+# Configuração PostgreSQL FDW
+
+## Conceito
+
+FDW, ou Foreign Data Wrapper, permite consultar tabelas de outro banco PostgreSQL como se elas existissem no banco atual.
+
+Neste exemplo:
+
+* **Banco origem**: banco onde a consulta será feita.
+* **Banco externo**: banco onde os dados reais estão.
+* **SERVER FDW**: configuração com host, porta e nome do banco externo.
+* **USER MAPPING**: ligação entre um usuário do banco origem e um usuário/senha do banco externo.
+* **FOREIGN TABLES**: tabelas externas criadas/importadas no banco origem.
+* **ROLE LOCAL**: usada para controlar quais usuários do banco origem podem consultar as tabelas FDW.
+
+O `SERVER` não guarda usuário e senha. Ele guarda apenas host, porta e dbname. Quem guarda usuário e senha é o `USER MAPPING`.
+
+---
+
+## 1. Configuração no banco externo
+
+Executar no **banco externo**, com usuário administrador ou dono dos schemas/tabelas.
+
+Criar usuário técnico para o FDW:
+
+```sql
+CREATE USER usr_fdw_fileupload WITH PASSWORD 'SENHA_FORTE';
+```
+
+Dar permissão nos schemas que serão acessados:
+
+```sql
+GRANT USAGE ON SCHEMA guardian TO usr_fdw_fileupload;
+GRANT SELECT ON ALL TABLES IN SCHEMA guardian TO usr_fdw_fileupload;
+
+GRANT USAGE ON SCHEMA scheduling TO usr_fdw_fileupload;
+GRANT SELECT ON ALL TABLES IN SCHEMA scheduling TO usr_fdw_fileupload;
+```
+
+Garantir permissão para tabelas futuras:
+
+```sql
+ALTER DEFAULT PRIVILEGES IN SCHEMA guardian
+GRANT SELECT ON TABLES TO usr_fdw_fileupload;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA scheduling
+GRANT SELECT ON TABLES TO usr_fdw_fileupload;
+```
+
+O schema `control` pode ser ignorado caso contenha apenas tabelas internas de controle do sistema.
+
+---
+
+## 2. Configuração no banco origem
+
+Executar no **banco origem**.
+
+Habilitar a extensão FDW:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS postgres_fdw;
+```
+
+Criar o server apontando para o banco externo:
+
+```sql
+CREATE SERVER srv_fileupload
+FOREIGN DATA WRAPPER postgres_fdw
+OPTIONS (
+  host '127.0.0.1',
+  port '5432',
+  dbname 'db_fileupload'
+);
+```
+
+Criar o user mapping para o usuário que executará o import ou as consultas:
+
+```sql
+CREATE USER MAPPING FOR apexadmin
+SERVER srv_fileupload
+OPTIONS (
+  user 'usr_fdw_fileupload',
+  password 'SENHA_FORTE'
+);
+```
+
+Explicação: quando o usuário local `apexadmin` usar o server `srv_fileupload`, ele conectará no banco externo usando o usuário externo `usr_fdw_fileupload`.
+
+Caso vários usuários precisem acessar diretamente via FDW, criar um user mapping para cada um ou usar `FOR PUBLIC`:
+
+```sql
+CREATE USER MAPPING FOR PUBLIC
+SERVER srv_fileupload
+OPTIONS (
+  user 'usr_fdw_fileupload',
+  password 'SENHA_FORTE'
+);
+```
+
+Usar `FOR PUBLIC` apenas quando fizer sentido permitir que qualquer usuário com permissão local nas foreign tables use o mesmo usuário externo.
+
+---
+
+## 3. Criar schemas no banco origem
+
+Recomendado criar um schema por área, espelhando os schemas do banco externo.
+
+```sql
+CREATE SCHEMA IF NOT EXISTS fdw_fileupload_guardian;
+CREATE SCHEMA IF NOT EXISTS fdw_fileupload_scheduling;
+```
+
+---
+
+## 4. Importar tabelas externas
+
+Executar no **banco origem**:
+
+```sql
+IMPORT FOREIGN SCHEMA guardian
+FROM SERVER srv_fileupload
+INTO fdw_fileupload_guardian;
+```
+
+```sql
+IMPORT FOREIGN SCHEMA scheduling
+FROM SERVER srv_fileupload
+INTO fdw_fileupload_scheduling;
+```
+
+Isso cria as foreign tables no banco origem. Os dados continuam fisicamente no banco externo.
+
+---
+
+## 5. Consultar dados
+
+Exemplo:
+
+```sql
+SELECT *
+FROM fdw_fileupload_guardian.nome_da_tabela
+LIMIT 10;
+```
+
+```sql
+SELECT *
+FROM fdw_fileupload_scheduling.nome_da_tabela
+LIMIT 10;
+```
+
+---
+
+## 6. Criar role local para liberar consulta
+
+Executar no **banco origem**.
+
+```sql
+CREATE ROLE role_fdw_fileupload_read;
+```
+
+Dar permissão nos schemas FDW:
+
+```sql
+GRANT USAGE ON SCHEMA fdw_fileupload_guardian TO role_fdw_fileupload_read;
+GRANT SELECT ON ALL TABLES IN SCHEMA fdw_fileupload_guardian TO role_fdw_fileupload_read;
+
+GRANT USAGE ON SCHEMA fdw_fileupload_scheduling TO role_fdw_fileupload_read;
+GRANT SELECT ON ALL TABLES IN SCHEMA fdw_fileupload_scheduling TO role_fdw_fileupload_read;
+```
+
+Adicionar usuários à role:
+
+```sql
+GRANT role_fdw_fileupload_read TO apexadmin;
+GRANT role_fdw_fileupload_read TO outro_usuario;
+```
+
+Importante: a role local controla quem pode consultar as foreign tables no banco origem. Ela não substitui o `USER MAPPING`.
+
+---
+
+## 7. Consultas úteis para verificar configuração
+
+Ver se a extensão existe:
+
+```sql
+SELECT extname, extversion
+FROM pg_extension
+WHERE extname = 'postgres_fdw';
+```
+
+Ver servers FDW configurados:
+
+```sql
+SELECT
+  srvname,
+  srvowner::regrole AS owner,
+  srvoptions
+FROM pg_foreign_server;
+```
+
+Ver opções completas de um server:
+
+```sql
+SELECT
+  srvname,
+  unnest(srvoptions) AS opcao
+FROM pg_foreign_server
+WHERE srvname = 'srv_fileupload';
+```
+
+Ver user mappings:
+
+```sql
+SELECT
+  s.srvname,
+  u.umuser::regrole AS usuario_origem,
+  u.umoptions
+FROM pg_user_mapping u
+JOIN pg_foreign_server s ON s.oid = u.umserver
+WHERE s.srvname = 'srv_fileupload';
+```
+
+Ver foreign tables importadas:
+
+```sql
+SELECT
+  foreign_table_schema,
+  foreign_table_name
+FROM information_schema.foreign_tables
+ORDER BY foreign_table_schema, foreign_table_name;
+```
+
+Ver foreign tables de um server específico:
+
+```sql
+SELECT
+  n.nspname AS schema_origem,
+  c.relname AS tabela_origem,
+  s.srvname AS server_fdw,
+  ft.ftoptions
+FROM pg_foreign_table ft
+JOIN pg_class c ON c.oid = ft.ftrelid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+JOIN pg_foreign_server s ON s.oid = ft.ftserver
+WHERE s.srvname = 'srv_fileupload'
+ORDER BY n.nspname, c.relname;
+```
+
+---
+
+## 8. Resumo mental
+
+```text
+SERVER = onde está o banco externo: host, porta e dbname.
+
+USER MAPPING = qual usuário local usa qual usuário/senha no banco externo.
+
+FOREIGN TABLES = tabelas externas visíveis no banco origem.
+
+GRANTS NO BANCO EXTERNO = o que o usuário técnico FDW pode ler no banco externo.
+
+GRANTS NO BANCO ORIGEM = quais usuários locais podem consultar as foreign tables.
+```
+
+Exemplo prático:
+
+```text
+apexadmin no banco origem
+usa o SERVER srv_fileupload
+com USER MAPPING
+e conecta no banco externo como usr_fdw_fileupload.
+```

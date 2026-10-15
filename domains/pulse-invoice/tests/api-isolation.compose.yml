@@ -1,0 +1,59 @@
+name: pulse-invoice-api-isolation-test
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: pulse_invoice_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: disposable-postgres-test-only
+    volumes:
+      - ../database/warehouse-schema.sql:/docker-entrypoint-initdb.d/01-warehouse-schema.sql:ro
+      - ../database/tenant-isolation.sql:/docker-entrypoint-initdb.d/02-tenant-isolation.sql:ro
+      - ./fixtures/api-tenant-seed.sql:/docker-entrypoint-initdb.d/03-api-tenant-seed.sql:ro
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U postgres -d pulse_invoice_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  tests:
+    image: pulse-invoice-api-test:dev
+    build:
+      context: ..
+      dockerfile: tests/Dockerfile.api-test
+    environment:
+      DATABASE_URL: postgresql://pulse_invoice_test_app:pulse-invoice-test-only@postgres:5432/pulse_invoice_test
+      OIDC_ISSUER_URL: https://idp.example.invalid/realms/pulse
+      OIDC_ALLOWED_AZP: pulse-oauth2-proxy
+      PAPERLESS_API_URL: http://paperless.example.invalid/api
+      PAPERLESS_API_TOKEN: disposable-paperless-token
+      DOCETL_API_URL: http://docetl.example.invalid
+      DOCLING_SERVER_URL: http://docling.example.invalid
+      INVOICE_PIPELINE_PATH: /not-used/in-api-isolation-test.yaml
+      DOCETL_SHARED_DIR: /tmp/pulse-invoice-tests
+      DOCETL_CONTAINER_DIR: /tmp/pulse-invoice-tests
+      DB_POOL_MIN_SIZE: "1"
+      DB_POOL_MAX_SIZE: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    image: pulse-invoice-api-test:dev
+    build:
+      context: ..
+      dockerfile: tests/Dockerfile.api-test
+    profiles: [staging]
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      DATABASE_URL: postgresql://pulse_invoice_test_app:pulse-invoice-test-only@postgres:5432/pulse_invoice_test
+      OIDC_ISSUER_URL: https://portal.izatacore.com/keylogin/realms/pulse
+      OIDC_ALLOWED_AZP: pulse-oauth2-proxy
+      DB_POOL_MIN_SIZE: "1"
+      DB_POOL_MAX_SIZE: "1"
+    ports:
+      - "127.0.0.1:18097:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy

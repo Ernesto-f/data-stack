@@ -1,0 +1,6 @@
+[options]
+admin_passwd = REPLACED_BY_setup-secrets.sh
+addons_path = /usr/lib/python3/dist-packages/odoo/addons,/mnt/extra-addons
+db_name = salus_erp_demo
+list_db = False
+proxy_mode = True

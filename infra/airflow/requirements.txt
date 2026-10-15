@@ -1,12 +1,54 @@
+# ======================================================================
+# Airflow Providers (conectores oficiais)
+# ======================================================================
 apache-airflow-providers-amazon
 apache-airflow-providers-microsoft-mssql
 apache-airflow-providers-odbc
 apache-airflow-providers-postgres
 apache-airflow-providers-http
 apache-airflow-providers-keycloak
+apache-airflow-providers-fab
+apache-airflow-providers-mysql
 
-requests
-psycopg2-binary
+
+# ======================================================================
+# Azure / Fabric (OneLake / DataLake)
+# ======================================================================
+azure-identity
+azure-storage-file-datalake
+
+
+# ======================================================================
+# Banco de dados / Conectividade
+# ======================================================================
 pyodbc
-pymssql
+sqlalchemy
+psycopg2-binary
 python-dotenv
+requests
+
+
+
+# ======================================================================
+# Manipulação de arquivos (Excel / CSV / ETL)
+# ======================================================================
+pandas
+openpyxl
+pyxlsb
+python-dateutil
+pyarrow
+polars
+
+
+# ======================================================================
+# Object Storage (MinIO / S3)
+# ======================================================================
+boto3
+minio
+
+
+# ======================================================================
+# Robustez / Qualidade de dados
+# ======================================================================
+tenacity
+pandera

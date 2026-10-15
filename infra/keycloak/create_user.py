@@ -20,10 +20,13 @@ GROUPS = {
     "pulse/home/analytics": "Analytics viewer",
     "pulse/home/analytics-admin": "Analytics editor",
     "pulse/admin": "Pulse/Grafana administrator",
+    "pulse/tenant-control-admin": "Pulse tenant-control administrator",
     "pulse/home/archive": "Archive UI (document ACL is separate)",
+    "pulse/home/tracking": "Pulse Tracking access",
+    "pulse/home/tracking-admin": "Pulse Tracking administrator",
     "pulse/home/crm": "Pulse CRM (Odoo)",
     "pulse/tenants/demo/crm": "CRM access for demo tenant",
-    "pulse/tenants/demo/crm-admin": "CRM manager role for tenant demo",
+    "pulse/tenants/demo/crm-admin": "Full SALUS CRM administrator for tenant demo",
     "pulse/tenants/demo/admin": "Tenant administration for demo",
 }
 TENANT_KEY_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,28}[a-z0-9]$")

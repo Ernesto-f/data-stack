@@ -1,0 +1,134 @@
+resumo dos comandos para executar a atividade 
+
+# Validar ZFS
+zpool status
+zfs list
+
+# Criar dataset para VMs
+zfs create rpool/data/vm
+
+# Otimizações
+zfs set compression=lz4 rpool
+zfs set atime=off rpool/data/vm
+zfs set recordsize=128K rpool/data/vm
+
+# Adicionar storage no Proxmox
+pvesm add zfspool vm-storage -pool rpool/data/vm -content images,rootdir
+
+# Remover storage padrão ZFS (opcional)
+pvesm remove local-zfs
+
+# Validar
+pvesm status
+zfs list
+
+
+
+
+###########################
+Arquitetura adotada
+##########################
+
+1 disco NVMe usado para o sistema e dados (rpool)
+
+
+1 disco NVMe ignorado (não utilizado)
+
+
+ZFS como filesystem principal
+
+
+Separação lógica via dataset
+
+
+Estrutura final:
+rpool
+├── ROOT        → sistema operacional
+└── data
+  └── vm      → discos das VMs
+Storage no Proxmox:
+
+
+local → ISO, backups, etc
+
+
+vm-storage → rpool/data/vm (discos das VMs)
+
+
+
+Passo a passo completo (replicar no outro servidor)
+
+
+Após instalação do Proxmox, validar ZFS
+
+
+zpool status
+zfs list
+
+
+
+Criar dataset para VMs
+
+
+zfs create rpool/data/vm
+
+
+
+Aplicar otimizações
+
+
+zfs set compression=lz4 rpool
+zfs set atime=off rpool/data/vm
+zfs set recordsize=128K rpool/data/vm
+
+
+
+Adicionar storage no Proxmox (via CLI)
+
+
+pvesm add zfspool vm-storage -pool rpool/data/vm -content images,rootdir
+
+
+
+Remover storage padrão ZFS (opcional, recomendado)
+
+
+pvesm remove local-zfs
+
+
+
+Validar storage
+
+
+pvesm status
+Deve aparecer:
+vm-storage   zfspool   active
+
+
+
+Teste criando uma VM
+
+
+
+
+selecionar storage: vm-storage
+
+
+Validar no ZFS:
+zfs list
+Deve aparecer algo como:
+rpool/data/vm/vm-100-disk-0
+
+Resultado final
+
+
+Sistema isolado em rpool/ROOT
+
+
+VMs isoladas em rpool/data/vm
+
+
+Um único disco gerenciado pelo ZFS
+
+
+Estrutura simples, flexível e pronta para replicação/HA posteriormente

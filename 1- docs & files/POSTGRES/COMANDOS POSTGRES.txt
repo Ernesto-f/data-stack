@@ -1,0 +1,38 @@
+### CRIANDO USUSARIO E DANDO ACESSO A ROLES PRONTAS 
+
+CREATE ROLE usuario_rw
+  WITH LOGIN
+  PASSWORD 'senha_forte_aqui'
+  INHERIT;
+
+GRANT pg_read_all_data TO usuario_rw WITH INHERIT TRUE;
+GRANT pg_write_all_data TO usuario_rw WITH INHERIT TRUE;
+
+
+
+
+### LIMITANDO ACESSOS A USUARIOS
+
+REVOKE CONNECT ON DATABASE banco_nao_permitido FROM PUBLIC;
+REVOKE CONNECT ON DATABASE banco_nao_permitido FROM usuario;
+
+GRANT CONNECT ON DATABASE banco_permitido TO usuario;
+
+### E, dentro do banco permitido:
+
+GRANT USAGE ON SCHEMA schema_permitido TO usuario;
+GRANT SELECT, INSERT, UPDATE, DELETE
+ON ALL TABLES IN SCHEMA schema_permitido
+TO usuario;
+
+
+### LIMITANDO TEMPO DE QUERY DOS USUARIOS
+
+-- usuário da aplicação
+ALTER ROLE app_user SET statement_timeout = '10s';
+
+-- usuário de BI/relatórios
+ALTER ROLE bi_user SET statement_timeout = '2min';
+
+-- usuário de manutenção/migração
+ALTER ROLE maintenance_user SET statement_timeout = '0';

@@ -1,0 +1,89 @@
+# ============================================================
+# Clientes de LLMs
+# ============================================================
+openai
+anthropic
+google-genai
+mistralai
+cohere
+groq
+ollama
+
+# ============================================================
+# Agentes, chains e orquestração
+# ============================================================
+langchain
+langchain-community
+langchain-openai
+langchain-anthropic
+langchain-google-genai
+langgraph
+llama-index
+
+# ============================================================
+# RAG, embeddings e bancos vetoriais remotos
+# ============================================================
+tiktoken
+qdrant-client
+pinecone
+weaviate-client
+pgvector
+
+# ============================================================
+# HTTP, validação, resiliência e configuração
+# ============================================================
+pydantic
+python-dotenv
+requests
+httpx
+tenacity
+PyYAML
+
+# ============================================================
+# Dados e processamento
+# ============================================================
+numpy
+pandas
+polars
+duckdb
+rapidfuzz
+
+# ============================================================
+# Documentos, HTML, imagens e planilhas
+# ============================================================
+pypdf
+python-docx
+openpyxl
+beautifulsoup4
+lxml
+markdownify
+Pillow
+
+# ============================================================
+# Bancos, filas e serviços cloud
+# ============================================================
+SQLAlchemy
+psycopg[binary]
+redis
+boto3
+google-cloud-storage
+azure-storage-blob
+
+# ============================================================
+# APIs e webhooks Python
+# ============================================================
+fastapi
+uvicorn
+
+# ============================================================
+# Pacotes pesados/opcionais
+# Podem aumentar muito a imagem ou falhar no Alpine por falta
+# de wheels compatíveis. Descomente apenas quando necessário.
+# ============================================================
+# transformers
+# sentence-transformers
+# torch
+# scikit-learn
+# scipy
+# chromadb
+# onnxruntime

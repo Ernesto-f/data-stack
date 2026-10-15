@@ -1,0 +1,48 @@
+-- remove permissões padrão do schema public
+REVOKE ALL ON SCHEMA public FROM PUBLIC;
+REVOKE ALL ON SCHEMA public FROM usr_aimirim;
+
+-- garante que o usuário possa conectar no banco
+GRANT CONNECT ON DATABASE apex_dw_raw TO usr_aimirim;
+
+-- dá acesso somente ao schema permitido
+GRANT USAGE ON SCHEMA udi_chronos_mcexperiencesuite TO usr_aimirim;
+
+-- dá leitura nas tabelas/views existentes do schema
+GRANT SELECT ON ALL TABLES IN SCHEMA udi_chronos_mcexperiencesuite TO usr_aimirim;
+
+-- dá uso nas sequences existentes, necessário se houver serial/identity expostos
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA udi_chronos_mcexperiencesuite TO usr_aimirim;
+
+-- garante leitura em tabelas futuras criadas nesse schema
+ALTER DEFAULT PRIVILEGES IN SCHEMA udi_chronos_mcexperiencesuite
+GRANT SELECT ON TABLES TO usr_aimirim;
+
+-- garante uso em sequences futuras
+ALTER DEFAULT PRIVILEGES IN SCHEMA udi_chronos_mcexperiencesuite
+GRANT USAGE, SELECT ON SEQUENCES TO usr_aimirim;
+
+-- opcional: força o usuário a cair direto nesse schema
+ALTER ROLE usr_aimirim IN DATABASE apex_dw_raw
+SET search_path = udi_chronos_mcexperiencesuite;
+
+
+
+
+REVOKE ALL ON SCHEMA udi_chronos_mcchronosdw FROM usr_aimirim;
+REVOKE ALL ON SCHEMA udi_chronos_mcexperiencesuite FROM usr_aimirim;
+REVOKE ALL ON SCHEMA udi_fdw_fileupload_guardian FROM usr_aimirim;
+REVOKE ALL ON SCHEMA udi_fileupload FROM usr_aimirim;
+REVOKE ALL ON SCHEMA udi_gmes FROM usr_aimirim;
+REVOKE ALL ON SCHEMA udi_guardian FROM usr_aimirim;
+REVOKE ALL ON SCHEMA udi_pmdnet FROM usr_aimirim;
+
+
+
+
+
+-- TIRANDO ACESSO A TODOS SCHEMAS 
+REVOKE ALL ON SCHEMA outro_schema FROM usr_aimirim;
+REVOKE ALL ON ALL TABLES IN SCHEMA outro_schema FROM usr_aimirim;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA outro_schema FROM usr_aimirim;
+REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA outro_schema FROM usr_aimirim;

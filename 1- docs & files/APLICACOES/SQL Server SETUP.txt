@@ -1,0 +1,42 @@
+
+===================================================================================
+CONFIGURE AUTOGROWTH NO BANCO DE DADOS
+-> importante para nao ficar crescendo aos poucos e dando overload no banco
+===================================================================================
+
+DECLARE @sql NVARCHAR(MAX) = N'';
+
+SELECT @sql = @sql + '
+ALTER DATABASE ' + QUOTENAME(d.name) + '
+MODIFY FILE (
+    NAME = ' + QUOTENAME(mf.name,'''') + ',
+    FILEGROWTH = ' +
+    CASE 
+        WHEN mf.type_desc = 'LOG' THEN '512MB'
+        ELSE '1024MB'
+    END + '
+);'
+FROM sys.databases d
+JOIN sys.master_files mf ON d.database_id = mf.database_id
+WHERE d.name NOT IN ('master','model','msdb','tempdb')
+ORDER BY d.name;
+
+PRINT @sql;
+EXEC sp_executesql @sql;
+
+
+==========================================================
+DEPOIS AUTOGROWTH DOS FILES TEMP
+==========================================================
+
+ALTER DATABASE tempdb MODIFY FILE (NAME='tempdev', FILEGROWTH=512MB);
+ALTER DATABASE tempdb MODIFY FILE (NAME='temp2',   FILEGROWTH=512MB);
+ALTER DATABASE tempdb MODIFY FILE (NAME='temp3',   FILEGROWTH=512MB);
+ALTER DATABASE tempdb MODIFY FILE (NAME='temp4',   FILEGROWTH=512MB);
+ALTER DATABASE tempdb MODIFY FILE (NAME='temp5',   FILEGROWTH=512MB);
+ALTER DATABASE tempdb MODIFY FILE (NAME='temp6',   FILEGROWTH=512MB);
+ALTER DATABASE tempdb MODIFY FILE (NAME='temp7',   FILEGROWTH=512MB);
+ALTER DATABASE tempdb MODIFY FILE (NAME='temp8',   FILEGROWTH=512MB);
+ALTER DATABASE tempdb MODIFY FILE (NAME='templog', FILEGROWTH=512MB);
+
+

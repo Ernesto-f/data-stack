@@ -1,0 +1,247 @@
+DOCUMENTAÇÃO – MIGRAÇÃO DA STACK DOCKER ENTRE PASTAS NO MESMO SERVIDOR
+(EXEMPLO: /home/pc/data-stack → /srv/data-stack)
+
+OBJETIVO
+Mover um projeto Docker Compose completo (código + volumes bind) de uma pasta para outra no mesmo servidor, preservando dados persistentes e permitindo que a stack suba normalmente no novo caminho.
+
+CENÁRIO
+Origem: /home/pc/data-stack
+Destino: /srv/data-stack
+
+Motivo comum:
+
+Partição /home cheia
+
+Inodes esgotados
+
+Padronização para diretório mais adequado (/srv)
+
+DIAGNÓSTICO ANTES DE MIGRAR
+
+1.1 Verificar espaço em disco
+df -h
+
+1.2 Verificar inode (muito importante)
+df -i
+
+Se /home estiver com IUse% 100%, significa que os inodes acabaram (mesmo que ainda exista espaço em GB disponível).
+Sintomas típicos:
+
+SSH instável
+
+Docker falhando ao criar arquivos
+
+Erro “No space left on device” mesmo com espaço livre
+
+1.3 Verificar tamanho do projeto
+sudo du -xhd1 /home/pc | sort -hr | head -n 20
+
+PARAR A STACK COM SEGURANÇA
+
+Entrar no diretório atual:
+
+cd /home/pc/data-stack
+
+Parar serviços:
+
+docker compose down
+
+Confirmar que nada está rodando:
+
+docker ps
+
+CRIAR DIRETÓRIO DE DESTINO
+
+sudo mkdir -p /srv/data-stack
+
+O -p significa:
+Cria a estrutura completa mesmo se pastas intermediárias não existirem.
+
+Exemplo:
+Se /srv não tivesse a pasta data-stack, ele cria automaticamente.
+
+COPIAR O PROJETO COMPLETO
+
+Recomendado usar rsync para preservar permissões e estrutura.
+
+sudo rsync -aHAX --progress /home/pc/data-stack/ /srv/data-stack/
+
+Explicação dos parâmetros:
+-a → modo arquivo (preserva permissões, links, datas)
+-H → preserva hard links
+-A → preserva ACL
+-X → preserva atributos estendidos
+--progress → mostra progresso
+
+IMPORTANTE:
+A barra final no diretório origem é essencial.
+
+Correto:
+... /home/pc/data-stack/ /srv/data-stack/
+
+Errado:
+... /home/pc/data-stack /srv/data-stack/
+(iria criar /srv/data-stack/data-stack)
+
+AJUSTAR PERMISSÕES (SE NECESSÁRIO)
+
+Se seu usuário for pc:
+
+sudo chown -R pc:pc /srv/data-stack
+
+Isso garante que você consiga editar arquivos e subir containers sem problema de permissão.
+
+VALIDAR NOVA ESTRUTURA
+
+cd /srv/data-stack
+ls -la
+
+Verificar se:
+
+docker-compose.yml está presente
+
+.env está presente
+
+volumes/ está presente
+
+subpastas de dados existem
+
+SUBIR A STACK NO NOVO LOCAL
+
+cd /srv/data-stack
+
+docker compose up -d
+
+Se tiver imagens customizadas:
+
+docker compose up -d --build
+
+Se usar profiles:
+
+docker compose --profile analytics up -d
+
+Verificar status:
+
+docker compose ps
+
+TESTES APÓS MIGRAÇÃO
+
+Ver logs:
+
+docker compose logs -f --tail 200
+
+Testar serviços via curl:
+
+curl -I http://localhost/
+
+curl -I http://localhost/analytics/
+
+APÓS VALIDAR QUE ESTÁ FUNCIONANDO
+
+Somente depois de confirmar que tudo está operacional:
+
+Remover pasta antiga para liberar inode e espaço:
+
+sudo rm -rf /home/pc/data-stack
+
+Verificar se liberou inode:
+
+df -i
+
+Verificar espaço:
+
+df -h
+
+COMO FUNCIONA O DOCKER NESSE CASO
+
+Importante entender:
+
+Docker não “guarda” o caminho do projeto.
+
+Quem define o caminho é o docker-compose.yml.
+
+Quando você executa docker compose up dentro de uma pasta, ele usa os binds relativos àquela pasta.
+
+Exemplo:
+
+volumes:
+
+./volumes/grafana-data:/var/lib/grafana
+
+Se o projeto estiver em:
+/home/pc/data-stack
+
+Ele monta:
+/home/pc/data-stack/volumes/grafana-data
+
+Se você mover para:
+/srv/data-stack
+
+Ele passa a montar:
+/srv/data-stack/volumes/grafana-data
+
+Ou seja:
+Não é necessário alterar o docker-compose.yml se os binds forem relativos (./).
+
+CONTAINERS ANTIGOS
+
+Se a stack estava parada antes da migração (docker compose down), ao subir no novo local:
+
+Os containers antigos deixam de existir
+
+Novos containers são criados apontando para o novo caminho
+
+Se quiser garantir ambiente limpo:
+
+docker compose down
+docker compose up -d --force-recreate
+
+ERROS COMUNS APÓS MIGRAR
+
+Erro de permissão:
+Permission denied em volume
+→ Ajustar chown no diretório correspondente
+
+Erro de inode ainda cheio:
+Você esqueceu de apagar a pasta antiga
+→ sudo rm -rf /home/pc/data-stack
+
+Erro de porta ocupada:
+Outro serviço já está usando a porta
+→ ss -lntp | grep :PORTA
+
+Erro de container antigo ainda rodando:
+docker ps
+docker stop CONTAINER_ID
+
+RECOMENDAÇÃO DE ESTRUTURA
+
+Para serviços permanentes, recomenda-se:
+
+/srv/data-stack
+
+Porque:
+
+/srv é destinado a serviços
+
+Evita poluir /home
+
+Facilita administração
+
+RESUMO EXECUTIVO (COPIAR E COLAR)
+
+docker compose down
+sudo mkdir -p /srv/data-stack
+sudo rsync -aHAX --progress /home/pc/data-stack/ /srv/data-stack/
+sudo chown -R pc:pc /srv/data-stack
+cd /srv/data-stack
+docker compose up -d
+docker compose ps
+
+Após validar:
+
+sudo rm -rf /home/pc/data-stack
+df -h
+df -i
+
+FIM DA DOCUMENTAÇÃO.

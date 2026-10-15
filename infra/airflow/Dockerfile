@@ -2,13 +2,13 @@ FROM apache/airflow:3.1.4
 
 USER root
 
-RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     unixodbc \
     unixodbc-dev \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+    odbcinst \
+    odbc-postgresql \
+    ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 
 USER airflow
 

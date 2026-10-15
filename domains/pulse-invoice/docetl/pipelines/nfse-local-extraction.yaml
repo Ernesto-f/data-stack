@@ -1,0 +1,269 @@
+# Uses DocETL's built-in split, code_map, and code_reduce operations.
+# No LLM operator is present: this pipeline makes no model/API calls.
+# field_confidence values are heuristic weights, not calibrated probabilities.
+# municipal_classic_v1 is established; nfse_nacional_candidate_v1 is experimental
+# and must remain in human review until more examples validate its rules.
+# Run from an isolated working directory containing invoice_input.json.
+datasets:
+  invoices:
+    type: file
+    path: ./invoice_input.json
+
+operations:
+  - name: split_nfse_pages
+    type: split
+    split_key: markdown
+    method: delimiter
+    method_kwargs:
+      delimiter: "## Page"
+      num_splits_to_group: 1
+
+  - name: extract_nfse_fields_by_page
+    type: code_map
+    concurrent_thread_count: 1
+    code: |
+      import re
+
+      def transform(doc):
+          text = str(doc.get("markdown_chunk", doc.get("markdown", "")))
+          lines = text.replace("\r\n", "\n").split("\n")
+          first = lines[0].strip() if lines else ""
+          page_match = re.match(r"(?:##\s*Page\s+)?(\d+)\s*$", first, re.IGNORECASE)
+          page_number = (
+              int(page_match.group(1))
+              if page_match
+              else int(doc.get("split_nfse_pages_chunk_num", 1))
+          )
+          layout_family = str(doc.get("layout_family") or "unclassified")
+
+          def section(start, end=None):
+              match = re.search(start, text, re.IGNORECASE)
+              if not match:
+                  return ""
+              body = text[match.end():]
+              if end:
+                  ending = re.search(end, body, re.IGNORECASE)
+                  if ending:
+                      body = body[:ending.start()]
+              return body
+
+          def field(pattern, transform=lambda value: value.strip(), source_text=None):
+              match = re.search(pattern, source_text if source_text is not None else text, re.IGNORECASE)
+              if not match:
+                  return {"value": None, "confidence": 0.0, "source": None}
+              value = transform(match.group(1).strip())
+              if value is None or value == "":
+                  return {"value": None, "confidence": 0.0, "source": None}
+              excerpt = re.sub(r"\s+", " ", match.group(0)).strip()[:240]
+              return {
+                  "value": value,
+                  "confidence": 0.99,
+                  "source": {"page": page_number, "text": excerpt},
+              }
+
+          def digits(value):
+              return re.sub(r"\D", "", value) or None
+
+          def money(value):
+              return f"{float(value.replace('.', '').replace(',', '.')):.2f}"
+
+          def date(value):
+              day, month, year = value.split("/")
+              return f"{year}-{month}-{day}"
+
+          money_pattern = r"([0-9.]+,[0-9]{2})"
+          national_layout = layout_family == "nfse_nacional_candidate_v1"
+          if national_layout:
+              issuer = section(r"EMITENTE(?:\s+DA\s+NFS-?E)?", r"DESTINAT[ÁA]RIO")
+              recipient = section(
+                  r"DESTINAT[ÁA]RIO",
+                  r"VALORES?|TRIBUTOS?|ISS|PAGAMENTO|INFORMA[CÇ][ÕO]ES\s+COMPLEMENTARES",
+              )
+              invoice_number_pattern = r"(?:N[uú]mero\s+(?:da\s+)?(?:NFS-?e|Nota)|NFS-?e\s*(?:n[oº.]?\s*)?N[uú]mero)\s*[:#]?\s*([0-9]+)"
+              issue_date_pattern = r"Data\s+(?:e\s+Hora\s+)?(?:de|da)\s+Emiss[aã]o(?:\s+(?:da|do)\s+NFS-?e)?\s*:?\s*(\d{2}/\d{2}/\d{4})"
+              tax_id_pattern = r"(?:CPF\s*/\s*CNPJ|CNPJ\s*/\s*CPF|CNPJ|CPF)\s*:?\s*([0-9./-]+)"
+              issuer_name_pattern = r"(?:Nome/Raz[aã]o\s+Social|Raz[aã]o\s+Social)\s*:?\s*([^\n]+)"
+              recipient_name_pattern = issuer_name_pattern
+              service_code_pattern = r"(?:C[oó]digo\s+de\s+Tributa[cç][ãa]o\s+Nacional|C[oó]digo\s+do\s+Servi[cç]o|Item\s+da\s+Lista\s+de\s+Servi[cç]os)\s*:?\s*([A-Z0-9./-]+)"
+              service_description_pattern = r"(?:Descri[cç][ãa]o|Discrimina[cç][ãa]o)\s+(?:do\s+)?Servi[cç]o\s*:?\s*([^\n]+)"
+              amount_gross_pattern = r"(?:Valor\s+(?:do|dos)\s+Servi[cç]os?|Valor\s+Bruto)\s*:?\s*(?:R\$\s*)?" + money_pattern
+              amount_total_pattern = r"(?:Valor\s+Total(?:\s+(?:da|do)\s+NFS-?e)?|Valor\s+L[ií]quido(?:\s+da\s+NFS-?e)?)\s*:?\s*(?:R\$\s*)?" + money_pattern
+          else:
+              issuer = section(r"PRESTADOR\s+DE\s+SERVI[ÇC]OS", r"TOMADOR\s+DE\s+SERVI[ÇC]OS")
+              recipient = section(r"TOMADOR\s+DE\s+SERVI[ÇC]OS", r"INTERMEDI[ÁA]RIO\s+DE\s+SERVI[ÇC]OS")
+              invoice_number_pattern = r"N[uú]mero\s+da\s+Nota\s*:?\s*(\d+)"
+              issue_date_pattern = r"Data\s+e\s+Hora\s+de\s+Emiss[aã]o\s*:?\s*(\d{2}/\d{2}/\d{4})"
+              tax_id_pattern = r"CPF/CNPJ\s*:\s*([0-9./-]+)"
+              issuer_name_pattern = r"Nome/Raz[aã]o\s+Social\s*:\s*([^\n]+)"
+              recipient_name_pattern = issuer_name_pattern
+              service_code_pattern = r"C[oó]digo\s+do\s+Servi[cç]o\s*:?\s*[ \t]*(\d{4,})\s*-"
+              service_description_pattern = r"C[oó]digo\s+do\s+Servi[cç]o\s*:?\s*\d{4,}\s*-\s*([^\n]+)"
+              amount_gross_pattern = r"VALOR\s+TOTAL\s+DO\s+SERVI[ÇC]O\s*=\s*R\$\s*" + money_pattern
+              amount_total_pattern = amount_gross_pattern
+          fields = {
+              "invoice_number": field(invoice_number_pattern),
+              "verification_code": field(r"C[oó]digo\s+de\s+Verifica[çc][ãa]o\s*:?\s*([A-Z0-9-]+)"),
+              "issue_date": field(issue_date_pattern, date),
+              "issuer_tax_id": field(tax_id_pattern, digits, issuer),
+              "issuer_name": field(issuer_name_pattern, lambda value: value.strip(" *"), issuer),
+              "recipient_tax_id": field(tax_id_pattern, digits, recipient),
+              "recipient_name": field(recipient_name_pattern, lambda value: value.strip(" *"), recipient),
+              "service_code": field(r"C[oó]digo\s+do\s+Servi[çc]o\s*:?[ \t]*(\d{4,})\s*-"),
+              "service_description": field(r"C[oó]digo\s+do\s+Servi[çc]o\s*:?[ \t]*\d{4,}\s*-\s*([^\n]+)"),
+              "service_narrative": field(r"DISCRIMINA[ÇC][ÃA]O\s+DE\s+SERVI[ÇC]OS\s*\n\s*([^\n]+)"),
+              "amount_gross": field(amount_gross_pattern, money),
+              "amount_total": field(amount_total_pattern, money),
+              "amount_deductions": field(r"Valor\s+Total\s+das\s+Dedu[cç][õo]es\s*\(R\$\)\s*" + money_pattern, money),
+              "tax_iss": field(r"Valor\s+do\s+ISS\s*\(R\$\)\s*" + money_pattern, money),
+              "tax_pis": field(r"PIS/PASEP\s*\(R\$\)\s*" + money_pattern, money),
+              "tax_cofins": field(r"COFINS\s*\(R\$\)\s*" + money_pattern, money),
+              "tax_irrf": field(r"IRRF\s*\(R\$\)\s*" + money_pattern, money),
+              "tax_inss": field(r"Contribui[cç][ãa]o\s+Previdenci[áa]ria\s*-\s*Retida\s*\(R\$\)\s*" + money_pattern, money),
+              "payment_date": field(r"quitada\s+em\s+(\d{2}/\d{2}/\d{4})", date),
+          }
+
+          if national_layout:
+              fields["service_code"] = field(service_code_pattern)
+              fields["service_description"] = field(service_description_pattern)
+
+          recipient_tax_id_pattern = r"(?<!\d)(\d{2}\.?(?:\d{3})\.?(?:\d{3})/?\d{4}-?\d{2}|\d{3}\.?(?:\d{3})\.?(?:\d{3})-?\d{2})(?!\d)"
+          fields["recipient_tax_id"] = field(recipient_tax_id_pattern, digits, recipient)
+          if fields["recipient_name"]["value"] is None:
+              tax_match = re.search(recipient_tax_id_pattern, recipient)
+              if tax_match:
+                  before_tax = [
+                      re.sub(r"^[#*|\s]+|[#*|\s]+$", "", line).strip()
+                      for line in recipient[:tax_match.start()].splitlines()
+                  ]
+                  candidates = [
+                      line for line in before_tax
+                      if line
+                      and not re.search(
+                          r"Nome/Raz[aã]o\s+Social|CPF/CNPJ|Inscri[cç][ãa]o\s+Municipal|Endere[çc]o|Munic[ií]pio|E-mail",
+                          line,
+                          re.IGNORECASE,
+                      )
+                  ]
+                  if candidates:
+                      fields["recipient_name"] = {
+                          "value": candidates[-1].strip(" *|"),
+                          "confidence": 0.75,
+                          "source": {
+                              "page": page_number,
+                              "text": re.sub(r"\s+", " ", candidates[-1]).strip()[:240],
+                          },
+                      }
+
+          def set_row_cells(anchor_pattern, assignments, skip_gross_echo=False):
+              anchor = re.search(anchor_pattern, text, re.IGNORECASE)
+              if not anchor:
+                  return
+              row_text = text[anchor.end():anchor.end() + 3000]
+              cells = list(re.finditer(money_pattern, row_text))
+              if (
+                  skip_gross_echo
+                  and cells
+                  and fields["amount_gross"]["value"] is not None
+                  and money(cells[0].group(1)) == fields["amount_gross"]["value"]
+              ):
+                  cells = cells[1:]
+              for field_name, cell_index in assignments:
+                  if cell_index >= len(cells):
+                      continue
+                  cell = cells[cell_index]
+                  evidence = re.sub(r"\s+", " ", text[anchor.start():anchor.end() + cell.end()]).strip()[:240]
+                  fields[field_name] = {
+                      "value": money(cell.group(1)),
+                      "confidence": 0.94,
+                      "source": {"page": page_number, "text": evidence},
+                  }
+
+          # Docling preserves these municipal tax tables as separate header and
+          # value rows in Markdown. Read cells in column order, not by proximity
+          # to each label, which can bind a tax to the wrong adjacent value.
+          set_row_cells(
+              r"Contribui[cç][ãa]o\s+Previdenci[áa]ria\s*-\s*Retida\s*\(R\$\)",
+              [("tax_inss", 0), ("tax_irrf", 1), ("tax_cofins", 2), ("tax_pis", 3)],
+              skip_gross_echo=True,
+          )
+          set_row_cells(
+              r"Valor\s+Total\s+das\s+Dedu[cç][õo]es\s*\(R\$\)",
+              [("amount_deductions", 0), ("iss_rate_percent", 2), ("tax_iss", 3)],
+          )
+          if layout_family != "municipal_classic_v1":
+              for candidate in fields.values():
+                  if candidate.get("value") is not None:
+                      candidate["confidence"] = min(candidate.get("confidence", 0.0), 0.75)
+          fields["payment_status"] = (
+              {"value": "paid", "confidence": 0.99, "source": fields["payment_date"]["source"]}
+              if fields["payment_date"]["value"]
+              else {"value": "unknown", "confidence": 0.0, "source": None}
+          )
+          fields["competence_date"] = {"value": None, "confidence": 0.0, "source": None}
+          fields["due_date"] = {"value": None, "confidence": 0.0, "source": None}
+          return {
+              "page_number": page_number,
+              "layout_family": layout_family,
+              "source_document_id": doc.get("source_document_id"),
+              "source_sha256": doc.get("source_sha256"),
+              "fields": fields,
+          }
+
+  - name: combine_nfse_pages
+    type: code_reduce
+    reduce_key: source_document_id
+    pass_through: false
+    code: |
+      def transform(items):
+          fields = {}
+          layouts = {item.get("layout_family", "unclassified") for item in items}
+          layout_family = next(iter(layouts)) if len(layouts) == 1 else "mixed"
+          for item in items:
+              for name, candidate in item.get("fields", {}).items():
+                  current = fields.get(name)
+                  if candidate.get("value") is not None and (
+                      current is None or current.get("value") is None
+                  ):
+                      fields[name] = candidate
+                  elif current is None:
+                      fields[name] = candidate
+
+          required = ("invoice_number", "issue_date", "issuer_tax_id", "amount_total")
+          missing = [name for name in required if fields.get(name, {}).get("value") is None]
+          reasons = ["missing_required_field:" + name for name in missing]
+          low_confidence = [
+              name for name, field in fields.items()
+              if field.get("value") is not None and field.get("confidence", 0.0) < 0.9
+          ]
+          reasons.extend("low_confidence_field:" + name for name in low_confidence)
+          reasons.append("human_review_required_for_all_extractions")
+          if layout_family != "municipal_classic_v1":
+              reasons.append("layout_profile_requires_validation:" + layout_family)
+          values = {name: field.get("value") for name, field in fields.items()}
+          values["currency"] = "BRL"
+          return {
+              "source_document_id": items[0].get("source_document_id") if items else None,
+              "source_sha256": items[0].get("source_sha256") if items else None,
+              "document_type": "nfse",
+              "extractor_mode": "local-deterministic",
+              "extractor_version": "0.3.0",
+              "layout_family": layout_family,
+              "page_count": len({item.get("page_number") for item in items}),
+              "review_status": "pending_review",
+              "values": values,
+              "field_confidence": {name: field.get("confidence", 0.0) for name, field in fields.items()},
+              "source_pages": {name: field.get("source") for name, field in fields.items()},
+              "review_reasons": reasons,
+          }
+
+pipeline:
+  steps:
+    - name: extract_invoice
+      input: invoices
+      operations:
+        - split_nfse_pages
+        - extract_nfse_fields_by_page
+        - combine_nfse_pages
+  output:
+    type: file
+    path: ./invoice_extraction.json

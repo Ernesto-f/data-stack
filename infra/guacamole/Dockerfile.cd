@@ -1,0 +1,6 @@
+FROM guacamole/guacd:1.6.0
+
+ENV LOG_LEVEL=info \
+    TZ=America/Sao_Paulo
+
+EXPOSE 4822

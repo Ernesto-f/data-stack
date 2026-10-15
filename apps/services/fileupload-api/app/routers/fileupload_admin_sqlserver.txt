@@ -1,0 +1,328 @@
+from __future__ import annotations
+
+import os
+import json
+from typing import Optional, Any, Dict, List
+
+import pyodbc
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, field_validator
+
+router = APIRouter(prefix="/admin/routes", tags=["fileupload-admin"])
+
+# CONEXÃO SQL
+#pega variavel de conexção em .enx
+SQL_CONN = os.getenv("UPLOAD_SQL_CONN_STR")
+# Funcao para conexão generica
+def get_conn():
+    if not SQL_CONN:
+        raise RuntimeError("UPLOAD_SQL_CONN_STR não definido no ambiente.")
+    return pyodbc.connect(SQL_CONN)
+
+
+# CONVERTE RESPOSTA SQL EM JSON
+# como nao estou usando SQLAlchemy, precisamos disso.
+# por enquanto vamos sem SQLAlc para nao aumentar complexidade.
+
+def fetch_all_dict(cur) -> List[Dict[str, Any]]:
+    cols = [c[0] for c in cur.description]
+    return [dict(zip(cols, r)) for r in cur.fetchall()]
+
+
+def fetch_one_dict(cur) -> Optional[Dict[str, Any]]:
+    row = cur.fetchone()
+    if not row:
+        return None
+    cols = [c[0] for c in cur.description]
+    return dict(zip(cols, row))
+
+
+# Classe BaseModel pydentic para tipagem e normalização
+# com dados normalizados e tipados, ganhamos performance.
+class RouteCreate(BaseModel):
+    # opcional: trigger gera se vier vazio/NULL
+    route_key: Optional[str] = None
+
+    area_name: str
+    dataset_id: str
+
+    target_system: str  # obrigatório agora
+    airflow_conn_id: Optional[str] = None
+
+    target_schema: str
+    target_table: str
+
+    merge_proc: Optional[str] = None
+    allowed_ext: Optional[str] = "xlsx,csv"
+    sheet_name: Optional[str] = None
+    max_file_mb: Optional[int] = None
+    is_active: int = 1
+    notes: Optional[str] = None
+
+    expected_columns: Optional[str] = None
+    load_mode: str = "INCREMENTAL"
+    id_column_name: Optional[str] = None
+    column_map_json: Optional[str] = None
+
+    @field_validator("target_system")
+    @classmethod
+    def _ts(cls, v: str):
+        v = (v or "").strip().upper()
+        if not v:
+            raise ValueError("target_system é obrigatório (ex: SQLSERVER)")
+        return v
+
+    @field_validator("load_mode")
+    @classmethod
+    def _lm(cls, v: str):
+        v = (v or "INCREMENTAL").strip().upper()
+        if v not in ("INCREMENTAL", "OVERRIDE"):
+            raise ValueError("load_mode deve ser INCREMENTAL ou OVERRIDE")
+        return v
+
+    @field_validator("column_map_json")
+    @classmethod
+    def _validate_json(cls, v: Optional[str]):
+        if not v:
+            return v
+        obj = json.loads(v)
+        if not isinstance(obj, dict):
+            raise ValueError("column_map_json deve ser um JSON object {source: target}")
+        return v
+
+# Classe BaseModel pydentic para tipagem e normalização
+# com dados normalizados e tipados, ganhamos performance.
+class RouteUpdate(BaseModel):
+    
+    area_name: Optional[str] = None
+    dataset_id: Optional[str] = None
+
+    target_system: Optional[str] = None
+    airflow_conn_id: Optional[str] = None
+
+    target_schema: Optional[str] = None
+    target_table: Optional[str] = None
+
+    merge_proc: Optional[str] = None
+    allowed_ext: Optional[str] = None
+    sheet_name: Optional[str] = None
+    max_file_mb: Optional[int] = None
+    is_active: Optional[int] = None
+    notes: Optional[str] = None
+
+    expected_columns: Optional[str] = None
+    load_mode: Optional[str] = None
+    id_column_name: Optional[str] = None
+    column_map_json: Optional[str] = None
+
+    @field_validator("target_system")
+    @classmethod
+    def _ts(cls, v: Optional[str]):
+        if v is None:
+            return v
+        return v.strip().upper()
+
+    @field_validator("load_mode")
+    @classmethod
+    def _lm(cls, v: Optional[str]):
+        if v is None:
+            return v
+        v = v.strip().upper()
+        if v not in ("INCREMENTAL", "OVERRIDE"):
+            raise ValueError("load_mode deve ser INCREMENTAL ou OVERRIDE")
+        return v
+
+    @field_validator("column_map_json")
+    @classmethod
+    def _validate_json(cls, v: Optional[str]):
+        if v is None or v == "":
+            return v
+        obj = json.loads(v)
+        if not isinstance(obj, dict):
+            raise ValueError("column_map_json deve ser um JSON object {source: target}")
+        return v
+
+
+
+# rota get para lista de registros
+@router.get("")
+def list_routes():
+    with get_conn() as cn:
+        cur = cn.cursor()
+        cur.execute("""
+            SELECT
+                route_key,
+                area_name,
+                dataset_id,
+                target_system,
+                target_schema,
+                target_table,
+                load_mode,
+                is_active,
+                updated_at
+            FROM control.tb_file_route_upload
+            ORDER BY updated_at DESC, route_key ASC
+        """)
+        return fetch_all_dict(cur)
+
+# rota get para editar um registro
+# aqui ele usa o codigo routekey para buscar o registro,
+# não é o ideal, pode mudar depois para ID, mais performatico! 
+@router.get("/{route_key}")
+def get_route(route_key: str):
+    rk = (route_key or "").strip().upper()
+    with get_conn() as cn:
+        cur = cn.cursor()
+        cur.execute("""
+            SELECT
+                route_key,
+                area_name,
+                dataset_id,
+                target_system,
+                airflow_conn_id,
+                target_schema,
+                target_table,
+                merge_proc,
+                allowed_ext,
+                sheet_name,
+                max_file_mb,
+                is_active,
+                notes,
+                expected_columns,
+                load_mode,
+                id_column_name,
+                column_map_json,
+                created_at,
+                updated_at
+            FROM control.tb_file_route_upload
+            WHERE route_key = ?
+        """, rk)
+        data = fetch_one_dict(cur)
+        if not data:
+            raise HTTPException(status_code=404, detail="route_key não encontrada")
+        return data
+
+# rota para criar registro
+@router.post("")
+def create_route(payload: RouteCreate):
+    rk = (payload.route_key or "").strip().upper() or None
+
+    try:
+        with get_conn() as cn:
+            cur = cn.cursor()
+            cur.execute("""
+                INSERT INTO control.tb_file_route_upload
+                (
+                    route_key,
+                    area_name,
+                    dataset_id,
+                    target_system,
+                    airflow_conn_id,
+                    target_schema,
+                    target_table,
+                    merge_proc,
+                    allowed_ext,
+                    sheet_name,
+                    max_file_mb,
+                    is_active,
+                    notes,
+                    expected_columns,
+                    load_mode,
+                    id_column_name,
+                    column_map_json
+                )
+                VALUES
+                (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """,
+            rk,
+            payload.area_name,
+            payload.dataset_id,
+            payload.target_system,
+            payload.airflow_conn_id,
+            payload.target_schema,
+            payload.target_table,
+            payload.merge_proc,
+            payload.allowed_ext,
+            payload.sheet_name,
+            payload.max_file_mb,
+            payload.is_active,
+            payload.notes,
+            payload.expected_columns,
+            payload.load_mode,
+            payload.id_column_name,
+            payload.column_map_json
+            )
+            cn.commit()
+
+            # se trigger gerou route_key, buscar
+            # atualmente nao colocamos route_key na mao, o banco faz esse codigo com um trigger.
+            if rk is None:
+                row = cur.execute("""
+                    SELECT TOP 1 route_key
+                    FROM control.tb_file_route_upload
+                    WHERE area_name = ? AND dataset_id = ?
+                    ORDER BY created_at DESC
+                """, payload.area_name, payload.dataset_id).fetchone()
+                rk = row.route_key if row else None
+
+        return {"ok": True, "route_key": rk, "mode": "CREATED"}
+
+    except pyodbc.Error as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+#rota para atualizar registro
+# aqui ele usa o codigo routekey para buscar o registro,
+# não é o ideal, pode mudar depois para ID, mais performatico! 
+@router.put("/{route_key}")
+def update_route(route_key: str, payload: RouteUpdate):
+    rk = (route_key or "").strip().upper()
+
+    sets = []
+    params: List[Any] = []
+
+    def add(col: str, val: Any):
+        sets.append(f"{col} = ?")
+        params.append(val)
+    # payload para fazer update só noque for preciso.
+    if payload.area_name is not None: add("area_name", payload.area_name)
+    if payload.dataset_id is not None: add("dataset_id", payload.dataset_id)
+    if payload.target_system is not None: add("target_system", payload.target_system)
+    if payload.airflow_conn_id is not None: add("airflow_conn_id", payload.airflow_conn_id)
+    if payload.target_schema is not None: add("target_schema", payload.target_schema)
+    if payload.target_table is not None: add("target_table", payload.target_table)
+    if payload.merge_proc is not None: add("merge_proc", payload.merge_proc)
+    if payload.allowed_ext is not None: add("allowed_ext", payload.allowed_ext)
+    if payload.sheet_name is not None: add("sheet_name", payload.sheet_name)
+    if payload.max_file_mb is not None: add("max_file_mb", payload.max_file_mb)
+    if payload.is_active is not None: add("is_active", payload.is_active)
+    if payload.notes is not None: add("notes", payload.notes)
+    if payload.expected_columns is not None: add("expected_columns", payload.expected_columns)
+    if payload.load_mode is not None: add("load_mode", payload.load_mode)
+    if payload.id_column_name is not None: add("id_column_name", payload.id_column_name)
+    if payload.column_map_json is not None: add("column_map_json", payload.column_map_json)
+
+    if not sets:
+        return {"ok": True, "route_key": rk, "mode": "NO_CHANGES"}
+
+    # sempre atualiza updated_at
+    sets.append("updated_at = SYSDATETIME()")
+    params.append(rk)
+
+    try:
+        with get_conn() as cn:
+            cur = cn.cursor()
+            cur.execute(f"""
+                UPDATE control.tb_file_route_upload
+                   SET {", ".join(sets)}
+                 WHERE route_key = ?
+            """, params)
+
+            if cur.rowcount == 0:
+                raise HTTPException(status_code=404, detail="route_key não encontrada")
+
+            cn.commit()
+
+        return {"ok": True, "route_key": rk, "mode": "UPDATED"}
+
+    except pyodbc.Error as e:
+        raise HTTPException(status_code=500, detail=str(e))

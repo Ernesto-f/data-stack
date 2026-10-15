@@ -1,0 +1,18 @@
+vzdump 106 --storage local --compress zstd
+
+vzdump 106 → Faz backup da VM/CT com ID 106
+--storage local → Salva o backup no armazenamento local do Proxmox
+--compress zstd → Usa compressão Zstandard (zstd)
+
+# as VMs compressed ficam em 
+/var/lib/vz/dump/
+
+# para remover algum compressed
+rm /var/lib/vz/dump/""nome-do-arquivo""
+
+# para migrar de um servidor para o outro
+# o ip é a rede que quer utilizar. 
+# qemu-106-* é o nome do arquivo que quer transferir
+rsync -avh --progress /var/lib/vz/dump/vzdump-qemu-106-*.vma.zst root@172.20.0.20:/var/lib/vz/dump/
+
+

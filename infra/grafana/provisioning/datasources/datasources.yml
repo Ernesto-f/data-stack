@@ -1,0 +1,248 @@
+apiVersion: 1
+
+
+#prune: true
+
+
+datasources:
+
+  - name: "SQL CHRONOS UDI"
+    uid: "ffbpz5aspqtc0d_tv"
+    type: "mssql"
+    access: "proxy"
+    url: "10.116.135.88"
+    user: "usr_dashboard_tv"
+    editable: false
+    jsonData:
+      database: "db_mcExperienceSuite"
+      connMaxLifetime: 900
+      maxIdleConns: 100
+      maxIdleConnsAuto: true
+      maxOpenConns: 100
+    secureJsonData:
+      password: ${DS_SQL_CHRONOS_UDI_PASSWORD}
+    orgId: 2
+
+
+##apiVersion: 1
+##
+##prune: true
+##
+##datasources:
+##
+##  # ============================================================
+##  # GMES UDI
+##  # ============================================================
+##  - name: "GMES UDI"
+##    uid: "COLOQUE_UID_ATUAL_GMES_UDI"
+##    type: mssql
+##    access: proxy
+##    url: "10.116.135.23"
+##    user: $DS_GMES_UDI_USER
+##    orgId: 2
+##    editable: false
+##
+##    jsonData:
+##      database: $DS_GMES_UDI_DATABASE
+##
+##    secureJsonData:
+##      password: $DS_GMES_UDI_PASSWORD
+##
+##
+##  # ============================================================
+##  # Microsoft SQL Server Utilidades
+##  # ============================================================
+##  - name: "Microsoft SQL Server Utilidades"
+##    uid: "COLOQUE_UID_ATUAL_MSSQL_UTILIDADES"
+##    type: mssql
+##    access: proxy
+##    url: "10.121.121.18:1433"
+##    user: $DS_MSSQL_UTILIDADES_USER
+##    orgId: 2
+##    editable: false
+##
+##    jsonData:
+##      database: $DS_MSSQL_UTILIDADES_DATABASE
+##
+##    secureJsonData:
+##      password: $DS_MSSQL_UTILIDADES_PASSWORD
+##
+##
+##  # ============================================================
+##  # mssql / SQLOLAP
+##  # ============================================================
+##  - name: "mssql"
+##    uid: "COLOQUE_UID_ATUAL_MSSQL"
+##    type: mssql
+##    access: proxy
+##
+##    # Aspas simples são importantes aqui por causa da "\"
+##    url: '10.42.34.55\SQLOLAP'
+##
+##    user: $DS_MSSQL_USER
+##    orgId: 2
+##    editable: false
+##
+##    jsonData:
+##      database: $DS_MSSQL_DATABASE
+##
+##    secureJsonData:
+##      password: $DS_MSSQL_PASSWORD
+##
+##
+##  # ============================================================
+##  # MySQL Utilidades
+##  # ============================================================
+##  - name: "MySQLUtilidades"
+##    uid: "COLOQUE_UID_ATUAL_MYSQL_UTILIDADES"
+##    type: mysql
+##    access: proxy
+##    url: "10.113.122.108:3306"
+##    user: $DS_MYSQL_UTILIDADES_USER
+##    orgId: 2
+##    editable: false
+##
+##    jsonData:
+##      database: $DS_MYSQL_UTILIDADES_DATABASE
+##
+##    secureJsonData:
+##      password: $DS_MYSQL_UTILIDADES_PASSWORD
+##
+##
+##  # ============================================================
+##  # PostgreSQL - pg_apex_dw_reader
+##  # ============================================================
+##  - name: "pg_apex_dw_reader"
+##    uid: "COLOQUE_UID_ATUAL_PG_APEX_DW_READER"
+##    type: postgres
+##    access: proxy
+##    url: "10.42.34.205:5432"
+##    user: $DS_PG_APEX_DW_READER_USER
+##    orgId: 2
+##    editable: false
+##
+##    jsonData:
+##      database: $DS_PG_APEX_DW_READER_DATABASE
+##
+##      # Se hoje a conexão usa SSL, ajuste aqui.
+##      sslmode: "disable"
+##
+##    secureJsonData:
+##      password: $DS_PG_APEX_DW_READER_PASSWORD
+##
+##
+##  # ============================================================
+##  # PME
+##  # ============================================================
+##  - name: "PME"
+##    uid: "COLOQUE_UID_ATUAL_PME"
+##    type: mssql
+##    access: proxy
+##    url: '10.121.121.141\JOIN'
+##    user: $DS_PME_USER
+##    orgId: 2
+##    editable: false
+##
+##    jsonData:
+##      database: $DS_PME_DATABASE
+##
+##    secureJsonData:
+##      password: $DS_PME_PASSWORD
+##
+##
+##  # ============================================================
+##  # SQL AZURE APEX
+##  # Default na sua tela
+##  # ============================================================
+##  - name: "SQL AZURE APEX"
+##    uid: "COLOQUE_UID_ATUAL_SQL_AZURE_APEX"
+##    type: mssql
+##    access: proxy
+##    url: '10.42.34.55\SQLOLAP'
+##    user: $DS_SQL_AZURE_APEX_USER
+##    orgId: 2
+##
+##    isDefault: true
+##    editable: false
+##
+##    jsonData:
+##      database: $DS_SQL_AZURE_APEX_DATABASE
+##
+##    secureJsonData:
+##      password: $DS_SQL_AZURE_APEX_PASSWORD
+##
+##
+##  # ============================================================
+##  # SQL AZURE APEX FREE
+##  # ============================================================
+##  - name: "SQL AZURE APEX FREE"
+##    uid: "COLOQUE_UID_ATUAL_SQL_AZURE_APEX_FREE"
+##    type: mssql
+##    access: proxy
+##    url: "10.42.34.206"
+##    user: $DS_SQL_AZURE_APEX_FREE_USER
+##    orgId: 2
+##    editable: false
+##
+##    jsonData:
+##      database: $DS_SQL_AZURE_APEX_FREE_DATABASE
+##
+##    secureJsonData:
+##      password: $DS_SQL_AZURE_APEX_FREE_PASSWORD
+##
+##
+##  # ============================================================
+##  # SQL CHRONOS UDI
+##  # ============================================================
+##  - name: "SQL CHRONOS UDI"
+##    uid: "ffbpz5aspqtc0d_tv"
+##    type: mssql
+##    access: proxy
+##    url: "10.116.135.88"
+##    user: $DS_SQL_CHRONOS_UDI_USER
+##    orgId: 2
+##    editable: false
+##
+##    jsonData:
+##      database: "db_mcExperienceSuite"
+##
+##    secureJsonData:
+##      password: $DS_SQL_CHRONOS_UDI_PASSWORD
+##
+##
+##  # ============================================================
+##  # SQL GUARDIAN
+##  # ============================================================
+##  - name: "SQL GUARDIAN"
+##    uid: "COLOQUE_UID_ATUAL_SQL_GUARDIAN"
+##    type: mssql
+##    access: proxy
+##    url: '10.113.122.232\SQLEXPRESS'
+##    user: $DS_SQL_GUARDIAN_USER
+##    orgId: 2
+##    editable: false
+##
+##    jsonData:
+##      database: $DS_SQL_GUARDIAN_DATABASE
+##
+##    secureJsonData:
+##      password: $DS_SQL_GUARDIAN_PASSWORD
+##
+##
+##  # ============================================================
+##  # UDI_DW_APEX
+##  # ============================================================
+##  - name: "UDI_DW_APEX"
+##    uid: "COLOQUE_UID_ATUAL_UDI_DW_APEX"
+##    type: mssql
+##    access: proxy
+##    url: '10.42.34.55\SQLOLAP'
+##    user: $DS_UDI_DW_APEX_USER
+##    orgId: 2
+##    editable: false
+##
+##    jsonData:
+##      database: $DS_UDI_DW_APEX_DATABASE
+##
+##    secureJsonData:
+##      password: $DS_UDI_DW_APEX_PASSWORD

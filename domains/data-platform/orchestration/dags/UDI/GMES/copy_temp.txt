@@ -1,0 +1,12 @@
+ start \
+    >> get_tb_ContainerHistory >> wait_01 \
+    >> get_tb_inventory >> wait_02 \
+    >> get_tb_inventory_container >> wait_03 \
+    >> get_tb_warehouse_location >> wait_04 \
+    >> get_tb_product >> wait_05 \
+    >> get_tb_resources >> wait_06 \
+    >> get_tb_resource_class >> wait_07 \
+    >> get_tb_resource_collection >> wait_08 \
+    >> get_tb_resource_link >> wait_09 \
+    >> get_tb_equipment >> wait_10 \
+    >> end

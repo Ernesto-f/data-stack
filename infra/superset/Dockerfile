@@ -1,4 +1,4 @@
-FROM apache/superset:4.0.2
+FROM apache/superset:6.1.0
 
 # (Opcional) Instalar só o driver do Postgres.
 # A imagem já traz suporte, mas manter explícito ajuda.

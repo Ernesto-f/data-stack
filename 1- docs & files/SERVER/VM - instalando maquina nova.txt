@@ -1,0 +1,224 @@
+CASO NAO FUNCIONE APT INSTALL UPDATE
+
+sudo nano /etc/apt/sources.list
+
+deb http://deb.debian.org/debian stable main contrib non-free non-free-firmware
+deb http://security.debian.org/debian-security stable-security main contrib non-free non-free-firmware
+deb http://deb.debian.org/debian stable-updates main contrib non-free non-free-firmware
+
+
+INSTALAR NA MAQUINA
+
+sudo apt install -y docker.io
+sudo apt install -y docker-compose
+
+sudo apt --fix-broken install
+sudo apt update
+
+sudo apt install openssh-server
+
+
+apos adicione seu user ao grupo que pode executar sudo 
+
+# Entrar como root
+su -
+
+# Adicionar o usuário aos grupos necessários
+/usr/sbin/usermod -aG sudo pc
+/usr/sbin/usermod -aG docker pc
+
+# Recarregar grupos (opção 1: nova sessão do grupo docker)
+newgrp docker
+
+# Recarregar grupos (opção 2: forçar logout do usuário – systemd)
+	no vs code:
+		F1
+		KILL USER ON HOST
+		SELECIONA O HOST
+
+# Sair do root
+exit
+
+sudo chown -R pc:pc /home/pc/data-stack
+sudo chmod -R 755 /home/pc/data-stack
+
+sudo chmod -R 777 /home/pc/data-stack
+
+sudo find /home/pc/data-stack -type d -exec chmod 777 {} \;
+sudo find /home/pc/data-stack -type f -exec chmod 666 {} \;
+
+
+
+
+
+
+depois coloque ele no grupo do docker
+
+sudo usermod -aG docker apex
+
+
+
+DENTRO DA MAQUINA PRODUCAO
+
+instalar node para o nodered
+
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+
+
+
+no nodered instalar as biblotecas
+
+node-red-contrib-cip-ethernet-ip
+ 
+node-red-contrib-mssql
+ 
+node-red-contrib-mssql-plus
+ 
+node-red-contrib-pccc
+ 
+node-red-contrib-s7
+ 
+node-red-contrib-s7comm
+ 
+
+
+dando permições para pastas antes de subir os containers
+
+
+
+Docker Bind Mounts — Padronização de Permissões
+Problema
+
+Containers que usam bind mount (pasta do host → container) precisam escrever nesses diretórios.
+
+Se o UID/GID do container ≠ dono da pasta no host, ocorre:
+
+EACCES
+permission denied
+not writable
+mkdir: can't create directory
+copyfile -> /data/settings.js
+GF_PATHS_DATA is not writable
+
+Regra Geral
+Sempre alinhar:
+UID/GID do container  ==  dono da pasta no host
+
+
+Resolver com:
+
+chown -R UID:GID pasta
+
+Procedimento Padrão (antes do primeiro docker compose up)
+1) Criar estrutura de volumes
+mkdir -p volumes/grafana-data
+mkdir -p volumes/nodered_data
+mkdir -p volumes/pg-airflow-data
+
+2) Aplicar permissões corretas por serviço
+Grafana
+
+Caminho interno: /var/lib/grafana
+
+UID padrão: 472
+
+sudo chown -R 472:472 volumes/grafana-data
+
+Node-RED
+
+Caminho interno: /data
+
+UID padrão: 1000
+
+sudo chown -R 1000:1000 volumes/nodered_data
+
+Postgres
+
+Caminho interno: /var/lib/postgresql/data
+
+UID padrão: 999
+
+sudo chown -R 999:999 volumes/pg-airflow-data
+
+3) Subir stack
+docker compose up -d
+
+Como descobrir o UID correto de qualquer imagem
+Método universal
+docker run --rm --entrypoint sh <image> -lc 'id'
+
+
+Exemplos:
+
+docker run --rm --entrypoint sh grafana/grafana -lc 'id'
+docker run --rm --entrypoint sh nodered/node-red -lc 'id'
+docker run --rm --entrypoint sh postgres -lc 'id'
+
+Como validar qual pasta o container realmente usa
+docker inspect <container> \
+--format '{{range .Mounts}}{{println .Destination " <= " .Source}}{{end}}'
+
+
+Saída exemplo:
+
+/data <= /home/pc/data-stack/infra/volumes/nodered_data
+
+
+→ é essa pasta do host que precisa de chown.
+
+Boas Práticas (recomendado para homelab/proxmox)
+Padronizar nomes
+
+Use sempre underscore:
+
+nodered_data
+grafana_data
+postgres_data
+
+
+Evite misturar hífen/underscore (causa confusão, como aconteceu).
+
+Criar script automático (sugestão)
+
+Crie infra/init-permissions.sh:
+
+#!/bin/bash
+
+sudo chown -R 472:472 volumes/grafana-data
+sudo chown -R 1000:1000 volumes/nodered_data
+sudo chown -R 999:999 volumes/pg-airflow-data
+
+echo "Permissões ajustadas com sucesso."
+
+
+Uso:
+
+bash infra/init-permissions.sh
+docker compose up -d
+
+Diagnóstico rápido (checklist)
+
+Se aparecer erro de permissão:
+
+docker inspect <container> | grep Mounts
+
+descobrir Source real
+
+chown UID:GID pasta
+
+restart container
+
+Regra mental definitiva
+
+Se o log mostrar:
+
+EACCES
+permission denied
+not writable
+
+
+→ é bind mount + dono errado
+
+→ resolver com chown
+

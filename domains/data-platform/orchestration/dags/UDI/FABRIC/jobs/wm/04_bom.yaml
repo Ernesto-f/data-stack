@@ -1,0 +1,24 @@
+job_name: wm_specification_bom
+description: Lista tecnica/BOM SAP
+
+# Filtros e limites ficam explicitos aqui para o Airflow/job ser auditavel.
+# use_config_filters=false evita duplicar os filtros globais do config.py.
+use_config_filters: false
+force_reload: false
+so_ddl: false
+where: ""
+
+tabelas:
+  - name: dbo.sv_ecc_mast
+    limite: 1000000
+    where: ""
+  - name: dbo.STKO
+    limite: 1000000
+    where: "STLNR IN (SELECT STLNR FROM dbo.sv_ecc_mast WHERE [WERKS] = 'BRAD')"
+  - name: dbo.STPO
+    limite: 1000000
+    where: "STLNR IN (SELECT STLNR FROM dbo.sv_ecc_mast WHERE [WERKS] = 'BRAD')"
+
+logs_dir: logs
+status_dir: status/wm_specification_bom
+output_dir: output/wm_specification_bom

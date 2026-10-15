@@ -1,0 +1,206 @@
+Disco físico (Proxmox)
+130GB
+
+Dentro do Linux (antes)
+/dev/sda5         14GB (LVM)
+root (/)           7GB
+
+Sintomas
+
+docker build falha
+
+airflow image falha
+
+erro de espaço mesmo com disco grande no Proxmox
+
+✅ Estratégia técnica
+
+Cadeia obrigatória:
+
+Disco → Partição → PV → LV → Filesystem
+
+
+Ordem correta:
+
+Expandir extended (sda2)
+
+Expandir logical (sda5)
+
+pvresize
+
+lvextend
+
+resize2fs
+
+🔧 PRÉ-REQUISITOS (instalar pacotes)
+Instalar ferramentas necessárias
+
+Execute:
+
+sudo apt update
+sudo apt install -y lvm2 parted fdisk cloud-guest-utils e2fsprogs
+
+O que cada pacote fornece
+Pacote	Comando
+lvm2	pvresize, lvextend
+parted	resizepart
+fdisk	sfdisk
+cloud-guest-utils	growpart (opcional)
+e2fsprogs	resize2fs
+🚀 PROCEDIMENTO (COPY-PASTE)
+1) Ajustar PATH (Debian minimal)
+export PATH=$PATH:/sbin:/usr/sbin
+echo 'export PATH=$PATH:/sbin:/usr/sbin' >> ~/.bashrc
+
+2) Verificar layout atual
+lsblk
+
+
+Exemplo esperado (antes):
+
+sda 130G
+├─sda1
+├─sda2 (extended)
+└─sda5 14G (LVM)
+
+3) Redimensionar partições
+
+Abrir parted:
+
+sudo parted /dev/sda
+
+
+Dentro do parted:
+
+print free
+resizepart 2 100%
+Yes
+resizepart 5 100%
+Yes
+quit
+
+4) Recarregar partições
+Recomendado (mais seguro)
+sudo reboot
+
+5) Expandir LVM
+Expandir Physical Volume
+sudo pvresize /dev/sda5
+
+Expandir Logical Volume root
+sudo lvextend -l +100%FREE /dev/mapper/BRUD--LT8XRD417--vg-root
+
+6) Expandir filesystem
+
+(ext4 padrão Debian)
+
+sudo resize2fs /dev/mapper/BRUD--LT8XRD417--vg-root
+
+7) Validar
+df -h
+
+✅ Resultado esperado
+Filesystem                            Size  Used Avail Use%
+/dev/mapper/...-vg-root               120G   5G   110G   5%
+
+📊 Antes vs Depois
+Antes
+/ 7G
+Docker falhando
+
+Depois
+/ 120G+
+Docker OK
+Airflow OK
+Volumes OK
+
+🔍 Comandos de diagnóstico úteis
+Espaço geral
+df -h
+
+Estrutura de discos
+lsblk
+
+LVM status
+pvs
+vgs
+lvs
+
+Uso Docker
+docker system df
+
+Limpeza Docker (opcional)
+docker builder prune -af
+docker system prune -af
+
+⚠️ Problemas comuns
+resizepart 5 → "Can't have overlapping partitions"
+
+Causa:
+
+sda5 dentro de sda2 (extended)
+
+
+Solução:
+
+resizepart 2 primeiro
+resizepart 5 depois
+
+pvresize não encontrado
+
+Adicionar PATH:
+
+export PATH=$PATH:/sbin:/usr/sbin
+
+resize2fs não encontrado
+
+Instalar:
+
+sudo apt install e2fsprogs
+
+Partição não atualiza após resize
+
+Use:
+
+sudo reboot
+
+🧠 Boas práticas para seu data-stack
+
+Considerando:
+
+Airflow
+
+Nextcloud
+
+bancos
+
+MinIO
+
+volumes Docker
+
+logs
+
+Tamanhos recomendados
+Tipo	Recomendado
+root	60–120GB mínimo
+produção leve	120GB+
+data engineering	200GB+
+✅ Estado final ideal
+Disk   130G
+sda5   129G
+root   120G+
+
+
+Sem:
+
+no space left on device
+
+📌 Conclusão
+
+Após o procedimento:
+
+✔ Docker builds estáveis
+✔ Airflow images grandes OK
+✔ Volumes persistentes seguros
+✔ Sem necessidade de mover /var/lib/docker
+✔ Infra pronta para crescimento

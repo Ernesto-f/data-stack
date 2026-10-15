@@ -1,0 +1,5 @@
+FROM guacamole/guacamole:1.6.0
+
+ENV WEBAPP_CONTEXT=ROOT
+
+EXPOSE 8080

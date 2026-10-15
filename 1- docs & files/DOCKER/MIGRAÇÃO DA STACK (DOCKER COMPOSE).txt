@@ -1,0 +1,259 @@
+DOCUMENTAÇÃO - MIGRAÇÃO DA STACK (DOCKER COMPOSE) PARA OUTRO SERVIDOR (SRV)
+
+OBJETIVO
+Migrar uma stack baseada em Docker Compose (ex.: Nginx Gateway + Grafana + demais serviços) de um servidor origem para um servidor destino (SRV), garantindo que:
+
+A estrutura de pastas e volumes persistentes seja preservada
+
+As variáveis de ambiente (.env) e arquivos de configuração sejam copiados
+
+A stack suba com os mesmos paths e permissões
+
+Seja possível diagnosticar rapidamente problemas comuns (inode e espaço em disco)
+
+PRÉ-REQUISITOS NO SERVIDOR DESTINO (SRV)
+2.1 Instalar Docker e Docker Compose plugin
+Validar:
+docker --version
+docker compose version
+
+2.2 Criar diretório base da stack
+Exemplo:
+sudo mkdir -p /home/pc/data-stack
+sudo chown -R $USER:$USER /home/pc/data-stack
+
+INVENTÁRIO DO QUE PRECISA SER MIGRADO
+No servidor origem, identifique e anote:
+
+Diretório do projeto (onde está o docker-compose.yml)
+
+Arquivo .env (se existir)
+
+Diretórios de config montados via bind (ex.: ./nginx/conf.d, ./grafana/provisioning, etc.)
+
+Diretórios/volumes persistentes (ex.: ./volumes/grafana-data, ./volumes/postgres-data, ./volumes/minio-data, etc.)
+
+Scripts auxiliares (entrypoint.sh, create-bucket.sh, bootstrap scripts)
+
+Se a stack usa “profiles” no compose (ex.: --profile analytics)
+
+Comandos úteis:
+cd /caminho/da/stack
+ls -la
+docker compose config > /tmp/compose.rendered.yml
+cat /tmp/compose.rendered.yml
+
+PARADA CONTROLADA NO SERVIDOR ORIGEM
+4.1 Entrar no diretório da stack:
+cd /caminho/da/stack
+
+4.2 Parar serviços (mantendo dados):
+docker compose down
+
+Se você quiser garantir que não há processo gravando em volumes:
+docker compose ps
+docker ps
+
+BACKUP (COPIAR STACK + DADOS)
+Existem 2 formas. Use a A (rsync) se você tem acesso SSH entre os servidores. Use a B (tar) se vai transferir arquivo.
+
+5A) MIGRAÇÃO VIA RSYNC (RECOMENDADO)
+No servidor destino (SRV), crie diretório:
+sudo mkdir -p /home/pc/data-stack
+sudo chown -R $USER:$USER /home/pc/data-stack
+
+No servidor origem, copie tudo:
+rsync -avh --progress /caminho/da/stack/ user@SRV:/home/pc/data-stack/
+
+Se a origem exige sudo para ler os volumes do projeto:
+sudo rsync -avh --progress /caminho/da/stack/ user@SRV:/home/pc/data-stack/
+
+5B) MIGRAÇÃO VIA TAR (ARQUIVO ÚNICO)
+No servidor origem:
+cd /caminho/da/stack
+tar -czf data-stack_backup_$(date +%Y%m%d_%H%M).tar.gz .
+
+Transferir para o destino:
+scp data-stack_backup_*.tar.gz user@SRV:/home/pc/data-stack/
+
+No servidor destino:
+cd /home/pc/data-stack
+tar -xzf data-stack_backup_*.tar.gz
+
+AJUSTES NO SERVIDOR DESTINO (SRV)
+6.1 Conferir estrutura e arquivos
+cd /home/pc/data-stack
+ls -la
+
+6.2 Validar .env e variáveis
+Se existir .env:
+cat .env
+
+Pontos comuns para revisar:
+
+IPs/hosts (ex.: GF_SERVER_ROOT_URL, endpoints internos, URLs do gateway)
+
+Paths de volumes (bind mounts)
+
+Portas expostas (se conflitam com serviços já existentes no SRV)
+
+DNS/resolução interna (se a stack depende de nomes fixos)
+
+6.3 Ajustar permissões de diretórios montados (bind volumes)
+Se você usa bind mount para dados (ex.: ./volumes/grafana-data:/var/lib/grafana), garanta que o usuário do container consiga ler/escrever.
+Exemplos práticos:
+
+Ver o UID do usuário dentro do container (caso precise):
+docker run --rm grafana/grafana:12.3.1 sh -lc "id"
+
+Ajuste genérico (quando você controla o host e quer liberar para seu usuário):
+sudo chown -R $USER:$USER /home/pc/data-stack/volumes
+
+Ajuste típico para Grafana (comumente UID 472):
+sudo chown -R 472:472 /home/pc/data-stack/volumes/grafana-data
+sudo chown -R 472:472 /home/pc/data-stack/volumes/grafana-logs
+
+Observação: ajuste somente nos diretórios que realmente são volumes bind para containers.
+
+SUBIR A STACK NO SERVIDOR DESTINO
+7.1 Validar compose (render)
+cd /home/pc/data-stack
+docker compose config
+
+7.2 Subir serviços
+Sem rebuild:
+docker compose up -d
+
+Com rebuild (se você tem Dockerfile custom na stack):
+docker compose up -d --build
+
+Se usa profiles:
+docker compose --profile analytics up -d
+ou
+docker compose --profile orchestrator up -d
+
+7.3 Acompanhar logs
+docker compose ps
+docker compose logs -f --tail 200
+
+RELOAD / RECREATE DO NGINX (GATEWAY)
+8.1 Validar sintaxe antes do reload
+docker exec -it nginx sh -lc "nginx -t"
+
+8.2 Reload (não recria container, só recarrega config)
+docker exec -it nginx sh -lc "nginx -s reload"
+
+8.3 Recreate (derruba e sobe o container do nginx)
+docker compose up -d --force-recreate nginx
+
+8.4 Recreate com rebuild (se a imagem do nginx é custom)
+docker compose up -d --build --force-recreate nginx
+
+CHECKLIST DE SANIDADE (APÓS SUBIR)
+9.1 Containers ativos
+docker compose ps
+
+9.2 Portas no host
+ss -lntp | head -n 50
+
+9.3 Teste HTTP local no host do SRV (exemplos)
+curl -I http://localhost/
+
+curl -I http://localhost/analytics/
+
+9.4 Ver logs específicos (ex.: grafana)
+docker logs --tail 200 -f <CONTAINER_ID_OU_NOME>
+
+DIAGNÓSTICO RÁPIDO: ESPAÇO EM DISCO E INODE
+Problemas típicos após migração:
+
+“No space left on device” mesmo com espaço livre: geralmente inode esgotado
+
+Docker não consegue criar arquivos/camadas
+
+Serviços não iniciam por falha ao escrever em volume
+
+10.1 Verificar espaço em disco (em GB)
+df -h
+
+10.2 Verificar inode (quantidade de arquivos possíveis)
+df -i
+
+Interpretação rápida:
+
+Se df -h está ok, mas df -i está 100% em alguma partição usada pela stack, o problema é inode.
+
+10.3 Top diretórios que mais consomem espaço (host)
+sudo du -h --max-depth=2 /home/pc/data-stack | sort -h | tail -n 30
+
+10.4 Top diretórios que mais têm arquivos (provável causa de inode)
+sudo find /home/pc/data-stack -xdev -type f | wc -l
+sudo find /home/pc/data-stack/volumes -xdev -type f | wc -l
+
+Para localizar “explosões” de arquivos (logs, cache, etc.):
+sudo du -a /home/pc/data-stack/volumes | sort -n | tail -n 50
+
+10.5 Limpeza Docker (CUIDADO: remove recursos não usados)
+Ver uso do Docker:
+docker system df
+
+Limpeza segura de recursos não usados:
+docker system prune -f
+
+Se você quer limpar também imagens não usadas:
+docker system prune -a -f
+
+Se você quer limpar volumes não usados (risco se algum volume não estiver declarado/entendido):
+docker volume prune -f
+
+10.6 Logs gigantes em diretórios do host (exemplo)
+sudo du -h /var/lib/docker/containers | sort -h | tail -n 20
+
+Se estiver usando logging json-file e crescendo muito, considere limitar via daemon.json posteriormente.
+
+PROBLEMA COM TLS/CA DENTRO DE CONTAINER (EX.: GRAFANA NÃO ACESSA HTTPS EXTERNO)
+Sintoma comum em logs:
+tls: failed to verify certificate: x509: certificate signed by unknown authority
+
+Ação recomendada:
+
+Se for apenas update check / plugins e não precisa internet, desabilitar update check no env.
+
+Se precisa internet, instalar ca-certificates na imagem, ou adicionar CA corporativo no container.
+
+Exemplo (desabilitar update check e preinstall):
+GF_ANALYTICS_CHECK_FOR_UPDATES=false
+GF_PLUGINS_PREINSTALL_DISABLED=true
+
+PADRÃO DE RECUPERAÇÃO RÁPIDA (SE DEU RUIM)
+12.1 Ver quais serviços estão falhando
+docker compose ps
+
+12.2 Ver logs do serviço que falhou
+docker compose logs -f --tail 300 <servico>
+
+12.3 Recriar somente o serviço
+docker compose up -d --force-recreate <servico>
+
+12.4 Recriar tudo
+docker compose up -d --force-recreate
+
+12.5 Derrubar tudo e subir tudo
+docker compose down
+docker compose up -d
+
+CONFIRMAÇÃO FINAL
+
+A stack está respondendo nas URLs esperadas
+
+Todos containers “Up”
+
+Volumes persistentes ok (dashboards, bancos, etc. preservados)
+
+Sem erro de “no space left on device”
+
+Inode ok (df -i sem 100% no filesystem relevante)
+
+Nginx com config validada (nginx -t) e reload aplicado quando necessário
+
+FIM.

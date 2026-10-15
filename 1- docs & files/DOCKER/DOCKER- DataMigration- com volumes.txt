@@ -1,0 +1,279 @@
+📦 Docker Data & Volume Migration Guide
+Portable Infrastructure Runbook (Generic)
+🎯 Objetivo
+
+Este guia define o processo padrão de migração, backup e restauração de ambientes baseados em Docker / Docker Compose.
+
+Ele permite:
+
+✅ trocar de servidor
+
+✅ clonar ambientes (dev/staging/prod)
+
+✅ disaster recovery
+
+✅ backup seguro
+
+✅ replicação completa da stack
+
+✅ zero perda de dados
+
+Funciona para qualquer aplicação stateful, como:
+
+bancos de dados (Postgres, MySQL, SQL Server)
+
+storage / uploads / S3
+
+ferramentas de dados
+
+aplicações web
+
+serviços com arquivos persistentes
+
+🧠 Conceito fundamental
+Containers NÃO armazenam dados
+
+Docker separa:
+
+Camada	Persistência
+Imagem	código/binários
+Container	efêmero
+Volume	dados reais (persistentes)
+
+👉 Os dados vivem nos VOLUMES, não nos containers.
+
+Regra de ouro
+
+Imagem = software
+Volume = dados
+Migração = copiar volumes
+
+🏗️ Estrutura típica de persistência
+Bind mount (mais comum)
+volumes:
+  - ./volumes/app-data:/data
+
+
+Dados ficam em:
+
+./volumes/app-data
+
+
+👉 Basta copiar a pasta.
+
+Named volume
+volumes:
+  - app_data:/data
+
+
+Dados ficam em:
+
+/var/lib/docker/volumes/app_data/
+
+
+Descobrir caminho:
+
+docker volume inspect app_data
+
+🚀 Procedimento padrão de migração (Server → Server)
+PASSO 1 — Parar serviços
+docker compose down
+
+
+⚠️ Importante para evitar corrupção de dados.
+
+PASSO 2 — Backup dos volumes
+Bind mounts
+rsync -av ./volumes/ user@novo-host:/app/volumes/
+
+
+ou:
+
+tar -czf volumes-backup.tar.gz volumes/
+
+Named volumes
+
+Backup via container temporário:
+
+docker run --rm \
+  -v app_data:/data \
+  -v $(pwd):/backup \
+  alpine \
+  tar czf /backup/app_data.tar.gz /data
+
+PASSO 3 — Migrar imagens
+Opção A (recomendado): rebuild
+docker compose build
+
+Opção B: exportar/importar imagem
+docker save minha-imagem:latest -o image.tar
+docker load -i image.tar
+
+
+Use quando:
+
+não há internet
+
+quer imagem “congelada”
+
+ambiente air-gapped
+
+PASSO 4 — Migrar configurações
+
+Copiar:
+
+docker-compose.yml
+.env
+Dockerfiles
+scripts/
+configs/
+certificados/
+nginx/
+
+
+Exemplo:
+
+rsync -av .env docker-compose.yml infra/ user@novo-host:/app/
+
+PASSO 5 — Subir no novo servidor
+docker compose up -d
+
+PASSO 6 — Validar
+
+Testar:
+
+ serviços iniciaram
+
+ dados aparecem
+
+ uploads funcionam
+
+ banco responde
+
+ logs sem erro
+
+🔁 Backup recorrente (recomendado)
+Snapshot simples diário
+tar -czf backup-$(date +%F).tar.gz volumes/
+
+Backup incremental (melhor)
+rsync -az --delete volumes/ backup-server:/backups/volumes/
+
+Cron exemplo
+0 2 * * * /scripts/backup.sh
+
+🛡️ Boas práticas
+✔ Organize volumes por serviço
+volumes/
+  postgres/
+  uploads/
+  storage/
+  airflow/
+  logs/
+
+
+Facilita:
+
+backup seletivo
+
+restore parcial
+
+troubleshooting
+
+✔ Versione a infraestrutura
+
+Sempre manter no Git:
+
+docker-compose.yml
+Dockerfiles
+.env.example
+scripts/
+
+
+Permite recriar ambiente em qualquer máquina.
+
+✔ Evite salvar containers
+
+❌ errado:
+
+docker commit
+
+
+✔ correto:
+
+backup volumes + rebuild image
+
+✔ Teste restore periodicamente
+
+Simule:
+
+servidor limpo
+
+restaurar volumes
+
+docker compose up
+
+Se funcionar → backup válido
+
+🧪 Restore (Disaster Recovery)
+Restaurar volumes
+tar -xzf volumes-backup.tar.gz
+
+
+ou
+
+rsync -av backup/volumes/ ./volumes/
+
+Subir stack
+docker compose up -d
+
+📋 Checklist rápido
+Antes da migração
+
+ docker compose down
+
+ backup volumes
+
+ salvar imagens (se necessário)
+
+ copiar configs
+
+Depois
+
+ restaurar volumes
+
+ docker compose up -d
+
+ validar serviços
+
+ testar leitura/escrita
+
+🧰 Scripts utilitários (opcional)
+backup.sh
+#!/bin/bash
+set -e
+docker compose down
+tar -czf volumes-$(date +%F).tar.gz volumes/
+docker compose up -d
+
+restore.sh
+#!/bin/bash
+set -e
+docker compose down
+tar -xzf $1
+docker compose up -d
+
+
+Uso:
+
+./restore.sh volumes-2026-02-10.tar.gz
+
+🎯 Conclusão
+
+Se você migrar:
+
+✅ volumes
+✅ configs
+✅ imagens (ou rebuild)
+
+Seu ambiente sobe idêntico em qualquer servidor.

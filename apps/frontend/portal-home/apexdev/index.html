@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Pulse Portal</title>
+
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    referrerpolicy="no-referrer" />
+
+  <style>
+    :root {
+      --bg1: #0b1220;
+      --bg2: #0a1b2e;
+      --card: #0f2138cc;
+      --stroke: #214366;
+      --text: #e8f0ff;
+      --muted: #a8c0dd;
+      --shadow: 0 10px 35px rgba(0, 0, 0, .35);
+      --radius: 18px;
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      color: var(--text);
+      min-height: 100vh;
+      background:
+        radial-gradient(900px 600px at 20% 10%, #1a4b7a55, transparent 55%),
+        radial-gradient(900px 600px at 80% 15%, #7a1a5b44, transparent 60%),
+        linear-gradient(160deg, var(--bg1), var(--bg2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 28px;
+    }
+
+    .shell {
+      width: min(1100px, 100%);
+    }
+
+    header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      margin-bottom: 28px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 28px;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .status {
+      color: var(--muted);
+      font-size: 12px;
+      border: 1px solid var(--stroke);
+      background: rgba(16, 36, 58, .45);
+      padding: 10px 12px;
+      border-radius: 14px;
+      backdrop-filter: blur(8px);
+      box-shadow: var(--shadow);
+    }
+
+    .section {
+      margin-bottom: 32px;
+    }
+
+    .section-title {
+      font-size: 13px;
+      letter-spacing: 1.6px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 0 0 12px 4px;
+      font-weight: 600;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+    }
+
+    a.card {
+      text-decoration: none;
+      color: inherit;
+      border: 1px solid var(--stroke);
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 18px;
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      transition: .15s ease;
+    }
+
+    a.card:hover {
+      transform: translateY(-2px);
+      border-color: #3a77b6;
+      background: rgba(18, 46, 78, .75);
+    }
+
+    .icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(255, 255, 255, .12);
+      background: rgba(0, 0, 0, .18);
+    }
+
+    .icon i {
+      font-size: 22px;
+    }
+
+    .meta {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .name {
+      font-weight: 650;
+      font-size: 16px;
+      margin: 0;
+    }
+
+    .desc {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .g .icon {
+      background: rgba(255, 142, 0, .12);
+    }
+
+    .n .icon {
+      background: rgba(255, 75, 75, .10);
+    }
+
+    .s .icon {
+      background: rgba(0, 163, 255, .12);
+    }
+
+    .c .icon {
+      background: rgba(0, 145, 255, .12);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="shell">
+
+    <header>
+      <div>
+        <h1>Pulse Portal</h1>
+        <div class="subtitle">Acesso centralizado às soluções.</div>
+      </div>
+
+      <div class="status">
+        <div><strong>Ambiente:</strong> Internal</div>
+      </div>
+    </header>
+
+
+    <!-- ================= DATA ENGINEERING ================= -->
+    <div class="section">
+      <div class="section-title">Data Engineering & Visualization</div>
+
+      <section class="grid">
+
+        <a class="card g" href="/analytics/">
+          <div class="icon"><i class="fa-solid fa-chart-line"></i></div>
+          <div class="meta">
+            <p class="name">Prometheus</p>
+            <p class="desc">Dashboards e observabilidade.</p>
+          </div>
+        </a>
+
+
+        <a class="card n" href="/apexdevnrd/">
+          <div class="icon"><i class="fa-solid fa-sitemap"></i></div>
+          <div class="meta">
+            <p class="name">Node-RED</p>
+            <p class="desc">Automação e integrações OT/PLC.</p>
+          </div>
+        </a>
+
+      </section>
+    </div>
+
+
+    <!-- ================= TOOLS ================= -->
+    <div class="section">
+      <div class="section-title">Tools</div>
+
+      <section class="grid">
+
+        <a class="card s" href="/dataquery/">
+          <div class="icon"><i class="fa-solid fa-database"></i></div>
+          <div class="meta">
+            <p class="name">Data Query</p>
+            <p class="desc">Gerenciamento de bancos de dados.</p>
+          </div>
+        </a>
+
+
+        <a class="card c" href="/fileupload/">
+          <div class="icon"><i class="fa-solid fa-upload"></i></div>
+          <div class="meta">
+            <p class="name">File Upload</p>
+            <p class="desc">Upload arquivos para SQL DW.</p>
+          </div>
+        </a>
+
+      </section>
+    </div>
+
+  </div>
+</body>
+
+</html>

@@ -1,0 +1,142 @@
+========================================
+PROXMOX – CLUSTER CHEAT SHEET
+(remover nó, limpar cluster, corrigir quorum, recuperar GUI)
+========================================
+
+
+==============================
+REMOVER 1 NÓ DO CLUSTER
+==============================
+
+# no node principal
+pvecm nodes
+pvecm delnode NOMEDONODE
+
+
+# no node removido
+systemctl stop pve-cluster corosync
+pmxcfs -l
+rm -f /etc/pve/corosync.conf
+rm -rf /etc/corosync/*
+rm -rf /var/lib/corosync/*
+killall pmxcfs
+reboot
+
+
+
+==============================
+CORRIGIR QUORUM (quando ficar só 1 node)
+==============================
+
+# sintoma:
+# Quorate: No / Activity blocked
+
+pvecm expected 1
+
+# validar
+pvecm status
+
+
+
+==============================
+REMOVER NODE FANTASMA DA GUI
+==============================
+
+# conferir referências
+cat /etc/pve/.members
+ls /etc/pve/nodes
+
+# apagar pasta residual
+rm -rf /etc/pve/nodes/NOMEDONODE
+
+# reiniciar serviços
+systemctl restart pve-cluster
+systemctl restart pveproxy pvedaemon
+
+
+
+==============================
+GUI / WEB NÃO ABRE
+==============================
+
+# restart seguro (produção)
+systemctl restart pve-cluster
+systemctl restart pvedaemon
+systemctl restart pveproxy
+
+# verificar porta
+ss -tulnp | grep 8006
+
+# plano B (mais confiável)
+reboot
+
+
+
+==============================
+CONVERTER PARA STANDALONE TOTAL
+(limpar cluster inteiro)
+==============================
+
+systemctl stop pve-cluster corosync
+pmxcfs -l
+rm -f /etc/pve/corosync.conf
+rm -rf /etc/corosync/*
+rm -rf /var/lib/corosync/*
+killall pmxcfs
+systemctl start pve-cluster
+systemctl restart pveproxy pvedaemon
+
+#SE FICAR RESQUICIO 
+rm -rf /etc/pve/nodes/NOME_DO_NODE_ANTIGO
+
+# confirmar
+pvecm status
+# esperado: "no cluster defined"
+
+
+
+==============================
+CRIAR CLUSTER NOVO
+==============================
+
+pvecm create NOMECLUSTER
+
+# adicionar nós
+pvecm add IP_MASTER
+
+
+
+==============================
+COMANDOS DE DIAGNÓSTICO
+==============================
+
+pvecm status
+pvecm nodes
+cat /etc/pve/.members
+mount | grep pve
+systemctl status pve-cluster
+systemctl status pveproxy
+ss -tulnp | grep 8006
+
+
+
+==============================
+REGRAS DE OURO
+==============================
+
+OK:
+- restart pve-cluster / pveproxy / pvedaemon é seguro
+- reboot é seguro
+- VMs NÃO param com restart desses serviços
+
+NUNCA:
+- apagar /var/lib/corosync no node principal ativo
+- apagar /etc/pve/nodes antes de pvecm delnode
+
+SEMPRE que reduzir para 1 node:
+pvecm expected 1
+
+
+========================================
+FIM
+========================================

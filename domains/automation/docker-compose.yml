@@ -1,0 +1,28 @@
+name: automation
+
+services:
+  node-red:
+    image: nodered/node-red:latest
+    container_name: automation-node-red
+    restart: unless-stopped
+    # Existing flows include periodic PLC/DB actions. Start in safe mode so
+    # the editor and full flow configuration are available for review first.
+    command: ["--safe", "--no-telemetry"]
+    ports:
+      - "127.0.0.1:1882:1880"
+    environment:
+      TZ: America/Sao_Paulo
+    volumes:
+      - ./data:/data
+      - ./branding:/opt/pulse-branding:ro
+      - ../data-platform/monitoring/grafana/branding:/opt/pulse-icons:ro
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "require('http').get('http://127.0.0.1:1880/', r => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))"
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s

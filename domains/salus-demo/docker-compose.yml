@@ -1,0 +1,136 @@
+name: salus-demo
+
+services:
+  erp-postgres:
+    image: postgres:16
+    container_name: salus-demo-erp-postgres
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: ${ERP_POSTGRES_USER:?Set ERP_POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${ERP_POSTGRES_PASSWORD:?Set ERP_POSTGRES_PASSWORD in .env}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - erp-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - erp-internal
+
+  salus-erp:
+    build:
+      context: ./salus-erp
+      dockerfile: Dockerfile
+    image: salus-demo-erp:local
+    container_name: salus-demo-erp
+    depends_on:
+      erp-postgres:
+        condition: service_healthy
+    environment:
+      HOST: erp-postgres
+      PORT: 5432
+      USER: ${ERP_POSTGRES_USER:?Set ERP_POSTGRES_USER in .env}
+      PASSWORD: ${ERP_POSTGRES_PASSWORD:?Set ERP_POSTGRES_PASSWORD in .env}
+    volumes:
+      - erp-odoo-data:/var/lib/odoo
+      - ./config/erp.conf:/etc/odoo/odoo.conf:ro
+    ports:
+      - "127.0.0.1:18090:8069"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8069/web/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - erp-internal
+
+  lims-postgres:
+    image: postgres:16
+    container_name: salus-demo-lims-postgres
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: ${LIMS_POSTGRES_USER:?Set LIMS_POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${LIMS_POSTGRES_PASSWORD:?Set LIMS_POSTGRES_PASSWORD in .env}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - lims-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - lims-internal
+
+  salus-backoffice:
+    build:
+      context: ./SALUS/SALUS_BACKOFFICE
+      dockerfile: Dockerfile
+    image: salus-demo-lims:local
+    container_name: salus-demo-lims
+    depends_on:
+      lims-postgres:
+        condition: service_healthy
+    environment:
+      HOST: lims-postgres
+      PORT: 5432
+      USER: ${LIMS_POSTGRES_USER:?Set LIMS_POSTGRES_USER in .env}
+      PASSWORD: ${LIMS_POSTGRES_PASSWORD:?Set LIMS_POSTGRES_PASSWORD in .env}
+    volumes:
+      - lims-odoo-data:/var/lib/odoo
+      - ./config/lims.conf:/etc/odoo/odoo.conf:ro
+    ports:
+      - "127.0.0.1:18091:8069"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8069/web/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - lims-internal
+
+  salus-client:
+    build:
+      context: ./salus-ambiental
+      dockerfile: Dockerfile.prod
+      args:
+        ODOO_API_URL: http://salus-backoffice:8069
+    image: salus-demo-client:local
+    container_name: salus-demo-client
+    depends_on:
+      salus-backoffice:
+        condition: service_healthy
+    environment:
+      ODOO_API_URL: http://salus-backoffice:8069
+      ODOO_DEFAULT_DB: salus_ambiental_demo
+    ports:
+      - "127.0.0.1:13010:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - lims-internal
+
+volumes:
+  erp-db-data:
+  erp-odoo-data:
+  lims-db-data:
+  lims-odoo-data:
+
+networks:
+  erp-internal:
+  lims-internal:

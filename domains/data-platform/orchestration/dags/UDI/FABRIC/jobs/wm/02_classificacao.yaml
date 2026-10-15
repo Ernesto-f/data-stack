@@ -1,0 +1,36 @@
+job_name: wm_specification_classificacao
+description: Classificacao e caracteristicas SAP
+
+# Filtros e limites ficam explicitos aqui para o Airflow/job ser auditavel.
+# use_config_filters=false evita duplicar os filtros globais do config.py.
+use_config_filters: false
+force_reload: false
+so_ddl: false
+where: ""
+
+tabelas:
+  - name: dbo.SAPECC_CABN
+    limite: 200000
+    where: ""
+  - name: dbo.SAPECC_CABNT
+    limite: 200000
+    where: ""
+  - name: dbo.SAPECC_CAWN
+    limite: 200000
+    where: ""
+  - name: dbo.SAPECC_CAWNT
+    limite: 200000
+    where: ""
+  - name: dbo.SAPECC_AUSP
+    limite: 6000000
+    where: "KLART = '001' AND OBJEK IN (SELECT RIGHT(REPLICATE('0', 18) + MATNR, 18) FROM (\n        SELECT MATNR\n        FROM dbo.SAPECC_AFPO\n        WHERE [DWERK] = 'BRAD'\n          AND AUFNR IN (\n              SELECT AUFNR\n              FROM dbo.sv_ecc_resb\n              WHERE [WERKS] = 'BRAD'\n                AND [BDTER] BETWEEN '20260101' AND '20261231'\n          )\n        UNION\n        SELECT MATNR\n        FROM dbo.sv_ecc_resb\n        WHERE [WERKS] = 'BRAD'\n          AND [BDTER] BETWEEN '20260101' AND '20261231'\n    ) m)"
+  - name: dbo.SAPECC_ESTPH
+    limite: 1000000
+    where: ""
+  - name: dbo.SAPECC_ESTPP
+    limite: 1000000
+    where: ""
+
+logs_dir: logs
+status_dir: status/wm_specification_classificacao
+output_dir: output/wm_specification_classificacao

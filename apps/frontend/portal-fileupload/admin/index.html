@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Data Integration Admin</title>
+
+  <style>
+    :root{
+      --bg:#0b0f14;
+      --card:#111824;
+      --txt:#e7eefc;
+      --muted:#97a6c0;
+      --line:#203047;
+      --btn:#2f7dff;
+      --btn2:#1b2636;
+      --err:#ff5c5c;
+      --ok:#42d392;
+      --shadow: 0 24px 80px rgba(0,0,0,.55);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;}
+    .wrap{max-width:1200px;margin:22px auto;padding:0 16px;}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;}
+    h1{font-size:18px;margin:0;}
+    h2{font-size:13px;margin:0;color:var(--muted);font-weight:500}
+
+    label{display:block;font-size:12px;color:var(--muted);margin:0 0 6px;}
+    input, select, textarea{
+      width:100%;
+      background:#0f1622; color:var(--txt);
+      border:1px solid var(--line);
+      border-radius:10px;
+      padding:10px 10px; outline:none;
+    }
+    textarea{min-height:170px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
+
+    .btn{
+      background:var(--btn);border:0;color:white;
+      padding:10px 14px;border-radius:10px;cursor:pointer;
+      font-weight:700; letter-spacing:.2px;
+    }
+    .btn.secondary{background:var(--btn2);border:1px solid var(--line);color:var(--txt);}
+    .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--txt);}
+    .btn:disabled{opacity:.65;cursor:not-allowed}
+
+    .row{display:flex;gap:10px;align-items:center}
+    .grow{flex:1}
+    .mt{margin-top:12px}
+
+    .badge{display:inline-block;padding:2px 8px;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:11px}
+
+    .status{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      font-size:11px;
+      color:var(--muted);
+      white-space:nowrap;
+    }
+    .dot-sm{
+      width:8px;height:8px;border-radius:50%;
+      background:#7b879d;
+    }
+    .status.active{ color:var(--ok); }
+    .status.active .dot-sm{
+      background:var(--ok);
+      box-shadow:0 0 0 3px rgba(66,211,146,.12);
+    }
+
+    .out{
+      margin-top:10px; display:none;
+      border-radius:12px; padding:10px;
+      background:#0f1622; border:1px solid var(--line);
+      white-space:pre-wrap; word-break:break-word;
+      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      font-size:12px;
+    }
+    .out.err{border-color:rgba(255,92,92,.35)}
+    .out.ok{border-color:rgba(66,211,146,.35)}
+
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th,td{border-bottom:1px solid var(--line);padding:10px 8px;text-align:left;vertical-align:middle}
+    th{color:var(--muted);font-weight:650}
+    tr:hover{background:#0f1622}
+    .nowrap{white-space:nowrap}
+
+    .toolbar{
+      display:flex;gap:10px;align-items:center;justify-content:space-between;
+      margin-top:12px;
+    }
+    .toolbar-left{display:flex;gap:10px;align-items:center;flex:1}
+    .toolbar-right{display:flex;gap:10px;align-items:center}
+
+    .icon-btn{
+      width:34px;height:34px;border-radius:10px;
+      border:1px solid var(--line);
+      background:transparent;color:var(--txt);
+      display:inline-flex;align-items:center;justify-content:center;
+      cursor:pointer;
+    }
+    .icon-btn:hover{background:#0f1622}
+    .icon{
+      width:16px;height:16px;display:block;
+      fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
+      opacity:.95;
+    }
+
+    .modal-backdrop{
+      position:fixed;inset:0;
+      background:rgba(0,0,0,.55);
+      display:none;align-items:flex-start;justify-content:center;
+      padding:22px 16px;
+      z-index:9999;
+    }
+    .modal{
+      width:min(980px, 100%);
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:16px;
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    .modal-header{
+      padding:14px 14px;
+      border-bottom:1px solid var(--line);
+      display:flex;align-items:center;justify-content:space-between;gap:10px;
+    }
+    .modal-title{display:flex;flex-direction:column;gap:2px}
+    .modal-body{padding:14px}
+    .modal-footer{
+      padding:14px;border-top:1px solid var(--line);
+      display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;
+    }
+
+    .grid2{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:12px;
+    }
+    @media (max-width: 880px){
+      .grid2{grid-template-columns:1fr}
+      .toolbar{flex-direction:column;align-items:stretch}
+      .toolbar-left{flex-direction:column;align-items:stretch}
+      .toolbar-right{justify-content:flex-end}
+    }
+  </style>
+</head>
+
+<body>
+<div class="wrap">
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <div>
+        <h1>Data Integration Admin</h1>
+        <h2>Pagina para gerenciar as rotas de Data Ingestion, o route_key é imutavel!!</h2>
+      </div>
+      <button class="btn secondary" id="btnRefresh">Recarregar</button>
+    </div>
+
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <input id="q" class="grow" placeholder="Filtrar por route_key / dataset / destino..." />
+      </div>
+      <div class="toolbar-right">
+        <button class="btn" id="btnNew">+ Novo</button>
+      </div>
+    </div>
+
+    <div class="mt">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:28%">route_key</th>
+            <th style="width:10%">status</th>
+            <th style="width:22%">dataset</th>
+            <th style="width:28%">destino</th>
+            <th style="width:10%">system</th>
+            <th class="nowrap" style="width:6%">editar</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div id="listOut" class="out"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modalBackdrop" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-header">
+      <div class="modal-title">
+        <div class="row" style="gap:10px;align-items:baseline">
+          <h1 id="modalTitle" style="font-size:16px;margin:0">Rota</h1>
+          <span class="badge" id="currentKey">novo</span>
+        </div>
+        <h2 id="modalSub" style="margin:0">Preencha e salve</h2>
+      </div>
+      <button class="btn ghost" id="btnClose">Fechar</button>
+    </div>
+
+    <div class="modal-body">
+      <div id="out" class="out"></div>
+
+      <div class="mt">
+        <label for="route_key">route_key (gerado automaticamente no CREATE)</label>
+        <input id="route_key" placeholder="(vai ser gerado ao salvar)" readonly />
+      </div>
+
+      <div class="grid2 mt">
+        <div>
+          <label for="area_name">area_name</label>
+          <input id="area_name" placeholder="EX: production" />
+        </div>
+        <div>
+          <label for="dataset_id">dataset_id</label>
+          <input id="dataset_id" placeholder="EX: microevents" />
+        </div>
+      </div>
+
+      <div class="grid2 mt">
+        <div>
+          <label for="target_system">target_system</label>
+          <select id="target_system">
+            <option value="SQLSERVER" selected>SQLSERVER</option>
+            <option value="POSTGRES">POSTGRES</option>
+            <option value="S3">S3</option>
+            <option value="FABRIC">FABRIC</option>
+          </select>
+        </div>
+        <div>
+          <label for="airflow_conn_id">airflow_conn_id</label>
+          <input id="airflow_conn_id" placeholder="EX: sql_udi_gmes (opcional)" />
+        </div>
+      </div>
+
+      <div class="grid2 mt">
+        <div>
+          <label for="target_schema">target_schema</label>
+          <input id="target_schema" placeholder="EX: raw / bronze / silver" />
+        </div>
+        <div>
+          <label for="target_table">target_table</label>
+          <input id="target_table" placeholder="EX: tb_microevents ou db.schema.table" />
+        </div>
+      </div>
+
+      <div class="grid2 mt">
+        <div>
+          <label for="load_mode">load_mode</label>
+          <select id="load_mode">
+            <option value="INCREMENTAL">INCREMENTAL</option>
+            <option value="OVERRIDE">OVERRIDE</option>
+            <option value="UPSERT">UPSERT - não usar, em desenvolvimento</option>
+          </select>
+        </div>
+        <div>
+          <label for="is_active">is_active</label>
+          <select id="is_active">
+            <option value="1">1 (ativo)</option>
+            <option value="0">0 (inativo)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid2 mt">
+
+        <div id="upsert_column">
+          <label for="upsert_column">COLUNA ID PRO UPSERT</label>
+          <input id="upsert_column" placeholder="EX: Cod_Record, col Data" />
+        </div>
+
+      </div>
+
+      <div class="grid2 mt">
+        <div>
+          <label for="id_column_name">id_column_name (registro)</label>
+          <input id="id_column_name" placeholder="EX: id ou Cod_Record" />
+        </div>
+        <div>
+          <label for="allowed_ext">allowed_ext</label>
+          <input id="allowed_ext" value="xlsx,csv" />
+        </div>
+      </div>
+
+      <div class="grid2 mt">
+        <div>
+          <label for="sheet_name">sheet_name</label>
+          <input id="sheet_name" placeholder="(opcional)" />
+        </div>
+        <div>
+          <label for="max_file_mb">max_file_mb</label>
+          <input id="max_file_mb" placeholder="(opcional) EX: 200" />
+        </div>
+      </div>
+
+      <div class="mt">
+        <label for="expected_columns">expected_columns (opcional)</label>
+        <input id="expected_columns" placeholder="(csv) colunas esperadas (após o map, no nome SQL)" />
+      </div>
+
+      <div class="mt">
+        <label for="notes">notes</label>
+        <input id="notes" placeholder="(opcional)" />
+      </div>
+
+      <div class="mt">
+        <label for="column_map_json">column_map_json (manual: 'coluna arquivo' → 'coluna SQL')</label>
+        <textarea id="column_map_json" spellcheck="false">{
+  "Cód. Peça": "cod_peca",
+  "Qtd Produzida": "qtd_produzida",
+  "Data Produção": "data_producao"
+}</textarea>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn secondary" id="btnCancel">Cancelar</button>
+      <button class="btn" id="btnSave">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API_BASE = "/fileupload/api";
+  const $ = (id) => document.getElementById(id);
+
+  const modalBackdrop = $("modalBackdrop");
+  const out = $("out");
+  const listOut = $("listOut");
+
+  let allRoutes = [];
+  let isSaving = false;
+
+  const routeCache = new Map();
+
+  function showOut(box, msg, ok=true){
+    box.style.display = "block";
+    box.className = "out " + (ok ? "ok" : "err");
+    box.textContent = (typeof msg === "string") ? msg : JSON.stringify(msg, null, 2);
+  }
+
+  function hideOut(box){
+    box.style.display = "none";
+    box.textContent = "";
+  }
+
+  async function fetchJson(url, opts){
+    const res = await fetch(url, opts);
+    const txt = await res.text();
+    let data; try { data = JSON.parse(txt); } catch { data = txt; }
+    if (!res.ok) throw { status: res.status, data };
+    return data;
+  }
+
+  function asNull(v){
+    const s = (v ?? "").toString().trim();
+    return s ? s : null;
+  }
+
+  function asIntOrNull(v){
+    const s = (v ?? "").toString().trim();
+    if (!s) return null;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function formatDestino(r){
+    const tt = (r?.target_table || "").trim();
+    const ts = (r?.target_schema || "").trim();
+    if (!tt) return "";
+    if (tt.includes(".")) return tt;
+    return ts ? `${ts}.${tt}` : tt;
+  }
+
+  function payload(){
+    return {
+      route_key: asNull($("route_key").value),
+
+      area_name: asNull($("area_name").value),
+      dataset_id: asNull($("dataset_id").value),
+
+      target_system: ($("target_system").value || "SQLSERVER").trim().toUpperCase(),
+      airflow_conn_id: asNull($("airflow_conn_id").value),
+
+      target_schema: asNull($("target_schema").value),
+      target_table: asNull($("target_table").value),
+
+      merge_proc: null,
+      allowed_ext: asNull($("allowed_ext").value) || "xlsx,csv",
+      sheet_name: asNull($("sheet_name").value),
+      max_file_mb: asIntOrNull($("max_file_mb").value),
+      is_active: Number($("is_active").value),
+      notes: asNull($("notes").value),
+
+      expected_columns: asNull($("expected_columns").value),
+      load_mode: ($("load_mode").value || "INCREMENTAL").toUpperCase(),
+      id_column_name: asNull($("id_column_name").value),
+
+      column_map_json: asNull($("column_map_json").value),
+    };
+  }
+
+  function validate(p){
+    const miss = [];
+    if (!p.area_name) miss.push("area_name");
+    if (!p.dataset_id) miss.push("dataset_id");
+    if (!p.target_system) miss.push("target_system");
+    if (!p.target_schema) miss.push("target_schema");
+    if (!p.target_table) miss.push("target_table");
+    if (miss.length) throw new Error("Obrigatórios faltando: " + miss.join(", "));
+
+    if (p.column_map_json){
+      try { JSON.parse(p.column_map_json); }
+      catch(e){ throw new Error("column_map_json inválido: " + e.message); }
+    }
+  }
+
+  function fillForm(r){
+    $("currentKey").textContent = r?.route_key || "novo";
+    $("route_key").value = r?.route_key || "";
+
+    $("area_name").value = r?.area_name || "";
+    $("dataset_id").value = r?.dataset_id || "";
+
+    $("target_system").value = (r?.target_system || "SQLSERVER").toUpperCase();
+    $("airflow_conn_id").value = r?.airflow_conn_id || "";
+
+    $("target_schema").value = r?.target_schema || "";
+    $("target_table").value = r?.target_table || "";
+
+    $("load_mode").value = (r?.load_mode || "INCREMENTAL").toUpperCase();
+    $("is_active").value = (r?.is_active === false || Number(r?.is_active) === 0) ? "0" : "1";
+
+    $("id_column_name").value = r?.id_column_name || "";
+    $("allowed_ext").value = r?.allowed_ext || "xlsx,csv";
+    $("sheet_name").value = r?.sheet_name || "";
+    $("max_file_mb").value = (r?.max_file_mb ?? "");
+    $("expected_columns").value = r?.expected_columns || "";
+    $("notes").value = r?.notes || "";
+
+    $("column_map_json").value = r?.column_map_json || `{
+  "Cód. Peça": "cod_peca",
+  "Qtd Produzida": "qtd_produzida",
+  "Data Produção": "data_producao"
+}`;
+    hideOut(out);
+  }
+
+  function openModal(mode){
+    $("modalTitle").textContent = (mode === "edit") ? "Editar rota" : "Nova rota";
+    $("modalSub").textContent = (mode === "edit")
+      ? "Altere os campos desejados e salve (route_key não muda)."
+      : "Preencha os campos e salve (route_key será gerado).";
+
+    modalBackdrop.style.display = "flex";
+    modalBackdrop.setAttribute("aria-hidden", "false");
+
+    setTimeout(() => $("area_name")?.focus?.(), 50);
+  }
+
+  function closeModal(){
+    modalBackdrop.style.display = "none";
+    modalBackdrop.setAttribute("aria-hidden", "true");
+    hideOut(out);
+    isSaving = false;
+    $("btnSave").disabled = false;
+  }
+
+  function renderList(){
+    const q = ($("q").value || "").toLowerCase().trim();
+    const rows = $("rows");
+    rows.innerHTML = "";
+
+    const filtered = allRoutes.filter(r => {
+      if (!q) return true;
+      const s = `${r.route_key||""} ${r.dataset_id||""} ${formatDestino(r)} ${r.target_system||""}`.toLowerCase();
+      return s.includes(q);
+    });
+
+    for (const r of filtered){
+      const tr = document.createElement("tr");
+
+      const dest = formatDestino(r);
+      const isActive = Number(r.is_active) === 1 || r.is_active === true;
+
+      tr.innerHTML = `
+        <td>
+          <b>${r.route_key||""}</b><br>
+          <span class="badge">${r.load_mode||""}</span>
+        </td>
+
+        <td>
+          <span class="status ${isActive ? "active" : ""}">
+            <span class="dot-sm"></span>
+            ${isActive ? "Active" : "Desactive"}
+          </span>
+        </td>
+
+        <td>
+          <span class="badge">${r.dataset_id||""}</span>
+        </td>
+
+        <td>${dest}</td>
+        <td class="nowrap">${r.target_system||""}</td>
+        <td class="nowrap">
+          <button class="icon-btn" title="Editar" data-edit="${r.route_key}">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 20h9"/>
+              <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
+            </svg>
+          </button>
+        </td>
+      `;
+
+      tr.querySelector('[data-edit]')?.addEventListener("click", async (ev) => {
+        ev.stopPropagation();
+        hideOut(listOut);
+
+        const key = (r.route_key || "").trim();
+        if (!key) return;
+
+        fillForm(r);
+        openModal("edit");
+
+        // Evita salvar com dados incompletos da listagem.
+        $("btnSave").disabled = true;
+
+        try{
+          const full = await fetchJson(`${API_BASE}/admin/routes/${encodeURIComponent(key)}`);
+          routeCache.set(key, full);
+          fillForm(full);
+          $("btnSave").disabled = false;
+        }catch(e){
+          showOut(out, e, false);
+          $("btnSave").disabled = true;
+        }
+      });
+
+      rows.appendChild(tr);
+    }
+  }
+
+  async function refresh(){
+    hideOut(listOut);
+    try{
+      allRoutes = await fetchJson(`${API_BASE}/admin/routes`);
+      renderList();
+    }catch(e){
+      showOut(listOut, e, false);
+    }
+  }
+
+  async function save(){
+    if (isSaving) return;
+    isSaving = true;
+    $("btnSave").disabled = true;
+    hideOut(out);
+
+    const p = payload();
+    try{ validate(p); }
+    catch(e){
+      showOut(out, e.message, false);
+      isSaving = false;
+      $("btnSave").disabled = false;
+      return;
+    }
+
+    const rk = (p.route_key || "").trim().toUpperCase();
+
+    try{
+      let res;
+
+      if (!rk){
+        res = await fetchJson(`${API_BASE}/admin/routes`, {
+          method:"POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify(p)
+        });
+
+        if (res?.route_key){
+          $("route_key").value = res.route_key;
+          $("currentKey").textContent = res.route_key;
+
+          // A resposta do CREATE não contém todos os campos.
+          // Então não pode ser usada como cache de edição.
+          routeCache.delete(res.route_key);
+        }
+      } else {
+        const { route_key, ...upd } = p;
+
+        res = await fetchJson(`${API_BASE}/admin/routes/${encodeURIComponent(rk)}`, {
+          method:"PUT",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify(upd)
+        });
+
+        // Evita manter cache velho ou incompleto após salvar.
+        routeCache.delete(rk);
+      }
+
+      showOut(out, res, true);
+      await refresh();
+
+      closeModal();
+
+    }catch(e){
+      showOut(out, e, false);
+      isSaving = false;
+      $("btnSave").disabled = false;
+    }
+  }
+
+  $("btnRefresh").addEventListener("click", refresh);
+  $("q").addEventListener("input", renderList);
+
+  $("btnNew").addEventListener("click", () => {
+    fillForm(null);
+    openModal("create");
+  });
+
+  $("btnSave").addEventListener("click", save);
+  $("btnCancel").addEventListener("click", closeModal);
+  $("btnClose").addEventListener("click", closeModal);
+
+  refresh();
+</script>
+</body>
+</html>

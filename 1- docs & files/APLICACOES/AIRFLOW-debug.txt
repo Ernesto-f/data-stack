@@ -1,0 +1,85 @@
+============================================================
+============= DAG COM ERRO NAO ATUALIZA NO ARIFLOW =========
+============================================================
+
+
+    Como identificar rápido da próxima vez
+    Passo A — conferir o arquivo que o Airflow está lendo de fato
+
+    No container que faz parsing (airflow-dag-processor e/ou airflow-scheduler):
+
+    docker compose exec airflow-dag-processor nl -ba /opt/airflow/dags/commom/proc_bronze_ingest_VIEW_refresh_workday.py | sed -n '75,85p'
+    docker compose exec airflow-dag-processor python - << 'PY'
+    p="/opt/airflow/dags/commom/proc_bronze_ingest_VIEW_refresh_workday.py"
+    print(open(p,encoding="utf-8").read().splitlines()[79])
+    PY
+
+
+    Se a linha está correta ali, o parser não deveria falhar por isso.
+
+    Passo B — ver se é erro “atual” ou “histórico preso”
+
+    Use o comando que resolve 90% das dúvidas:
+
+    docker compose exec airflow-dag-processor airflow dags list-import-errors
+
+
+    Se lista erro: é o que está no DB (pode ser atual ou histórico).
+
+    Se não lista: a UI é que está atrasada/cacheada.
+
+    Passo C — forçar reprocessamento
+    docker compose restart airflow-dag-processor airflow-scheduler airflow-apiserver
+
+
+    Se sumir, era só atraso.
+
+    Como corrigir quando ficar “preso” no DB (como aconteceu agora)
+
+    Ache a linha exata no DB:
+
+
+
+    ###############################################
+    # COMANDO TERMINAL PARA DELETAR O LOG TRAVADO #
+    ###############################################
+
+    docker compose exec postgres-airflow psql -U airflow -d airflow -c "
+    SELECT id, timestamp, bundle_name, filename
+    FROM import_error
+    ORDER BY id DESC
+    LIMIT 20;
+    "
+
+
+    Apague só o registro correspondente:
+
+    docker compose exec postgres-airflow psql -U airflow -d airflow -c "
+    DELETE FROM import_error
+    WHERE bundle_name = 'dags-folder'
+      AND filename = 'commom/proc_bronze_ingest_VIEW_refresh_workday.py';
+    "
+
+
+    Restart dos parsers:
+
+    docker compose restart airflow-dag-processor airflow-scheduler airflow-apiserver
+
+
+
+============================================================
+=========== WARN DE IMPORT OBSOLETO - FAST REPLACE   =======
+============================================================
+
+  VER ONDE TEM IMPORTS DOS QUAIS VOCE QUER TROCAR
+  grep -RIn "from airflow.decorators import task" /home/pc/data-stack/orchestration/dags
+  grep -RIn "from airflow.operators.empty import EmptyOperator" /home/pc/data-stack/orchestration/dags
+  grep -RIn "from airflow.utils.trigger_rule import TriggerRule" /home/pc/data-stack/orchestration/dags
+  grep -RIn "from airflow.hooks.base import BaseHook" /home/pc/data-stack/orchestration/dags
+
+
+
+
+
+
+

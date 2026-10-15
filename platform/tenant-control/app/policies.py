@@ -25,7 +25,10 @@ MANAGED_GLOBAL_GROUPS = {"/pulse/home/crm", "/pulse/home/analytics"}
 
 
 def is_platform_admin(identity: Identity) -> bool:
-    return "/pulse/admin" in identity.groups
+    return (
+        "/pulse/admin" in identity.groups
+        or "/pulse/tenant-control-admin" in identity.groups
+    )
 
 
 def product_group_paths(tenant_key: str, product_key: str, product_role: str) -> set[str]:

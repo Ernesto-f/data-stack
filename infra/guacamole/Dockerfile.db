@@ -1,0 +1,6 @@
+FROM postgres:16
+
+# Executado automaticamente apenas quando /var/lib/postgresql/data estiver vazio.
+COPY initdb.sql /docker-entrypoint-initdb.d/001-guacamole.sql
+
+RUN chmod 0444 /docker-entrypoint-initdb.d/001-guacamole.sql

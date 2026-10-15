@@ -1,0 +1,39 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
+{
+  "manifestVersion": "2.0.0",
+  "signatureType": "community",
+  "signedByOrg": "grafana",
+  "signedByOrgName": "Grafana Labs",
+  "plugin": "volkovlabs-echarts-panel",
+  "version": "7.2.4",
+  "time": 1774014169498,
+  "keyId": "7e4d0c6a708866e7",
+  "files": {
+    "156.js.map": "c7f25be5aa0ef08807fb94483f0f7bb7f6d47c01833a31e2087c4d99033b2857",
+    "156.js": "18c62359ef8fd8a8192732c1188972e021999a3f8a1a9cd4fe3f949466bd54b6",
+    "module.js.map": "0751ef23a4dc298ce10ecc153f34efcb5e358fff786ab8ca71e707dbd660a4fb",
+    "README.md": "2e87c1f04a3e2a1dbbee1f81d6348eb691dd3952dea95b61a6bcfbedd7046c08",
+    "plugin.json": "e5bd22e89ad4bd1d067b3cc93b442e45f3047e5e533a3498d52da8f86f8ed27a",
+    "img/examples.png": "314ed38b5f8565e47bdbfedfcd2bdd92fc5adb02e6d23265dd70fad2a0832aed",
+    "img/dashboard.png": "53b9532dfcbb87b7fe1ce8839c81903395c080a3ea26174dc970dce50d6764ce",
+    "img/logo.svg": "135b0a0ee0616fd0574641df59a4d51e7c0edd688e1db3a5743c419febeefd06",
+    "maps/USA.json": "7eb797cebe5d24563fbb7b673b5123f3e12d5e233514399d6b74c5a405c4e15d",
+    "maps/world.json": "4c9e872b430c3313ce758ffd75b1b38c12ef490a732c0101568903726e0fec08",
+    "module.js.LICENSE.txt": "f6bc5b5baff58973550c46f16e6db112167d1de28161ab54f40c0501275f327b",
+    "module.js": "adfdbe2061d98b296606d002f1383a028c1ab3a2bc3597272678d322afb30d57",
+    "CHANGELOG.md": "52d6a7cb1411c5c4dfd57dc95f2050860609d9c7d68efc96858ffbab80ef5e9a",
+    "LICENSE": "6ec12926d6478d895ccec681c3739c170a88773d6c54d0a57e46682ae6f0adc0"
+  }
+}
+-----BEGIN PGP SIGNATURE-----
+
+wsA+BAETCgBtBYJpvU7ZCRB+TQxqcIhm50UUAAAAAAAcACBzYWx0QG5vdGF0
+aW9ucy5vcGVucGdwanMub3JnaEN7S/WL0lCrKmxIhY3q0bF8vXW8rTtCRt86
+YDPJ+hIWIQTzOyW2kQdOhGNlcPN+TQxqcIhm5wAA7JsCCM0fVBAGTBPINRPC
+GHSZ/TeuvOGwnsdN87gabo3NJUp/tCXQpV9IzSMwEfznVHwwRT2N6ccESURT
+blgfZkyBvpcBAgkBNMZhVsS8oecAZQEW6Z/qx2CMNlIGelVu8745jcm4B4pN
++7OyOaqMwikiKEOqJvhi9yvanYM/EVCzJU/r/wNYh88=
+=J5x5
+-----END PGP SIGNATURE-----

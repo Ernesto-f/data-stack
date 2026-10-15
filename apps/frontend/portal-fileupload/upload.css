@@ -1,0 +1,245 @@
+/* =========================================================
+   APEX PORTAL • File Upload UI
+   Felipe / Apex Stack style
+   ========================================================= */
+
+:root {
+  --bg: #0f1117;
+  --card: #171a22;
+  --card-2: #1d212b;
+
+  --text: #e6e8ef;
+  --muted: #9aa3b2;
+
+  --primary: #4f8cff;
+  --primary-hover: #3b74e0;
+
+  --ok: #25d366;
+  --err: #ff4d4f;
+  --busy: #f0b90b;
+
+  --border: #2a2f3a;
+  --radius: 14px;
+}
+
+/* =========================================================
+   Reset
+   ========================================================= */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+body {
+  background: linear-gradient(135deg, #0f1117, #141824);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* =========================================================
+   Layout
+   ========================================================= */
+
+.wrap {
+  max-width: 1000px;
+  margin: 60px auto;
+  padding: 0 24px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+}
+
+h1 {
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.sub {
+  font-size: 14px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+.badge {
+  background: var(--primary);
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* =========================================================
+   Grid / Cards
+   ========================================================= */
+
+.grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 800px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card {
+  background: var(--card);
+  padding: 26px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.35);
+}
+
+/* =========================================================
+   Form
+   ========================================================= */
+
+label {
+  font-size: 13px;
+  color: var(--muted);
+  display: block;
+  margin: 18px 0 6px;
+}
+
+input[type="text"],
+input[type="file"],
+input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--card-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  outline: none;
+}
+
+input:focus {
+  border-color: var(--primary);
+}
+
+/* =========================================================
+   Buttons
+   ========================================================= */
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.btn {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.15s ease;
+}
+
+.btn.primary {
+  background: var(--primary);
+  color: white;
+}
+
+.btn.primary:hover {
+  background: var(--primary-hover);
+}
+
+.btn.ghost {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.btn.ghost:hover {
+  background: #20242f;
+}
+
+/* =========================================================
+   Status
+   ========================================================= */
+
+.status {
+  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.dot.idle {
+  background: #777;
+}
+
+.dot.busy {
+  background: var(--busy);
+  animation: pulse 1.1s infinite;
+}
+
+.dot.ok {
+  background: var(--ok);
+}
+
+.dot.err {
+  background: var(--err);
+}
+
+@keyframes pulse {
+  0%   { opacity: 0.4; }
+  50%  { opacity: 1; }
+  100% { opacity: 0.4; }
+}
+
+/* =========================================================
+   Response box
+   ========================================================= */
+
+.mono {
+  margin-top: 16px;
+  font-family: "Consolas", monospace;
+  font-size: 12px;
+  background: #111;
+  padding: 12px;
+  border-radius: 8px;
+  overflow: auto;
+  max-height: 200px;
+  border: 1px solid var(--border);
+}
+
+/* =========================================================
+   Sidebar info
+   ========================================================= */
+
+aside h2 {
+  font-size: 16px;
+  margin-bottom: 14px;
+}
+
+.kv div {
+  font-size: 13px;
+  margin-bottom: 8px;
+  color: var(--muted);
+}
+
+code {
+  background: #111;
+  padding: 3px 6px;
+  border-radius: 6px;
+  color: #9cc3ff;
+}

@@ -1,0 +1,280 @@
+DOCUMENTAÇÃO CONSOLIDADA
+ARQUITETURA PROXMOX — PRODUÇÃO + AUTOMATION BRIDGE (NAT)
+
+OBJETIVO
+
+Permitir que:
+
+Produção acesse Internet normalmente
+
+Produção acesse rede de automação
+
+Automação NÃO enxergue IPs internos
+
+Automação enxergue apenas o IP da Bridge
+
+Sem rotas de retorno na automação
+
+Persistente após reboot
+
+Persistente após queda/retorno de link
+
+Sem scripts customizados
+
+Sem hacks
+
+TOPOLOGIA FINAL
+
+Rede WAN Corporativa: 10.113.120.0/24
+Rede Interna: 172.10.0.0/24
+Rede Automação: 10.113.23.0/24
+
+Produção
+ens18 → 10.113.120.120/24 (WAN)
+ens19 → 172.10.0.5/24 (Interna)
+
+Automation Bridge
+ens18 → 10.113.23.78/24 (Automação)
+ens19 → 172.10.0.10/24 (Interna)
+
+Gateway WAN: 10.113.120.1
+Gateway da Produção para Automação: 172.10.0.10
+
+PROXMOX — BRIDGES
+
+vmbr0 → WAN
+NIC física corporativa (10.113.120.x)
+
+vmbr1 → Interna
+Somente VMs (sem NIC física)
+
+vmbr2 → Automação
+NIC física automação (10.113.23.x)
+
+VM 1 — AUTOMATION BRIDGE (Router + NAT)
+
+Função:
+
+Router L3
+
+Gateway da Produção
+
+Aplicar NAT
+
+Mascarar rede 172.10.0.0/24
+
+Expor apenas 10.113.23.78 para automação
+
+Gerenciamento de rede: ifupdown
+NÃO usar NetworkManager aqui
+
+Interfaces
+ens18 → vmbr2 (automação)
+ens19 → vmbr1 (interna)
+
+/etc/network/interfaces
+
+auto lo
+iface lo inet loopback
+
+auto ens18
+iface ens18 inet static
+address 10.113.23.78/24
+
+auto ens19
+iface ens19 inet static
+address 172.10.0.10/24
+
+Não configurar gateway nessa VM.
+
+Aplicar:
+
+systemctl restart networking
+
+Ativar roteamento:
+
+echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+sysctl -p
+
+NAT persistente oficial:
+
+apt install -y iptables-persistent
+
+iptables -t nat -A POSTROUTING -s 172.10.0.0/24 -o ens18 -j MASQUERADE
+
+iptables-save > /etc/iptables/rules.v4
+
+Validação:
+
+iptables -t nat -L -n -v
+sysctl net.ipv4.ip_forward
+
+Deve existir regra MASQUERADE para 172.10.0.0/24 saindo por ens18.
+
+NUNCA usar nessa VM:
+
+rc.local
+
+scripts custom
+
+cron
+
+systemd services para rota
+
+serviços NAT custom
+
+Somente iptables-persistent.
+
+VM 2 — PRODUÇÃO (Docker / Aplicações)
+
+Função:
+
+Rodar Docker
+
+Acessar Internet
+
+Acessar rede de automação via Bridge
+
+Não aplicar NAT
+
+Gerenciamento de rede: NetworkManager ONLY
+
+/etc/network/interfaces deve conter apenas:
+
+auto lo
+iface lo inet loopback
+
+Nenhuma outra configuração.
+
+Interfaces
+ens18 → vmbr0 (WAN)
+ens19 → vmbr1 (Interna)
+
+Configuração via nmcli
+
+WAN (ens18)
+
+nmcli con add type ethernet ifname ens18 con-name WAN
+ipv4.method manual
+ipv4.addresses 10.113.120.120/24
+ipv4.gateway 10.113.120.1
+ipv4.never-default no
+connection.autoconnect yes
+
+Rede Interna (ens19)
+
+nmcli con add type ethernet ifname ens19 con-name INT-AUT
+ipv4.method manual
+ipv4.addresses 172.10.0.5/24
+ipv4.gateway ""
+ipv4.never-default yes
+connection.autoconnect yes
+
+Rota persistente para automação (obrigatório):
+
+nmcli con mod INT-AUT +ipv4.routes "10.113.23.0/24 172.10.0.10"
+
+Subir conexões:
+
+nmcli con up WAN
+nmcli con up INT-AUT
+
+Garantir apenas um default:
+
+ip route | grep default
+
+Deve existir somente:
+
+default via 10.113.120.1
+
+Deve existir:
+
+10.113.23.0/24 via 172.10.0.10
+
+NUNCA usar na Produção:
+
+/etc/network/interfaces
+
+post-up
+
+systemd route services
+
+cron
+
+ip route manual
+
+scripts custom
+
+Somente nmcli.
+
+FLUXO DE TRÁFEGO
+
+Produção (172.10.0.5)
+→ envia para 10.113.23.x
+→ rota via 172.10.0.10
+→ Bridge aplica NAT
+→ origem vira 10.113.23.78
+→ Automação responde
+→ Bridge desfaz NAT
+→ retorna para 172.10.0.5
+
+A rede de automação sempre enxerga apenas:
+
+10.113.23.78
+
+Nunca enxerga:
+
+172.10.0.x
+
+TESTES FINAIS
+
+Produção:
+
+ping 172.10.0.10
+ping 10.113.23.78
+
+Bridge:
+
+tcpdump -i ens18 -nn
+
+Durante ping da Produção para automação, deve aparecer:
+
+SRC 10.113.23.78
+
+Se aparecer SRC 172.10.0.5, o NAT não está funcionando.
+
+ESTADO FINAL ESPERADO
+
+Automation Bridge
+
+Atua como Router
+
+NAT ativo
+
+ip_forward ativo
+
+1 IP visível para automação
+
+Persistente após reboot
+
+Produção
+
+NetworkManager gerencia tudo
+
+1 único default
+
+Rota automática para 10.113.23.0/24
+
+Funciona após reboot
+
+Funciona após queda de cabo
+
+Automação
+
+Não possui rota de retorno
+
+Enxerga apenas IP da Bridge
+
+Comunicação controlada e isolada
+
+Arquitetura estável, limpa e sem dependência de serviços auxiliares.

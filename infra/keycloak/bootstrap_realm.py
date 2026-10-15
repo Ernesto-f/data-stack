@@ -394,6 +394,7 @@ def main() -> int:
     groups = (
         "pulse/home",
         "pulse/admin",
+        "pulse/tenant-control-admin",
         "pulse/home/airflow",
         "pulse/home/airflow-admin",
         "pulse/home/cloudbeaver",
@@ -405,6 +406,8 @@ def main() -> int:
         "pulse/home/analytics-admin",
         "pulse/home/archive",
         "pulse/home/crm",
+        "pulse/home/tracking",
+        "pulse/home/tracking-admin",
         "pulse/tenants",
     )
     for group in groups:

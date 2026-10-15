@@ -1,0 +1,1 @@
+ferramentas = prometheus, nodered, dataquery, fileupload

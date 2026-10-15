@@ -67,7 +67,7 @@
           <div class="fields">
             <label>Identificador (slug)<input name="tenant_key" pattern="[a-z0-9][a-z0-9-]{1,29}[a-z0-9]" required placeholder="acme" /></label>
             <label>Nome da empresa<input name="display_name" required minlength="2" maxlength="160" /></label>
-            <label>Host CRM<input name="crm_host" required placeholder="acme.crm.izatacore.com" /></label>
+            <label>Host CRM<input name="crm_host" placeholder="acme.crm.izatacore.com" /></label>
             <label>Acesso CRM<select name="crm_access_mode"><option value="all_members">Todos os funcionários</option><option value="assigned">Assentos escolhidos pelo administrador</option></select></label>
             <label>Assentos CRM<input name="crm_seat_limit" type="number" min="1" placeholder="Vazio = ilimitado" /></label>
           </div>
@@ -84,8 +84,24 @@
             <div id="tenant-meta" class="muted"></div>
           </div>
           <label>Empresa<select id="tenant-select"></select></label>
-          <button id="activate-tenant" class="secondary hidden" type="button">Ativar tenant provisionado</button>
+          <div class="toolbar">
+            <button id="preflight-tenant" class="secondary hidden" type="button">Verificar ativação</button>
+            <button id="activate-tenant" class="hidden" type="button">Ativar tenant</button>
+            <button id="suspend-tenant" class="danger hidden" type="button">Suspender tenant</button>
+            <button id="resume-tenant" class="hidden" type="button">Reativar tenant</button>
+          </div>
         </div>
+        <section id="company-panel" class="hidden">
+          <h2>Dados da empresa</h2>
+          <form id="company-form">
+            <div class="fields">
+              <label>Nome da empresa<input name="display_name" required minlength="2" maxlength="160" /></label>
+              <label>Host CRM<input name="crm_host" placeholder="acme.crm.izatacore.com" /></label>
+            </div>
+            <button type="submit">Salvar dados da empresa</button>
+          </form>
+        </section>
+        <section id="preflight-panel" class="hidden" aria-live="polite"></section>
         <div id="products" class="checks"></div>
         <section id="plan-panel" class="hidden">
           <h2>Produtos e assentos</h2>
@@ -156,7 +172,11 @@
           ...options,
         });
         const body = response.status === 204 ? null : await response.json().catch(() => null);
-        if (!response.ok) throw new Error(body?.detail || `Falha HTTP ${response.status}`);
+        if (!response.ok) {
+          const detail = body?.detail;
+          const message = typeof detail === "string" ? detail : detail?.message || JSON.stringify(detail) || `Falha HTTP ${response.status}`;
+          throw new Error(message);
+        }
         return body;
       }
 
@@ -196,7 +216,17 @@
         const canManage = platformAdmin || ["owner", "admin"].includes(tenant.tenant_role);
         document.getElementById("plan-panel").classList.toggle("hidden", !platformAdmin);
         document.getElementById("invite-panel").classList.toggle("hidden", !canManage || tenant.tenant_status !== "active");
+        document.getElementById("company-panel").classList.toggle("hidden", !platformAdmin);
+        if (platformAdmin) {
+          const companyForm = document.getElementById("company-form");
+          companyForm.elements.display_name.value = tenant.display_name;
+          companyForm.elements.crm_host.value = tenant.crm_host || "";
+        }
+        document.getElementById("preflight-tenant").classList.toggle("hidden", !platformAdmin || tenant.tenant_status === "active");
         document.getElementById("activate-tenant").classList.toggle("hidden", !platformAdmin || tenant.tenant_status === "active");
+        document.getElementById("suspend-tenant").classList.toggle("hidden", !platformAdmin || tenant.tenant_status !== "active");
+        document.getElementById("resume-tenant").classList.toggle("hidden", !platformAdmin || tenant.tenant_status !== "suspended");
+        document.getElementById("preflight-panel").classList.add("hidden");
         const roleSelect = document.getElementById("member-tenant-role");
         const mayManageAdmins = platformAdmin || tenant.tenant_role === "owner";
         roleSelect.innerHTML = `<option value="member">Funcionário</option>${mayManageAdmins ? `<option value="admin">Administrador da empresa</option>` : ""}${platformAdmin ? `<option value="owner">Proprietário inicial</option>` : ""}`;
@@ -314,7 +344,7 @@
             body: JSON.stringify({ tenant_key: tenantKey, display_name: form.get("display_name"), crm_host: form.get("crm_host") || null, products }),
           });
           event.currentTarget.reset();
-          document.querySelector("#tenant-form [name='crm_host']").required = true;
+          document.querySelector("#tenant-form [name='crm_host']").required = document.querySelector("#tenant-form [name='crm_enabled']").checked;
           await loadTenants();
           showMessage(`Tenant ${tenantKey} registrado. Provisionar a stack CRM se contratada e ativar o tenant antes de convidar usuários.`, "ok");
         } catch (error) { showMessage(error.message, "error"); }
@@ -322,6 +352,21 @@
 
       document.querySelector("#tenant-form [name='crm_enabled']").addEventListener("change", event => {
         document.querySelector("#tenant-form [name='crm_host']").required = event.target.checked;
+      });
+
+      document.getElementById("company-form").addEventListener("submit", async event => {
+        event.preventDefault();
+        const tenant = state.tenants.find(item => item.tenant_key === state.selected);
+        if (!tenant) return;
+        const form = event.currentTarget;
+        try {
+          await apiCall(`/admin/tenants/${encodeURIComponent(tenant.tenant_key)}`, {
+            method: "PATCH",
+            body: JSON.stringify({ display_name: form.elements.display_name.value, crm_host: form.elements.crm_host.value || null }),
+          });
+          await loadTenants();
+          showMessage("Dados da empresa atualizados.", "ok");
+        } catch (error) { showMessage(error.message, "error"); }
       });
 
       document.getElementById("plan-form").addEventListener("submit", async event => {
@@ -353,14 +398,63 @@
         } catch (error) { showMessage(error.message, "error"); }
       });
 
+      async function checkTenantActivation() {
+        const tenant = state.tenants.find(item => item.tenant_key === state.selected);
+        if (!tenant) return null;
+        try {
+          const result = await apiCall(`/admin/tenants/${encodeURIComponent(tenant.tenant_key)}/preflight`);
+          const panel = document.getElementById("preflight-panel");
+          const checkLabel = key => key === "crm_host" ? "Host CRM" : key.startsWith("group:") ? `Grupo ${key.slice(6)}` : key;
+          const statusLabel = status => status === "ready" ? "OK" : status === "not_required" ? "Não necessário" : "Pendente";
+          panel.innerHTML = `<h2>Verificação para ativar</h2><div class="checks">${result.checks.map(check => `<span class="status ${check.status === "ready" ? "ok" : check.status === "blocked" ? "error" : ""}"><strong>${esc(checkLabel(check.key))}:</strong> ${esc(statusLabel(check.status))} · ${esc(check.detail)}</span>`).join("")}</div>${result.manual_checks?.length ? `<p class="callout">${result.manual_checks.map(esc).join(" ")}</p>` : ""}<p class="muted">${result.ready ? "As verificações automáticas passaram. Confirme também as etapas manuais antes de ativar." : "Resolva as pendências acima e execute a verificação novamente."}</p>`;
+          panel.classList.remove("hidden");
+          return result;
+        } catch (error) {
+          showMessage(error.message, "error");
+          return null;
+        }
+      }
+
+      document.getElementById("preflight-tenant").addEventListener("click", checkTenantActivation);
       document.getElementById("activate-tenant").addEventListener("click", async () => {
         const tenant = state.tenants.find(item => item.tenant_key === state.selected);
         if (!tenant) return;
+        const readiness = await checkTenantActivation();
+        if (!readiness?.ready) return;
+        if (!confirm(`Ativar ${tenant.display_name}? Confira também o provisionamento manual da stack antes de confirmar.`)) return;
         try {
           await apiCall(`/admin/tenants/${encodeURIComponent(tenant.tenant_key)}`, {
-            method: "PATCH", body: JSON.stringify({ tenant_status: "active", crm_host: tenant.crm_host }),
+            method: "PATCH", body: JSON.stringify({ tenant_status: "active" }),
           });
           await loadTenants();
+          showMessage("Tenant ativado e acessos sincronizados.", "ok");
+        } catch (error) { showMessage(error.message, "error"); }
+      });
+
+      document.getElementById("suspend-tenant").addEventListener("click", async () => {
+        const tenant = state.tenants.find(item => item.tenant_key === state.selected);
+        if (!tenant || !confirm(`Suspender ${tenant.display_name}? O acesso dos usuários a este tenant será removido.`)) return;
+        try {
+          await apiCall(`/admin/tenants/${encodeURIComponent(tenant.tenant_key)}`, {
+            method: "PATCH", body: JSON.stringify({ tenant_status: "suspended" }),
+          });
+          await loadTenants();
+          showMessage("Tenant suspenso; os grupos de acesso foram sincronizados.", "ok");
+        } catch (error) { showMessage(error.message, "error"); }
+      });
+
+      document.getElementById("resume-tenant").addEventListener("click", async () => {
+        const tenant = state.tenants.find(item => item.tenant_key === state.selected);
+        if (!tenant) return;
+        const readiness = await checkTenantActivation();
+        if (!readiness?.ready) return;
+        if (!confirm(`Reativar ${tenant.display_name} e restaurar os acessos configurados?`)) return;
+        try {
+          await apiCall(`/admin/tenants/${encodeURIComponent(tenant.tenant_key)}`, {
+            method: "PATCH", body: JSON.stringify({ tenant_status: "active" }),
+          });
+          await loadTenants();
+          showMessage("Tenant reativado e acessos sincronizados.", "ok");
         } catch (error) { showMessage(error.message, "error"); }
       });
 

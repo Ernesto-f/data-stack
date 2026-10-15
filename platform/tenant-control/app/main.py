@@ -46,8 +46,9 @@ class TenantCreate(BaseModel):
     products: list[ProductEntitlement]
 
 
-class TenantStatusUpdate(BaseModel):
-    tenant_status: Literal["active", "suspended", "provisioning"]
+class TenantUpdate(BaseModel):
+    display_name: str | None = Field(default=None, min_length=2, max_length=160)
+    tenant_status: Literal["active", "suspended", "provisioning"] | None = None
     crm_host: str | None = None
 
 
@@ -115,6 +116,65 @@ async def entitlement_rows(request: Request, tenant_key: str) -> list[dict]:
         tenant_key,
     )
     return [dict(row) for row in rows]
+
+
+async def tenant_activation_preflight(request: Request, tenant: dict) -> dict:
+    """Check the prerequisites that the control plane can verify before activation."""
+    tenant_key = tenant["tenant_key"]
+    expected_host = tenant_host(tenant_key)
+    crm = await request.app.state.pool.fetchrow(
+        """SELECT t.crm_host,
+                  EXISTS (SELECT 1 FROM tenant_products tp
+                          WHERE tp.tenant_key=t.tenant_key
+                            AND tp.product_key='crm' AND tp.enabled) AS crm_enabled
+           FROM tenants t WHERE t.tenant_key=$1""",
+        tenant_key,
+    )
+    checks: list[dict[str, str]] = []
+    crm_enabled = bool(crm and crm["crm_enabled"])
+    if crm_enabled:
+        host_ready = crm["crm_host"] == expected_host
+        checks.append({
+            "key": "crm_host",
+            "status": "ready" if host_ready else "blocked",
+            "detail": expected_host if host_ready else f"Configure o host CRM como {expected_host}.",
+        })
+    else:
+        checks.append({"key": "crm_host", "status": "not_required", "detail": "CRM não contratado."})
+
+    memberships = await request.app.state.pool.fetch(
+        """SELECT tm.tenant_role, mp.product_role
+           FROM tenant_memberships tm
+           LEFT JOIN membership_products mp
+             ON mp.tenant_key=tm.tenant_key
+            AND mp.keycloak_subject=tm.keycloak_subject
+            AND mp.product_key='crm'
+           WHERE tm.tenant_key=$1 AND tm.membership_status!='suspended'""",
+        tenant_key,
+    )
+    # Every tenant needs its admin group so the first owner can manage members
+    # immediately after activation, even when CRM is not part of the contract.
+    required_groups: set[str] = {f"pulse/tenants/{tenant_key}/admin"}
+    if crm_enabled:
+        required_groups.add(f"pulse/tenants/{tenant_key}/crm")
+        if any(member["product_role"] == "manager" for member in memberships):
+            required_groups.add(f"pulse/tenants/{tenant_key}/crm-admin")
+    for group_path in sorted(required_groups):
+        try:
+            await request.app.state.keycloak.group_id(group_path)
+            checks.append({"key": f"group:{group_path}", "status": "ready", "detail": f"/{group_path}"})
+        except KeycloakError:
+            checks.append({"key": f"group:{group_path}", "status": "blocked", "detail": f"Grupo /{group_path} não encontrado no Keycloak."})
+
+    return {
+        "tenant_key": tenant_key,
+        "current_status": tenant["tenant_status"],
+        "ready": all(check["status"] != "blocked" for check in checks),
+        "checks": checks,
+        "manual_checks": [
+            "Confirme que a stack CRM está instalada e acessível no host informado."
+        ] if crm_enabled else [],
+    }
 
 
 @asynccontextmanager
@@ -285,43 +345,113 @@ async def create_tenant(
     return {"tenant_key": body.tenant_key, "tenant_status": "provisioning"}
 
 
-@app.patch("/v1/admin/tenants/{tenant_key}")
-async def update_tenant(
+@app.get("/v1/admin/tenants/{tenant_key}/preflight")
+async def get_tenant_activation_preflight(
     tenant_key: str,
-    body: TenantStatusUpdate,
     request: Request,
     identity: Identity = Depends(current_identity),
 ) -> dict:
     if not is_platform_admin(identity):
         raise HTTPException(403, "Platform administrator role required")
-    if body.crm_host and body.crm_host != tenant_host(tenant_key):
-        raise HTTPException(422, f"CRM host must be {tenant_host(tenant_key)}")
-    if body.tenant_status == "active":
-        crm_enabled = await request.app.state.pool.fetchval(
-            "SELECT EXISTS (SELECT 1 FROM tenant_products WHERE tenant_key=$1 AND product_key='crm' AND enabled)",
-            tenant_key,
-        )
-    else:
-        crm_enabled = False
-    if crm_enabled:
-        try:
-            await request.app.state.keycloak.group_id(f"pulse/tenants/{tenant_key}/crm")
-        except KeycloakError as error:
-            raise HTTPException(409, "Provision the tenant Odoo stack and Keycloak group before activation") from error
-    row = await request.app.state.pool.fetchrow(
-        """UPDATE tenants SET tenant_status=$2,crm_host=COALESCE($3,crm_host)
-           WHERE tenant_key=$1 RETURNING tenant_key,tenant_status,crm_host""",
+    tenant = await request.app.state.pool.fetchrow(
+        "SELECT tenant_key,tenant_status FROM tenants WHERE tenant_key=$1", tenant_key
+    )
+    if tenant is None:
+        raise HTTPException(404, "Tenant not found")
+    return await tenant_activation_preflight(request, tenant)
+
+
+@app.patch("/v1/admin/tenants/{tenant_key}")
+async def update_tenant(
+    tenant_key: str,
+    body: TenantUpdate,
+    request: Request,
+    identity: Identity = Depends(current_identity),
+) -> dict:
+    if not is_platform_admin(identity):
+        raise HTTPException(403, "Platform administrator role required")
+    if not body.model_fields_set:
+        raise HTTPException(422, "Provide at least one tenant field to update")
+
+    current = await request.app.state.pool.fetchrow(
+        """SELECT t.tenant_key,t.display_name,t.crm_host,t.tenant_status,
+                  EXISTS (SELECT 1 FROM tenant_products tp
+                          WHERE tp.tenant_key=t.tenant_key
+                            AND tp.product_key='crm' AND tp.enabled) AS crm_enabled
+           FROM tenants t WHERE t.tenant_key=$1""",
         tenant_key,
-        body.tenant_status,
-        body.crm_host,
+    )
+    if current is None:
+        raise HTTPException(404, "Tenant not found")
+
+    changes: dict[str, object] = {}
+    if "display_name" in body.model_fields_set:
+        display_name = (body.display_name or "").strip()
+        if len(display_name) < 2:
+            raise HTTPException(422, "A company name is required")
+        changes["display_name"] = display_name
+
+    if "crm_host" in body.model_fields_set:
+        crm_host = body.crm_host.strip().lower() if body.crm_host else None
+        expected_host = tenant_host(tenant_key)
+        if crm_host and crm_host != expected_host:
+            raise HTTPException(422, f"CRM host must be {expected_host}")
+        if current["crm_enabled"] and crm_host != expected_host:
+            raise HTTPException(409, "Disable the CRM entitlement before clearing its host")
+        changes["crm_host"] = crm_host
+
+    target_status = body.tenant_status if "tenant_status" in body.model_fields_set else None
+    if "tenant_status" in body.model_fields_set and target_status is None:
+        raise HTTPException(422, "Tenant status cannot be empty")
+    if target_status == "active":
+        tenant_for_check = {
+            "tenant_key": tenant_key,
+            "tenant_status": current["tenant_status"],
+        }
+        readiness = await tenant_activation_preflight(request, tenant_for_check)
+        if not readiness["ready"]:
+            raise HTTPException(
+                409,
+                {"message": "Tenant activation prerequisites are not satisfied", "preflight": readiness},
+            )
+    if target_status is not None:
+        changes["tenant_status"] = target_status
+
+    if not changes:
+        raise HTTPException(422, "No tenant changes were provided")
+
+    set_clause = ",".join(f"{column}=${index}" for index, column in enumerate(changes, start=2))
+    row = await request.app.state.pool.fetchrow(
+        f"UPDATE tenants SET {set_clause} WHERE tenant_key=$1 "
+        "RETURNING tenant_key,display_name,tenant_status,crm_host",
+        tenant_key,
+        *changes.values(),
     )
     if row is None:
         raise HTTPException(404, "Tenant not found")
-    members = await request.app.state.pool.fetch(
-        "SELECT keycloak_subject FROM tenant_memberships WHERE tenant_key=$1", tenant_key
-    )
-    for member in members:
-        await sync_subject_groups(request, member["keycloak_subject"])
+
+    if "tenant_status" in changes:
+        members = await request.app.state.pool.fetch(
+            "SELECT keycloak_subject FROM tenant_memberships WHERE tenant_key=$1", tenant_key
+        )
+        try:
+            for member in members:
+                await sync_subject_groups(request, member["keycloak_subject"])
+        except KeycloakError as error:
+            await request.app.state.pool.execute(
+                "UPDATE tenants SET tenant_status=$2 WHERE tenant_key=$1",
+                tenant_key,
+                current["tenant_status"],
+            )
+            try:
+                for member in members:
+                    await sync_subject_groups(request, member["keycloak_subject"])
+            except KeycloakError:
+                pass
+            raise HTTPException(
+                503,
+                "Tenant state was rolled back because Keycloak access synchronization failed; retry the operation.",
+            ) from error
     return dict(row)
 
 
