@@ -107,6 +107,9 @@ Arquivos da alteração atual:
   para o fluxo de login do Portal, com o grupo tenant-scoped correspondente.
 - Certificados Let's Encrypt e vhosts Nginx foram instalados para os dois hosts; `nginx -t`
   passou.
+- O script `domains/crm/install-vhost.sh <tenant>` automatiza a instalação: faz backup do
+  vhost, prepara o desafio HTTP, executa Certbot, instala o vhost TLS e restaura a versão
+  anterior se a validação falhar. A execução exige `sudo` interativo no host.
 - O banco do control plane ainda contém `0` tenants. As instâncias acima são stacks isoladas
   de teste, mas ainda não foram registradas no `/admin`; não inserir linhas diretamente no
   banco, pois o cadastro deve passar pela API/UI e pelo preflight de ativação.

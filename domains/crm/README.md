@@ -51,13 +51,14 @@ Para uma nova empresa, escolha um slug estável e uma porta de loopback ainda li
 
 ```bash
 bash ./setup-secrets.sh acme 18101
+bash ./install-vhost.sh acme
 bash ./initialize-db.sh acme
 bash ./deploy.sh acme
 ```
 
 O provisionador cria `tenants/<slug>/.env`, `config/odoo.conf`, o client e grupo Keycloak e um vhost Nginx em `tenants/<slug>/nginx.conf`. Esses arquivos locais têm permissões restritas e são ignorados pelo Git. O tenant `demo` usa `https://democrm.izatacore.com`; `acme` usa `https://acme.crm.izatacore.com`.
 
-Instale o vhost gerado no Nginx do host, emita o certificado TLS, execute `nginx -t` e recarregue o serviço. O Odoo escuta somente em loopback e cada Compose project tem rede e volumes próprios. PostgreSQL não publica porta no host.
+`install-vhost.sh <tenant>` instala o vhost gerado no Nginx do host, cria um vhost HTTP temporário quando necessário, emite o certificado TLS pelo Certbot, instala a configuração HTTPS definitiva, executa `nginx -t` e recarrega o serviço. Informe `CERTBOT_EMAIL` para registrar um e-mail de renovação; sem ele o Certbot usa a opção sem e-mail. O script faz backup do vhost anterior e restaura a configuração se a emissão ou validação falhar. O Odoo escuta somente em loopback e cada Compose project tem rede e volumes próprios. PostgreSQL não publica porta no host.
 
 `initialize-db.sh <tenant>` instala `crm`, `auth_oidc` e `pulse_crm_sso` numa base nova e define a senha inicial local. Ele recusa uma base existente para não redefinir a senha do administrador. `deploy.sh <tenant>` compila/inicia somente aquele tenant. Não execute `docker compose down -v` sem backup aprovado.
 
