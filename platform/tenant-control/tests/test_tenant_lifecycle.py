@@ -175,6 +175,41 @@ def test_status_rolls_back_when_keycloak_sync_fails(monkeypatch):
     assert calls == 2  # failed transition plus best-effort restoration
 
 
+class CombinedTenantUpdatePool(StatusUpdatePool):
+    def __init__(self):
+        super().__init__()
+        self.restored_args = None
+
+    async def execute(self, query, *args):
+        self.status_updates.append(query)
+        if "display_name=$2" in query:
+            self.restored_args = args
+        self.status = "active"
+
+
+def test_tenant_update_rolls_back_all_fields_when_sync_fails(monkeypatch):
+    pool = CombinedTenantUpdatePool()
+
+    async def fail_sync(_request, _subject):
+        raise KeycloakError("Keycloak unavailable")
+
+    monkeypatch.setattr(main, "sync_subject_groups", fail_sync)
+    body = main.TenantUpdate(
+        display_name="New Name",
+        crm_host="acme.crm.izatacore.com",
+        tenant_status="suspended",
+    )
+
+    async def run_update():
+        with pytest.raises(HTTPException) as error:
+            await main.update_tenant("acme", body, request_for(pool, FakeKeycloak()), identity())
+        return error.value
+
+    error = asyncio.run(run_update())
+    assert error.status_code == 503
+    assert pool.restored_args == ("acme", "Acme", "acme.crm.izatacore.com", "active")
+
+
 class TenantEditPool:
     def __init__(self, *, crm_enabled=False):
         self.crm_enabled = crm_enabled

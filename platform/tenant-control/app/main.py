@@ -667,8 +667,12 @@ async def update_tenant(
                 await sync_subject_groups(request, member["keycloak_subject"])
         except KeycloakError as error:
             await request.app.state.pool.execute(
-                "UPDATE tenants SET tenant_status=$2 WHERE tenant_key=$1",
+                """UPDATE tenants
+                   SET display_name=$2,crm_host=$3,tenant_status=$4
+                   WHERE tenant_key=$1""",
                 tenant_key,
+                current["display_name"],
+                current["crm_host"],
                 current["tenant_status"],
             )
             try:

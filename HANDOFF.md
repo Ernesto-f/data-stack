@@ -58,6 +58,7 @@ Melhorias de robustez aplicadas nesta revisão:
 - Ruff corrigiu imports/estilo seguro e agora passa com as exceções documentadas `B008` (padrão FastAPI `Depends`) e `SIM117` (contextos async aninhados mantidos explícitos); não há outros avisos.
 - A autorização de função preserva o caminho de atualização de produtos quando a função não muda; testes cobrem funções inalteradas sem relaxar mudanças de owner/admin.
 - O sincronizador Keycloak agora compensa também grupos removidos quando uma operação falha no meio; a regressão foi coberta por teste dedicado.
+- Rollback de alteração de tenant restaura nome, host e status anteriores quando a sincronização falha, evitando aplicação parcial em PATCH combinado.
 
 Arquivos da alteração atual:
 
@@ -70,7 +71,7 @@ Arquivos da alteração atual:
 
 ## Validação executada
 
-- `PYTHONPATH=platform/tenant-control /tmp/opencode/tenant-control-venv/bin/pytest -q platform/tenant-control/tests` — **28 passaram**.
+- `PYTHONPATH=platform/tenant-control /tmp/opencode/tenant-control-venv/bin/pytest -q platform/tenant-control/tests` — **30 passaram**.
 - `python -m py_compile platform/tenant-control/app/main.py platform/tenant-control/app/policies.py` — passou.
 - `node --check` no JavaScript embutido de `platform/portal/admin/index.html` — passou.
 - `git diff --check` nos arquivos da tarefa — passou.
@@ -106,7 +107,7 @@ Arquivos da alteração atual:
 - `33c7de7` — `Harden entitlement synchronization failures` — validação de desativação e erros 503 explícitos.
 - `538b4d8` — `Make verified login activation retry-safe` — compensação do primeiro login.
 - `8d1bd0b` — `Serialize tenant membership mutations` — locks do tenant/membership e validações sob transação.
-- Healthcheck Docker da API adicionado em `infra/compose.tenant-control.yml`; `docker compose config`, suíte (**29 testes**), Python, JavaScript, Ruff e `git diff --check` passaram.
+- Healthcheck Docker da API adicionado em `infra/compose.tenant-control.yml`; `docker compose config`, suíte (**30 testes**), Python, JavaScript, Ruff e `git diff --check` passaram.
 
 ## Cuidados de contexto
 
