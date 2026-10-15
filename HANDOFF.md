@@ -59,6 +59,7 @@ Melhorias de robustez aplicadas nesta revisão:
 - A autorização de função preserva o caminho de atualização de produtos quando a função não muda; testes cobrem funções inalteradas sem relaxar mudanças de owner/admin.
 - O sincronizador Keycloak agora compensa também grupos removidos quando uma operação falha no meio; a regressão foi coberta por teste dedicado.
 - Rollback de alteração de tenant restaura nome, host e status anteriores quando a sincronização falha, evitando aplicação parcial em PATCH combinado.
+- Replace de entitlements agora bloqueia a linha do tenant antes de validar remoções, desativações e limites, alinhando a concorrência com mutações de memberships.
 
 Arquivos da alteração atual:
 

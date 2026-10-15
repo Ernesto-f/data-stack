@@ -736,10 +736,10 @@ async def replace_entitlements(
                 raise HTTPException(503, "Keycloak is unavailable; entitlement was not changed") from error
     async with request.app.state.pool.acquire() as connection:
         async with connection.transaction():
-            exists = await connection.fetchval(
-                "SELECT EXISTS (SELECT 1 FROM tenants WHERE tenant_key=$1)", tenant_key
+            tenant = await connection.fetchrow(
+                "SELECT tenant_key FROM tenants WHERE tenant_key=$1 FOR UPDATE", tenant_key
             )
-            if not exists:
+            if tenant is None:
                 raise HTTPException(404, "Tenant not found")
             removed = await connection.fetch(
                 "SELECT product_key FROM tenant_products WHERE tenant_key=$1", tenant_key
