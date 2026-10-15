@@ -54,6 +54,7 @@ Melhorias de robustez aplicadas nesta revisão:
 - Primeiro login verificado agora reverte somente as memberships recém-ativadas se a sincronização falhar, permitindo retry seguro.
 - Nome de membro após trim exige pelo menos dois caracteres; testes cobrem progresso parcial de sync e rollback do primeiro login.
 - PATCH de tenant que corrige `crm_host` e ativa na mesma requisição agora valida o host candidato, sem exigir uma segunda chamada artificial.
+- A política de grupos também aplica `READY_PRODUCTS` na sincronização, evitando conceder grupos de produtos planejados mesmo se o banco/catalogo for alterado indevidamente.
 
 Arquivos da alteração atual:
 
@@ -73,6 +74,7 @@ Arquivos da alteração atual:
 - Última validação: suíte tenant-control **27 passaram**; compilação Python, sintaxe JS e `git diff --check` passaram.
 - Revisão de autorização e fluxo concluída: preflight/update restritos a platform admins; a ativação exige grupo admin tenant-scoped mesmo sem CRM; suspender/reativar sincroniza grupos sem alterar os grupos de outros tenants.
 - Não foi feita validação visual com sessão Keycloak no navegador.
+- Há divergência conhecida entre `platform/portal/nginx/portal.izatacore.com.conf` (proxy completo da API) e `infra/nginx/locations-enabled/portal-admin.conf` (configuração Docker ativa previamente observada); não alterei essa infraestrutura sem validação do caminho de deployment.
 
 ## Produção / deployment
 

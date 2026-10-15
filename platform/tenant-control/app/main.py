@@ -109,6 +109,8 @@ async def subject_group_policy(request: Request, subject: str) -> tuple[set[str]
             subject,
         )
         for product in products:
+            if product["product_key"] not in READY_PRODUCTS:
+                continue
             desired.update(product_group_paths(tenant_key, product["product_key"], product["product_role"]))
     return desired, managed
 
