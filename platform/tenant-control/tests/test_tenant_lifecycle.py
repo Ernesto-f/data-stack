@@ -374,3 +374,31 @@ def test_member_role_changes_keep_platform_admin_boundaries():
 
     main.authorize_member_role_change("owner", "admin", "member")
     main.authorize_member_role_change("platform_admin", "owner", "member")
+
+
+class SeatLimitConnection:
+    def __init__(self, *, used, limit=1):
+        self.used = used
+        self.limit = limit
+        self.inserted = False
+
+    async def fetchrow(self, _query, *_args):
+        return {"seat_limit": self.limit}
+
+    async def fetchval(self, _query, *_args):
+        return self.used
+
+    async def execute(self, _query, *_args):
+        self.inserted = True
+
+
+def test_seat_limit_blocks_extra_assignment_and_allows_available_seat():
+    full = SeatLimitConnection(used=1)
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(main.save_product_access(full, "acme", "member-2", ["crm"], "user"))
+    assert error.value.status_code == 409
+    assert full.inserted is False
+
+    available = SeatLimitConnection(used=0)
+    asyncio.run(main.save_product_access(available, "acme", "member-2", ["crm"], "user"))
+    assert available.inserted is True

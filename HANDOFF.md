@@ -25,6 +25,7 @@ Fase 2 em andamento (alterações ainda não commitadas):
 - Impede demover/suspender o último owner ativo.
 - Reativação de membership suspensa com seleção de produtos/assentos; valida tenant ativo e entitlement e sincroniza grupos, revertendo se Keycloak falhar.
 - A edição de produtos/função restaura os dados anteriores se a sincronização de grupos falhar.
+- Teste de regressão confirma que assento no limite bloqueia nova atribuição e que assento disponível permite atribuir.
 - UI mostra ação de reativação e seletor de função conforme as permissões do ator.
 
 Arquivos da alteração atual:
@@ -42,7 +43,7 @@ Arquivos da alteração atual:
 - `python -m py_compile platform/tenant-control/app/main.py platform/tenant-control/app/policies.py` — passou.
 - `node --check` no JavaScript embutido de `platform/portal/admin/index.html` — passou.
 - `git diff --check` nos arquivos da tarefa — passou.
-- Depois das alterações da Fase 2: suíte tenant-control **14 passaram**; compilação Python, sintaxe JS e `git diff --check` passaram.
+- Depois das alterações da Fase 2: suíte tenant-control **15 passaram**; compilação Python, sintaxe JS e `git diff --check` passaram.
 - Revisão de autorização e fluxo concluída: preflight/update restritos a platform admins; a ativação exige grupo admin tenant-scoped mesmo sem CRM; suspender/reativar sincroniza grupos sem alterar os grupos de outros tenants.
 - Não foi feita validação visual com sessão Keycloak no navegador.
 
@@ -64,7 +65,8 @@ Arquivos da alteração atual:
 ## Commits recentes
 
 - `1a6e3d0` — `Commit pending repository updates` — commitou o working tree inteiro (472 arquivos; 278,799 inserções / 1,850 remoções). A exceção solicitada foi `files/notasficas/NFSe_55083048_6530635.pdf`, que permanece não rastreado junto de `files/`.
-- As alterações da Fase 2 descritas acima foram feitas depois desse commit e ainda estão locais/não commitadas.
+- `62289e5` — `Add tenant member reactivation and role management` — alterações de reativação/funções e testes.
+- Alteração local posterior: cobertura do limite de assentos, validada junto à suíte (15 passaram); será incluída no próximo commit da entrega de operação.
 
 ## Cuidados de contexto
 
