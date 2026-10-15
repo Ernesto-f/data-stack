@@ -50,7 +50,7 @@ Melhorias de robustez aplicadas nesta revisão:
 - Atualização de acesso lê os produtos anteriores dentro do mesmo lock transacional da membership.
 - Erros de grupo ausente no Keycloak têm tipo próprio; indisponibilidade não é reportada como grupo faltante e preflight retorna 503.
 - Atualização de entitlement exige revogar memberships antes de desativar um produto; falhas de sincronização pós-gravação retornam 503 com progresso explícito, em vez de erro 500 genérico.
-- Leituras críticas de suspensão ficam sob `FOR UPDATE`; chamadas externas do Keycloak não são executadas dentro da transação SQL de entitlement.
+- Leituras críticas de suspensão, função e reativação ficam sob lock da linha do tenant e membership; chamadas externas do Keycloak não são executadas dentro da transação SQL de entitlement.
 - Primeiro login verificado agora reverte somente as memberships recém-ativadas se a sincronização falhar, permitindo retry seguro.
 - Nome de membro após trim exige pelo menos dois caracteres; testes cobrem progresso parcial de sync e rollback do primeiro login.
 
@@ -82,7 +82,7 @@ Arquivos da alteração atual:
 
 ## Próximos passos
 
-1. Commitar a compensação do primeiro login e avaliar lacunas de endpoint e UI restantes.
+1. Adicionar healthcheck operacional da API, atualizar a documentação dos fluxos finais e revisar lacunas de endpoint/UI.
 2. Aguardar autorização explícita antes de publicar na VPS; deployment não foi solicitado nem executado nesta etapa.
 3. Se autorizado, publicar com backup das imagens e configuração anterior; não alterar dados nem stacks de produto.
 4. Validar login, lista vazia, criação, preflight, ativação, suspensão/retomada, reativação, auditoria e reconciliação no painel implantado.
@@ -96,6 +96,11 @@ Arquivos da alteração atual:
 - `3971f7d` — `Add tenant control administrative audit log` — eventos, endpoint e painel de auditoria admin.
 - `ccd9898` — `Add read-only tenant Keycloak reconciliation` — endpoint/report, UI e detecção de drift.
 - A entrega mais recente `Add confirmed Keycloak drift synchronization` está no commit HEAD deste handoff.
+- `70f3b73` — `Harden tenant access synchronization` — primeiro login, rollback de suspensão e erros tipados do Keycloak.
+- `33c7de7` — `Harden entitlement synchronization failures` — validação de desativação e erros 503 explícitos.
+- `538b4d8` — `Make verified login activation retry-safe` — compensação do primeiro login.
+- `8d1bd0b` — `Serialize tenant membership mutations` — locks do tenant/membership e validações sob transação.
+- Healthcheck Docker da API adicionado em `infra/compose.tenant-control.yml`; `docker compose config`, suíte (**26 testes**), Python, JavaScript e `git diff --check` passaram.
 
 ## Cuidados de contexto
 

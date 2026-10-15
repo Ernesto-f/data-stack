@@ -28,6 +28,8 @@ docker compose --env-file .env.auth --env-file .env.tenant-control \
 5. Instalar `platform/portal/nginx/portal.izatacore.com.conf` no Nginx do host; a API fica presa a `127.0.0.1:18098`. O endpoint `/tenant-admin/api/` recebe um token sobrescrito por Nginx; tokens de browser não são encaminhados como cabeçalho confiável.
 6. Servir `platform/portal/admin/index.html` como `/admin/` e recarregar o Nginx.
 
+O container da API possui healthcheck Docker em `/health`; ele confirma que o processo subiu depois da criação do pool/schema do banco. A disponibilidade do Keycloak é verificada sob demanda e retorna `503` quando uma operação depende do provedor.
+
 Para habilitar um administrador do control plane, associe a conta verificada ao grupo `pulse/tenant-control-admin` no Keycloak. O script privado `infra/keycloak/create_user.py` oferece esse grupo na criação de contas. Não conceda grupos administrativos globais a owners/admins de clientes.
 
 ## Fluxo de ativação
