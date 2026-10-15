@@ -32,6 +32,12 @@ def test_tenant_admin_role_does_not_imply_crm_subscription():
     assert "/pulse/home/crm" not in groups
 
 
+def test_default_portal_group_is_managed_for_suspension_cleanup():
+    from app.policies import MANAGED_GLOBAL_GROUPS
+
+    assert "/pulse/home" in MANAGED_GLOBAL_GROUPS
+
+
 def test_platform_admin_is_an_explicit_global_group():
     assert is_platform_admin(identity("/pulse/admin"))
     assert is_platform_admin(identity("/pulse/tenant-control-admin"))

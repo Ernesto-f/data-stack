@@ -451,3 +451,58 @@ def test_audit_list_is_platform_admin_only_and_caps_page_size():
             )
         )
     assert error.value.status_code == 403
+
+
+def test_reconciliation_reports_missing_and_extra_managed_groups_only():
+    managed = {"/pulse/home", "/pulse/tenants/acme/admin", "/pulse/tenants/acme/crm"}
+    drift = main.member_group_drift(
+        "member-1",
+        {"/pulse/tenants/acme/admin", "/pulse/tenants/acme/crm"},
+        {"/pulse/home", "/pulse/tenants/acme/admin", "/pulse/home/crm"},
+        managed,
+    )
+    assert drift == {
+        "subject": "member-1",
+        "missing": ["/pulse/tenants/acme/crm"],
+        "extra": ["/pulse/home"],
+    }
+    assert main.member_group_drift("member-1", managed, managed, managed) is None
+
+
+class ReconciliationPool:
+    async def fetch(self, query, *_args):
+        if "SELECT tenant_key FROM tenants" in query:
+            return []
+        if "SELECT DISTINCT keycloak_subject" in query:
+            return [{"keycloak_subject": "member-1"}]
+        if "FROM tenant_memberships m JOIN tenants" in query:
+            return []
+        if "SELECT mp.product_key, mp.product_role" in query:
+            return []
+        raise AssertionError(f"Unexpected fetch query: {query}")
+
+
+class UnavailableKeycloak:
+    async def groups_for_user(self, _subject):
+        raise KeycloakError("Keycloak unavailable")
+
+
+def test_reconciliation_requires_platform_admin_and_reports_keycloak_outage():
+    non_admin = Identity("member", "pulse-oauth2-proxy", ("/pulse/home",))
+    with pytest.raises(HTTPException) as forbidden:
+        asyncio.run(
+            main.reconcile_keycloak_state(
+                request_for(ReconciliationPool(), UnavailableKeycloak()), non_admin
+            )
+        )
+    assert forbidden.value.status_code == 403
+
+    async def run_reconciliation():
+        with pytest.raises(HTTPException) as error:
+            await main.reconcile_keycloak_state(
+                request_for(ReconciliationPool(), UnavailableKeycloak()), identity()
+            )
+        return error.value
+
+    error = asyncio.run(run_reconciliation())
+    assert error.status_code == 503

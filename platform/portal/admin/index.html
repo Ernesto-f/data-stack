@@ -87,6 +87,8 @@
         <p id="tenant-filter-summary" class="muted" aria-live="polite"></p>
         <h3>Atividade administrativa recente</h3>
         <div class="table-wrap"><table><thead><tr><th>Quando</th><th>Ação</th><th>Empresa</th><th>Ator</th></tr></thead><tbody id="tenant-audit"><tr><td colspan="4" class="muted">Carregando auditoria…</td></tr></tbody></table></div>
+        <div class="toolbar" style="margin-top:16px"><h3>Alinhamento Keycloak</h3><button id="run-reconciliation" class="secondary" type="button">Verificar grupos e memberships</button></div>
+        <div id="reconciliation-result" class="muted" aria-live="polite">A verificação é somente leitura; ela não altera os grupos.</div>
       </section>
 
       <section id="tenant-panel" class="panel hidden">
@@ -212,6 +214,25 @@
           }).join("") : "<tr><td colspan='4' class='muted'>Nenhuma operação registrada.</td></tr>";
         } catch (error) {
           tbody.innerHTML = `<tr><td colspan="4" class="muted">Auditoria indisponível: ${esc(error.message)}</td></tr>`;
+        }
+      }
+
+      async function runReconciliation() {
+        const button = document.getElementById("run-reconciliation");
+        const host = document.getElementById("reconciliation-result");
+        button.disabled = true;
+        host.textContent = "Verificando o estado atual do Keycloak…";
+        try {
+          const report = await apiCall("/admin/reconciliation");
+          const rows = [
+            ...report.missing_groups.map(item => `<li>Grupo ausente em ${esc(item.tenant_key)}: ${esc(item.group_path)}</li>`),
+            ...report.member_group_drift.map(item => `<li>Membership ${esc(item.subject)} · faltando: ${esc(item.missing.join(", ") || "nenhum")} · extras: ${esc(item.extra.join(", ") || "nenhum")}</li>`),
+          ];
+          host.innerHTML = `<p class="status ${report.status === "ok" ? "ok" : "error"}">${report.status === "ok" ? "Sem divergências detectadas" : "Divergências encontradas"} · ${esc(report.tenants_checked)} tenants · ${esc(report.members_checked)} memberships</p>${rows.length ? `<ul>${rows.join("")}</ul><p class="muted">Relatório somente leitura. Corrija os grupos no Keycloak e execute novamente.</p>` : ""}`;
+        } catch (error) {
+          host.textContent = `Falha na reconciliação: ${error.message}`;
+        } finally {
+          button.disabled = false;
         }
       }
 
@@ -430,6 +451,7 @@
 
       document.getElementById("tenant-search").addEventListener("input", applyTenantFilters);
       document.getElementById("tenant-status-filter").addEventListener("change", applyTenantFilters);
+      document.getElementById("run-reconciliation").addEventListener("click", runReconciliation);
 
       document.getElementById("member-form").addEventListener("submit", async event => {
         event.preventDefault();

@@ -21,7 +21,7 @@ MANAGED_TENANT_SUFFIXES = (
     "analytics",
     "invoice",
 )
-MANAGED_GLOBAL_GROUPS = {"/pulse/home/crm", "/pulse/home/analytics"}
+MANAGED_GLOBAL_GROUPS = {"/pulse/home", "/pulse/home/crm", "/pulse/home/analytics"}
 
 
 def is_platform_admin(identity: Identity) -> bool:

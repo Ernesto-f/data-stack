@@ -76,7 +76,7 @@ class MemberReactivate(BaseModel):
     crm_role: Literal["user", "manager"] = "user"
 
 
-async def sync_subject_groups(request: Request, subject: str) -> list[str]:
+async def subject_group_policy(request: Request, subject: str) -> tuple[set[str], set[str]]:
     pool = request.app.state.pool
     memberships = await pool.fetch(
         """SELECT m.tenant_key,m.tenant_role,m.membership_status,t.tenant_status
@@ -107,7 +107,24 @@ async def sync_subject_groups(request: Request, subject: str) -> list[str]:
         )
         for product in products:
             desired.update(product_group_paths(tenant_key, product["product_key"], product["product_role"]))
+    return desired, managed
+
+
+async def sync_subject_groups(request: Request, subject: str) -> list[str]:
+    desired, managed = await subject_group_policy(request, subject)
     return await request.app.state.keycloak.set_groups(subject, desired, managed)
+
+
+def member_group_drift(
+    subject: str, desired: set[str], existing: set[str], managed: set[str]
+) -> dict[str, list[str] | str] | None:
+    expected_managed = desired & managed
+    actual_managed = existing & managed
+    missing = sorted(expected_managed - actual_managed)
+    extra = sorted(actual_managed - expected_managed)
+    if not missing and not extra:
+        return None
+    return {"subject": subject, "missing": missing, "extra": extra}
 
 
 async def entitlement_rows(request: Request, tenant_key: str) -> list[dict]:
@@ -275,6 +292,72 @@ async def list_admin_audit(
         limit,
     )
     return [dict(row) for row in rows]
+
+
+@app.get("/v1/admin/reconciliation")
+async def reconcile_keycloak_state(
+    request: Request,
+    identity: Identity = Depends(current_identity),
+) -> dict:
+    if not is_platform_admin(identity):
+        raise HTTPException(403, "Platform administrator role required")
+
+    pool = request.app.state.pool
+    tenants = await pool.fetch("SELECT tenant_key FROM tenants ORDER BY tenant_key")
+    memberships = await pool.fetch(
+        "SELECT DISTINCT keycloak_subject FROM tenant_memberships ORDER BY keycloak_subject"
+    )
+    missing_groups: list[dict[str, str]] = []
+    group_drift: list[dict[str, list[str] | str]] = []
+
+    try:
+        for tenant in tenants:
+            tenant_key = tenant["tenant_key"]
+            products = await pool.fetch(
+                """SELECT tp.product_key FROM tenant_products tp
+                   WHERE tp.tenant_key=$1 AND tp.enabled""",
+                tenant_key,
+            )
+            required = {f"pulse/tenants/{tenant_key}/admin"}
+            if any(product["product_key"] == "crm" for product in products):
+                required.add(f"pulse/tenants/{tenant_key}/crm")
+            has_crm_manager = await pool.fetchval(
+                """SELECT EXISTS (
+                     SELECT 1 FROM membership_products mp
+                     JOIN tenant_memberships tm USING (tenant_key,keycloak_subject)
+                     WHERE mp.tenant_key=$1 AND mp.product_key='crm'
+                       AND mp.product_role='manager' AND tm.membership_status!='suspended'
+                   )""",
+                tenant_key,
+            )
+            if has_crm_manager:
+                required.add(f"pulse/tenants/{tenant_key}/crm-admin")
+            for group_path in sorted(required):
+                try:
+                    await request.app.state.keycloak.group_id(group_path)
+                except KeycloakError as error:
+                    if str(error).startswith("Required Keycloak group is missing:"):
+                        missing_groups.append({"tenant_key": tenant_key, "group_path": f"/{group_path}"})
+                    else:
+                        raise
+
+        for row in memberships:
+            subject = row["keycloak_subject"]
+            desired, managed = await subject_group_policy(request, subject)
+            existing = await request.app.state.keycloak.groups_for_user(subject)
+            drift = member_group_drift(subject, desired, existing, managed)
+            if drift:
+                group_drift.append(drift)
+    except KeycloakError as error:
+        raise HTTPException(503, "Keycloak is unavailable; reconciliation could not be completed") from error
+
+    return {
+        "status": "drift" if missing_groups or group_drift else "ok",
+        "tenants_checked": len(tenants),
+        "members_checked": len(memberships),
+        "missing_groups": missing_groups,
+        "member_group_drift": group_drift,
+    }
 
 
 @app.get("/v1/me")
