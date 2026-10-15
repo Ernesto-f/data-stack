@@ -88,6 +88,8 @@ Arquivos da alteração atual:
 - Exceção autorizada: como `/srv/data-stack` não possuía checkout Git, a publicação foi feita por staging/transferência controlada, sem alterar Keycloak, PostgreSQL ou stacks de produto.
 - Backup remoto: `/srv/backups/tenant-control/20261015-225800/`, contendo código/configuração, dump PostgreSQL, imagem anterior e configuração Nginx.
 - Validação pós-deploy: `/health` respondeu `{"status":"ok"}`, Compose validado, Nginx permaneceu inalterado e o banco continuou com `0` tenants.
+- Exceção rápida autorizada para a melhoria visual: `platform/portal/admin/index.html` do commit `742b33f` foi publicado diretamente, sem reiniciar serviços; o hash remoto confere com o local e `/admin/` respondeu `302` para o login.
+- Backup da versão anterior da interface: `/srv/backups/tenant-control/ui-20261015-200609/index.html`.
 - O control plane ativo é servido na VPS `portal.izatacore.com` / host SSH com chave validada previamente como `knowledge.izatacore.com`.
 - O banco de tenant-control foi consultado anteriormente e estava vazio (`tenants_total = 0`). Reconfirmar antes de mudanças operacionais.
 - Não tocar em configurações secretas, bancos ou stacks de produto durante deploy sem plano de rollback.
