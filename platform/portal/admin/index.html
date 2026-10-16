@@ -123,6 +123,8 @@
             <div class="fields">
               <label><span class="field-label">Nome da empresa</span><input name="display_name" autocomplete="organization" required minlength="2" maxlength="160" placeholder="Ex.: Acme Serviços Ambientais" /></label>
               <label><span class="field-label">Identificador</span><input name="tenant_key" autocomplete="off" autocapitalize="none" spellcheck="false" pattern="[a-z0-9][a-z0-9-]{1,29}[a-z0-9]" required placeholder="acme" /><small class="muted">Use letras minúsculas, números e hífen.</small></label>
+              <label><span class="field-label">Nome do responsável</span><input name="responsible_name" autocomplete="name" required minlength="2" maxlength="160" placeholder="Ex.: Elena Sampaio" /></label>
+              <label><span class="field-label">E-mail do responsável</span><input name="responsible_email" type="email" autocomplete="email" required maxlength="320" placeholder="responsavel@empresa.com" /><small class="muted">Essa pessoa receberá o convite do Portal após a ativação.</small></label>
             </div>
             <input type="hidden" name="crm_host" />
             <div class="host-preview"><span>Endereço do CRM</span><code id="create-host-preview">Digite o identificador para gerar o endereço</code></div>
@@ -184,11 +186,13 @@
         </div>
         <div id="tenant-detail">
         <dialog id="company-panel" class="wide-dialog" aria-labelledby="company-title">
-          <div class="dialog-heading"><div><div class="section-kicker">Dados da empresa</div><h2 id="company-title">Editar informações</h2><p>Atualize o nome ou o endereço público do CRM.</p></div><button class="dialog-close" type="button" data-close-dialog="company-panel" aria-label="Fechar">×</button></div>
+          <div class="dialog-heading"><div><div class="section-kicker">Dados da empresa</div><h2 id="company-title">Editar informações</h2><p>Atualize os dados da empresa e o responsável pelo acesso ao Portal.</p></div><button class="dialog-close" type="button" data-close-dialog="company-panel" aria-label="Fechar">×</button></div>
           <form id="company-form">
             <div class="fields">
               <label><span class="field-label">Nome da empresa</span><input name="display_name" autocomplete="organization" required minlength="2" maxlength="160" /></label>
               <label><span class="field-label">Host CRM</span><input name="crm_host" placeholder="acme.crm.izatacore.com" /></label>
+              <label><span class="field-label">Nome do responsável</span><input name="responsible_name" autocomplete="name" minlength="2" maxlength="160" /></label>
+              <label><span class="field-label">E-mail do responsável</span><input name="responsible_email" type="email" autocomplete="email" maxlength="320" /></label>
             </div>
             <div class="modal-actions"><button class="secondary" type="button" data-close-dialog="company-panel">Cancelar</button><button type="submit">Salvar alterações</button></div>
           </form>
@@ -473,7 +477,8 @@
         const tenant = state.tenants.find(item => item.tenant_key === state.selected);
         if (!tenant) return;
         document.getElementById("tenant-title").textContent = tenant.display_name;
-        document.getElementById("tenant-meta").textContent = `${tenant.tenant_key} · ${tenant.crm_host || "CRM não contratado"} · ${tenantStatusLabel(tenant.tenant_status)}`;
+        const responsibleMeta = tenant.responsible_email ? ` · Responsável: ${tenant.responsible_email}` : "";
+        document.getElementById("tenant-meta").textContent = `${tenant.tenant_key} · ${tenant.crm_host || "CRM não contratado"} · ${tenantStatusLabel(tenant.tenant_status)}${responsibleMeta}`;
         const platformAdmin = state.me.platform_admin;
         const canManage = platformAdmin || ["owner", "admin"].includes(tenant.tenant_role);
         document.getElementById("plan-panel").classList.toggle("hidden", !platformAdmin);
@@ -483,6 +488,8 @@
           const companyForm = document.getElementById("company-form");
           companyForm.elements.display_name.value = tenant.display_name;
           companyForm.elements.crm_host.value = tenant.crm_host || "";
+          companyForm.elements.responsible_name.value = tenant.responsible_name || "";
+          companyForm.elements.responsible_email.value = tenant.responsible_email || "";
         }
         document.getElementById("preflight-tenant").classList.toggle("hidden", !platformAdmin || tenant.tenant_status === "active");
         document.getElementById("activate-tenant").classList.toggle("hidden", !platformAdmin || tenant.tenant_status === "active");
@@ -676,13 +683,13 @@
         try {
           await apiCall("/admin/tenants", {
             method: "POST",
-            body: JSON.stringify({ tenant_key: tenantKey, display_name: form.get("display_name"), crm_host: form.get("crm_host") || null, products }),
+            body: JSON.stringify({ tenant_key: tenantKey, display_name: form.get("display_name"), crm_host: form.get("crm_host") || null, responsible_name: form.get("responsible_name"), responsible_email: form.get("responsible_email"), products }),
            });
            closeDialog("create-tenant-dialog");
            formElement.reset();
           syncCreateTenantFields();
           await loadTenants();
-           showMessage(`Empresa ${tenantKey} cadastrada. Prepare o CRM, se contratado, e ative a empresa antes de adicionar usuários.`, "ok");
+           showMessage(`Empresa ${tenantKey} cadastrada. Após a ativação, o responsável receberá o convite do Portal.`, "ok");
         } catch (error) { showMessage(error.message, "error"); }
         finally { setFormBusy(formElement, false); }
       });
@@ -700,7 +707,12 @@
         try {
           await apiCall(`/admin/tenants/${encodeURIComponent(tenant.tenant_key)}`, {
             method: "PATCH",
-            body: JSON.stringify({ display_name: form.elements.display_name.value, crm_host: form.elements.crm_host.value || null }),
+              body: JSON.stringify({
+                display_name: form.elements.display_name.value,
+                crm_host: form.elements.crm_host.value || null,
+                responsible_name: form.elements.responsible_name.value || null,
+                responsible_email: form.elements.responsible_email.value || null,
+              }),
            });
            closeDialog("company-panel");
            await loadTenants();

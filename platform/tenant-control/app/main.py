@@ -47,12 +47,16 @@ class TenantCreate(BaseModel):
     display_name: str = Field(min_length=2, max_length=160)
     crm_host: str | None = None
     products: list[ProductEntitlement]
+    responsible_name: str | None = Field(default=None, min_length=2, max_length=160)
+    responsible_email: str | None = Field(default=None, max_length=320)
 
 
 class TenantUpdate(BaseModel):
     display_name: str | None = Field(default=None, min_length=2, max_length=160)
     tenant_status: Literal["active", "suspended", "provisioning"] | None = None
     crm_host: str | None = None
+    responsible_name: str | None = Field(default=None, min_length=2, max_length=160)
+    responsible_email: str | None = Field(default=None, max_length=320)
 
 
 class TenantProductsUpdate(BaseModel):
@@ -484,7 +488,9 @@ async def list_tenants(
 ) -> list[dict]:
     if is_platform_admin(identity):
         rows = await request.app.state.pool.fetch(
-            "SELECT tenant_key,display_name,crm_host,tenant_status FROM tenants ORDER BY display_name"
+            """SELECT tenant_key,display_name,crm_host,tenant_status,
+                      responsible_name,responsible_email
+               FROM tenants ORDER BY display_name"""
         )
     else:
         rows = await request.app.state.pool.fetch(
@@ -520,15 +526,26 @@ async def create_tenant(
     display_name = body.display_name.strip()
     if len(display_name) < 2:
         raise HTTPException(422, "A company name is required")
+    responsible_name: str | None = None
+    responsible_email: str | None = None
+    if body.responsible_name or body.responsible_email:
+        if not body.responsible_name or not body.responsible_email:
+            raise HTTPException(422, "Responsible name and email are required together")
+        responsible_email, responsible_name = normalize_member_contact(
+            body.responsible_email, body.responsible_name
+        )
     seen: set[str] = set()
     async with request.app.state.pool.acquire() as connection:
         async with connection.transaction():
             await connection.execute(
-                """INSERT INTO tenants (tenant_key,display_name,crm_host,created_by)
-                   VALUES ($1,$2,$3,$4)""",
+                """INSERT INTO tenants
+                   (tenant_key,display_name,crm_host,responsible_name,responsible_email,created_by)
+                   VALUES ($1,$2,$3,$4,$5,$6)""",
                 body.tenant_key,
                 display_name,
                 crm_host,
+                responsible_name,
+                responsible_email,
                 identity.subject,
             )
             for product in body.products:
@@ -558,9 +575,16 @@ async def create_tenant(
         identity,
         body.tenant_key,
         "tenant.created",
-        {"products": [item.product_key for item in body.products]},
+        {
+            "products": [item.product_key for item in body.products],
+            "responsible_email": responsible_email,
+        },
     )
-    return {"tenant_key": body.tenant_key, "tenant_status": "provisioning"}
+    return {
+        "tenant_key": body.tenant_key,
+        "tenant_status": "provisioning",
+        "responsible_email": responsible_email,
+    }
 
 
 @app.get("/v1/admin/tenants/{tenant_key}/preflight")
@@ -596,7 +620,8 @@ async def update_tenant(
 
     current = await request.app.state.pool.fetchrow(
         """SELECT t.tenant_key,t.display_name,t.crm_host,t.tenant_status,
-                  EXISTS (SELECT 1 FROM tenant_products tp
+                         t.responsible_name,t.responsible_email,
+                   EXISTS (SELECT 1 FROM tenant_products tp
                           WHERE tp.tenant_key=t.tenant_key
                             AND tp.product_key='crm' AND tp.enabled) AS crm_enabled
            FROM tenants t WHERE t.tenant_key=$1""",
@@ -604,6 +629,31 @@ async def update_tenant(
     )
     if current is None:
         raise HTTPException(404, "Tenant not found")
+
+    async def restore_current_tenant() -> None:
+        if "responsible_name" in current and "responsible_email" in current:
+            await request.app.state.pool.execute(
+                """UPDATE tenants
+                   SET display_name=$2,crm_host=$3,responsible_name=$4,
+                       responsible_email=$5,tenant_status=$6
+                   WHERE tenant_key=$1""",
+                tenant_key,
+                current["display_name"],
+                current["crm_host"],
+                current.get("responsible_name"),
+                current.get("responsible_email"),
+                current["tenant_status"],
+            )
+            return
+        await request.app.state.pool.execute(
+            """UPDATE tenants
+               SET display_name=$2,crm_host=$3,tenant_status=$4
+               WHERE tenant_key=$1""",
+            tenant_key,
+            current["display_name"],
+            current["crm_host"],
+            current["tenant_status"],
+        )
 
     changes: dict[str, object] = {}
     if "display_name" in body.model_fields_set:
@@ -620,6 +670,23 @@ async def update_tenant(
         if current["crm_enabled"] and crm_host != expected_host:
             raise HTTPException(409, "Disable the CRM entitlement before clearing its host")
         changes["crm_host"] = crm_host
+
+    if "responsible_name" in body.model_fields_set or "responsible_email" in body.model_fields_set:
+        current_name = current.get("responsible_name")
+        current_email = current.get("responsible_email")
+        responsible_name = body.responsible_name if "responsible_name" in body.model_fields_set else current_name
+        responsible_email = body.responsible_email if "responsible_email" in body.model_fields_set else current_email
+        if responsible_name is None and responsible_email is None:
+            changes["responsible_name"] = None
+            changes["responsible_email"] = None
+        elif not responsible_name or not responsible_email:
+            raise HTTPException(422, "Responsible name and email are required together")
+        else:
+            normalized_email, normalized_name = normalize_member_contact(
+                responsible_email, responsible_name
+            )
+            changes["responsible_name"] = normalized_name
+            changes["responsible_email"] = normalized_email
 
     target_status = body.tenant_status if "tenant_status" in body.model_fields_set else None
     if "tenant_status" in body.model_fields_set and target_status is None:
@@ -665,16 +732,41 @@ async def update_tenant(
         try:
             for member in members:
                 await sync_subject_groups(request, member["keycloak_subject"])
+            responsible_email = current.get("responsible_email")
+            responsible_name = current.get("responsible_name")
+            if (
+                target_status == "active"
+                and current["tenant_status"] != "active"
+                and responsible_email
+                and responsible_name
+            ):
+                existing_responsible = await request.app.state.pool.fetchrow(
+                    """SELECT keycloak_subject FROM tenant_memberships
+                       WHERE tenant_key=$1 AND email=$2""",
+                    tenant_key,
+                    responsible_email,
+                )
+                if existing_responsible is None:
+                    responsible_products = await request.app.state.pool.fetch(
+                        """SELECT product_key FROM tenant_products
+                           WHERE tenant_key=$1 AND enabled
+                           ORDER BY product_key""",
+                        tenant_key,
+                    )
+                    await create_membership_invitation(
+                        request,
+                        tenant_key,
+                        MemberCreate(
+                            email=responsible_email,
+                            display_name=responsible_name,
+                            tenant_role="owner",
+                            crm_role="manager",
+                            products=[row["product_key"] for row in responsible_products],
+                        ),
+                        identity,
+                    )
         except KeycloakError as error:
-            await request.app.state.pool.execute(
-                """UPDATE tenants
-                   SET display_name=$2,crm_host=$3,tenant_status=$4
-                   WHERE tenant_key=$1""",
-                tenant_key,
-                current["display_name"],
-                current["crm_host"],
-                current["tenant_status"],
-            )
+            await restore_current_tenant()
             try:
                 for member in members:
                     await sync_subject_groups(request, member["keycloak_subject"])
@@ -684,6 +776,17 @@ async def update_tenant(
                 503,
                 "Tenant state was rolled back because Keycloak access synchronization failed; retry the operation.",
             ) from error
+        except HTTPException:
+            await restore_current_tenant()
+            try:
+                current_members = await request.app.state.pool.fetch(
+                    "SELECT keycloak_subject FROM tenant_memberships WHERE tenant_key=$1", tenant_key
+                )
+                for member in current_members:
+                    await sync_subject_groups(request, member["keycloak_subject"])
+            except KeycloakError:
+                pass
+            raise
     await record_audit(
         request,
         identity,
@@ -939,30 +1042,31 @@ def authorize_member_role_change(actor_role: str, current_role: str, target_role
         raise HTTPException(403, "Only the tenant owner can appoint or change tenant administrators")
 
 
-@app.post("/v1/tenants/{tenant_key}/members", status_code=201)
-async def invite_member(
+def normalize_member_contact(email: str, display_name: str) -> tuple[str, str]:
+    normalized_email = email.strip().lower()
+    if len(normalized_email) > 320 or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", normalized_email):
+        raise HTTPException(422, "A valid work email is required")
+    normalized_name = display_name.strip()
+    if len(normalized_name) < 2:
+        raise HTTPException(422, "A display name with at least 2 characters is required")
+    return normalized_email, normalized_name
+
+
+async def create_membership_invitation(
+    request: Request,
     tenant_key: str,
     body: MemberCreate,
-    request: Request,
-    identity: Identity = Depends(current_identity),
+    identity: Identity,
+    *,
+    require_active: bool = True,
 ) -> dict:
-    actor_role = await require_tenant_admin(request, identity, tenant_key)
-    if body.tenant_role == "owner" and actor_role != "platform_admin":
-        raise HTTPException(403, "Only a platform admin can appoint the tenant owner")
-    if body.tenant_role == "admin" and actor_role not in {"owner", "platform_admin"}:
-        raise HTTPException(403, "Only the tenant owner can appoint tenant admins")
-    email = body.email.strip().lower()
-    if len(email) > 320 or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
-        raise HTTPException(422, "A valid work email is required")
-    display_name = body.display_name.strip()
-    if len(display_name) < 2:
-        raise HTTPException(422, "A display name with at least 2 characters is required")
+    email, display_name = normalize_member_contact(body.email, body.display_name)
     tenant = await request.app.state.pool.fetchrow(
         "SELECT tenant_status FROM tenants WHERE tenant_key=$1", tenant_key
     )
     if tenant is None:
         raise HTTPException(404, "Tenant not found")
-    if tenant["tenant_status"] != "active":
+    if require_active and tenant["tenant_status"] != "active":
         raise HTTPException(409, "Tenant is not active yet")
     products, _entitlements = await validate_products(request, tenant_key, body.products)
 
@@ -1072,6 +1176,21 @@ async def invite_member(
         "email": email,
         "membership_status": "active" if keycloak_user.get("emailVerified") else "invited",
     }
+
+
+@app.post("/v1/tenants/{tenant_key}/members", status_code=201)
+async def invite_member(
+    tenant_key: str,
+    body: MemberCreate,
+    request: Request,
+    identity: Identity = Depends(current_identity),
+) -> dict:
+    actor_role = await require_tenant_admin(request, identity, tenant_key)
+    if body.tenant_role == "owner" and actor_role != "platform_admin":
+        raise HTTPException(403, "Only a platform admin can appoint the tenant owner")
+    if body.tenant_role == "admin" and actor_role not in {"owner", "platform_admin"}:
+        raise HTTPException(403, "Only the tenant owner can appoint tenant admins")
+    return await create_membership_invitation(request, tenant_key, body, identity)
 
 
 @app.put("/v1/tenants/{tenant_key}/members/{subject}/products")

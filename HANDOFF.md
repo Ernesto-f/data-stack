@@ -65,6 +65,8 @@ Melhorias de robustez aplicadas nesta revisão:
 - Formulários do `/admin` passaram a ser acionados por botões e abertos em modais: nova empresa, dados da empresa, contratação e convite de usuário; a tela principal ficou focada em resumo, seleção e ações.
 - Revisão de robustez da interface: referências de formulário preservadas durante `await`, botões e formulários bloqueiam duplo envio, erros de rede têm mensagem comercial, diálogos restauram foco e podem ser fechados pelo backdrop, e campos ganharam autocomplete/validação nativa.
 - Formulários do `/admin` receberam rótulos estruturados, alturas consistentes e grid responsivo para manter textos, campos e mensagens de ajuda alinhados; estilos inline e regras CSS obsoletas foram removidos.
+- O cadastro de empresa agora coleta nome/e-mail do responsável; após a ativação, o control plane cria o proprietário no Keycloak, envia o convite e atribui somente os produtos contratados. A informação fica persistida no tenant para retries seguros.
+- Corrigido `500` intermitente no CRM: os vhosts tenantizados passaram a aceitar cabeçalhos grandes do OAuth2 Proxy (`proxy_buffer_size 32k`); o Acme voltou a redirecionar para o login e o Odoo continuou saudável.
 
 Arquivos da alteração atual:
 
@@ -119,6 +121,9 @@ Arquivos da alteração atual:
   banco, pois o cadastro deve passar pela API/UI e pelo preflight de ativação.
 - Backup operacional dos arquivos privados, configurações e bancos das instâncias:
   `/srv/backups/tenant-control/crm-tenants/20261015-233600/`.
+- Backup da publicação do fluxo de responsável/convite e da migração aditiva do control plane:
+  `/srv/backups/tenant-control/20261016-003700/`. Backup dos vhosts ajustados para o erro de
+  cabeçalho OAuth2: `/srv/backups/tenant-control/crm-tenants/20261016-002500/nginx/`.
 
 ## Próximos passos
 
