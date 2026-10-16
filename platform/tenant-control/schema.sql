@@ -61,6 +61,9 @@ CREATE TABLE IF NOT EXISTS tenant_memberships (
     UNIQUE (tenant_key, email)
 );
 
+ALTER TABLE tenant_memberships ADD COLUMN IF NOT EXISTS activated_at timestamptz;
+ALTER TABLE tenant_memberships ADD COLUMN IF NOT EXISTS last_access_at timestamptz;
+
 CREATE TABLE IF NOT EXISTS membership_products (
     tenant_key text NOT NULL,
     keycloak_subject text NOT NULL,
