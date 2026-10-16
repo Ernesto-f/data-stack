@@ -230,7 +230,7 @@
           </form>
         </dialog>
         <h2>Usuários da empresa</h2>
-         <div class="table-wrap"><table><caption class="sr-only">Usuários da empresa</caption><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Produtos</th><th>Status</th><th>Último acesso</th><th><span class="sr-only">Ações</span></th></tr></thead><tbody id="members"></tbody></table></div>
+         <div class="table-wrap"><table><caption class="sr-only">Usuários da empresa</caption><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Produtos</th><th>Status</th><th>Convite concluído</th><th>Último acesso</th><th><span class="sr-only">Ações</span></th></tr></thead><tbody id="members"></tbody></table></div>
         <dialog id="edit-member-dialog" aria-labelledby="edit-member-title">
           <form id="edit-member-form">
             <div class="dialog-heading"><div><div class="section-kicker">Acessos</div><h2 id="edit-member-title">Editar usuário</h2></div><button class="dialog-close" type="button" id="cancel-edit-member" aria-label="Fechar">×</button></div>
@@ -555,7 +555,7 @@
       function renderMembers(members, canManage) {
         const tbody = document.getElementById("members");
         if (!members.length) {
-           tbody.innerHTML = "<tr><td colspan='7' class='muted'>Nenhum usuário cadastrado.</td></tr>";
+           tbody.innerHTML = "<tr><td colspan='8' class='muted'>Nenhum usuário cadastrado.</td></tr>";
           return;
         }
         const tenant = state.tenants.find(item => item.tenant_key === state.selected);
@@ -565,7 +565,7 @@
           <td>${esc(member.display_name)}</td><td>${esc(member.email)}</td>
           <td>${esc(roleLabel(member.tenant_role))}${member.products?.some(p => p.product_role === "manager") ? " · Gerente CRM" : ""}</td>
           <td>${esc((member.products || []).map(p => p.product_key).join(", "))}</td>
-           <td>${esc(membershipStatusLabel(member.membership_status))}</td><td>${esc(dateLabel(member.last_access_at))}</td>
+           <td>${esc(membershipStatusLabel(member.membership_status))}</td><td>${esc(dateLabel(member.activated_at))}</td><td>${esc(dateLabel(member.last_access_at))}</td>
           <td><div class="table-actions">${mayEdit(member) ? member.membership_status === "suspended" ? `<button class="secondary" data-reactivate="${esc(member.keycloak_subject)}">Reativar acesso</button>` : `<button class="secondary" data-edit="${esc(member.keycloak_subject)}">Editar</button>${member.membership_status === "invited" ? `<button class="secondary" data-resend="${esc(member.keycloak_subject)}">Reenviar convite</button><button class="secondary" data-copy-invitation="${esc(member.keycloak_subject)}">Copiar link do convite</button>` : ""}<button class="danger" data-remove="${esc(member.keycloak_subject)}">Suspender</button>` : ""}</div></td>
         </tr>`).join("");
         tbody.querySelectorAll("[data-edit]").forEach(button => button.addEventListener("click", () => {
