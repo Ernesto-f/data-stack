@@ -611,14 +611,15 @@
 
       document.getElementById("member-form").addEventListener("submit", async event => {
         event.preventDefault();
-        const form = new FormData(event.currentTarget);
+        const formElement = event.currentTarget;
+        const form = new FormData(formElement);
         const products = [...document.querySelectorAll("#product-choices input[name='products']:checked")].map(input => input.value);
         try {
           const result = await apiCall(`/tenants/${encodeURIComponent(state.selected)}/members`, {
             method: "POST",
             body: JSON.stringify({ display_name: form.get("display_name"), email: form.get("email"), tenant_role: form.get("tenant_role"), crm_role: form.get("crm_role"), products }),
            });
-           event.currentTarget.reset();
+           formElement.reset();
            closeDialog("invite-panel");
            await loadSelectedTenant();
            showMessage(result.membership_status === "invited" ? "Convite enviado. A pessoa precisa confirmar o e-mail antes do primeiro acesso." : "Acesso habilitado para este usuário.", "ok");
@@ -627,7 +628,8 @@
 
       document.getElementById("tenant-form").addEventListener("submit", async event => {
         event.preventDefault();
-        const form = new FormData(event.currentTarget);
+        const formElement = event.currentTarget;
+        const form = new FormData(formElement);
         const tenantKey = String(form.get("tenant_key")).trim();
         const products = form.get("crm_enabled") ? [{ product_key: "crm", enabled: true, access_mode: form.get("crm_access_mode"), seat_limit: form.get("crm_seat_limit") || null }] : [];
         try {
@@ -636,7 +638,7 @@
             body: JSON.stringify({ tenant_key: tenantKey, display_name: form.get("display_name"), crm_host: form.get("crm_host") || null, products }),
            });
            closeDialog("create-tenant-dialog");
-           event.currentTarget.reset();
+           formElement.reset();
           syncCreateTenantFields();
           await loadTenants();
            showMessage(`Empresa ${tenantKey} cadastrada. Prepare o CRM, se contratado, e ative a empresa antes de adicionar usuários.`, "ok");
