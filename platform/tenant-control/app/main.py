@@ -735,8 +735,7 @@ async def update_tenant(
             responsible_email = current.get("responsible_email")
             responsible_name = current.get("responsible_name")
             if (
-                target_status == "active"
-                and current["tenant_status"] != "active"
+                (target_status or current["tenant_status"]) == "active"
                 and responsible_email
                 and responsible_name
             ):

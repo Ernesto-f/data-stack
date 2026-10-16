@@ -124,6 +124,9 @@ Arquivos da alteração atual:
 - Backup da publicação do fluxo de responsável/convite e da migração aditiva do control plane:
   `/srv/backups/tenant-control/20261016-003700/`. Backup dos vhosts ajustados para o erro de
   cabeçalho OAuth2: `/srv/backups/tenant-control/crm-tenants/20261016-002500/nginx/`.
+- Backup da correção de recuperação de convite para tenants já ativos:
+  `/srv/backups/tenant-control/20261016-004000/`. Ao salvar novamente o responsável de um
+  tenant ativo sem membership, o control plane cria o proprietário e envia o convite.
 
 ## Próximos passos
 
