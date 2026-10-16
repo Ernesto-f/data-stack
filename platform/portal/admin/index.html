@@ -37,6 +37,7 @@
       button.danger { border-color:#86404a; background:#512731; }
       button:disabled { opacity:.55; cursor:not-allowed; }
       .muted { color:var(--muted); }
+      .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
       .status { padding:10px 13px; border:1px solid var(--line-soft); border-radius:10px; background:#0e1326cc; color:var(--muted); }
       .status.error { color:var(--red); border:1px solid #85404a; }
       .status.ok { color:var(--green); border:1px solid #326b55; }
@@ -124,14 +125,14 @@
         <button id="open-create-tenant" type="button">Cadastrar empresa</button>
       </section>
 
-      <dialog id="create-tenant-dialog" class="wide-dialog">
-        <div class="dialog-heading"><div><div class="section-kicker">Nova empresa</div><h2>Cadastre um cliente em poucos passos</h2><p>Depois da preparação técnica, você poderá ativar a empresa e convidar os primeiros usuários.</p></div><button class="dialog-close" type="button" data-close-dialog="create-tenant-dialog" aria-label="Fechar">×</button></div>
+      <dialog id="create-tenant-dialog" class="wide-dialog" aria-labelledby="create-tenant-title" aria-describedby="create-tenant-description">
+        <div class="dialog-heading"><div><div class="section-kicker">Nova empresa</div><h2 id="create-tenant-title">Cadastre um cliente em poucos passos</h2><p id="create-tenant-description">Depois da preparação técnica, você poderá ativar a empresa e convidar os primeiros usuários.</p></div><button class="dialog-close" type="button" data-close-dialog="create-tenant-dialog" aria-label="Fechar">×</button></div>
         <form id="tenant-form">
           <div class="step-block">
             <div class="step-title"><span class="step-number">01</span>Dados da empresa</div>
             <div class="fields">
-              <label>Nome da empresa<input name="display_name" required minlength="2" maxlength="160" placeholder="Ex.: Acme Serviços Ambientais" /></label>
-              <label>Identificador<input name="tenant_key" pattern="[a-z0-9][a-z0-9-]{1,29}[a-z0-9]" required placeholder="acme" /><small class="muted">Use letras minúsculas, números e hífen.</small></label>
+              <label>Nome da empresa<input name="display_name" autocomplete="organization" required minlength="2" maxlength="160" placeholder="Ex.: Acme Serviços Ambientais" /></label>
+              <label>Identificador<input name="tenant_key" autocomplete="off" autocapitalize="none" spellcheck="false" pattern="[a-z0-9][a-z0-9-]{1,29}[a-z0-9]" required placeholder="acme" /><small class="muted">Use letras minúsculas, números e hífen.</small></label>
             </div>
             <input type="hidden" name="crm_host" />
             <div class="host-preview"><span>Endereço do CRM</span><code id="create-host-preview">Digite o identificador para gerar o endereço</code></div>
@@ -141,7 +142,7 @@
             <label class="product-toggle"><input type="checkbox" name="crm_enabled" checked /><span><strong>SALUS CRM</strong><small>Gestão comercial e relacionamento com clientes</small></span><em>Pronto para uso</em></label>
             <div id="crm-plan-fields" class="fields" style="margin-top:13px">
               <label>Como os usuários terão acesso<select name="crm_access_mode"><option value="all_members">Todos os usuários da empresa</option><option value="assigned">Usuários escolhidos pelo administrador</option></select></label>
-              <label>Capacidade contratada<input name="crm_seat_limit" type="number" min="1" placeholder="Sem limite definido" /><small class="muted">Você poderá ajustar depois.</small></label>
+              <label>Capacidade contratada<input name="crm_seat_limit" type="number" min="1" step="1" inputmode="numeric" placeholder="Sem limite definido" /><small class="muted">Você poderá ajustar depois.</small></label>
             </div>
           </div>
           <div class="modal-actions"><button class="secondary" type="button" data-close-dialog="create-tenant-dialog">Cancelar</button><button type="submit">Cadastrar empresa</button></div>
@@ -192,11 +193,11 @@
           <button id="open-invite-panel" class="hidden" type="button">Adicionar usuário</button>
         </div>
         <div id="tenant-detail">
-        <dialog id="company-panel" class="wide-dialog">
-          <div class="dialog-heading"><div><div class="section-kicker">Dados da empresa</div><h2>Editar informações</h2><p>Atualize o nome ou o endereço público do CRM.</p></div><button class="dialog-close" type="button" data-close-dialog="company-panel" aria-label="Fechar">×</button></div>
+        <dialog id="company-panel" class="wide-dialog" aria-labelledby="company-title">
+          <div class="dialog-heading"><div><div class="section-kicker">Dados da empresa</div><h2 id="company-title">Editar informações</h2><p>Atualize o nome ou o endereço público do CRM.</p></div><button class="dialog-close" type="button" data-close-dialog="company-panel" aria-label="Fechar">×</button></div>
           <form id="company-form">
             <div class="fields">
-              <label>Nome da empresa<input name="display_name" required minlength="2" maxlength="160" /></label>
+              <label>Nome da empresa<input name="display_name" autocomplete="organization" required minlength="2" maxlength="160" /></label>
               <label>Host CRM<input name="crm_host" placeholder="acme.crm.izatacore.com" /></label>
             </div>
             <div class="modal-actions"><button class="secondary" type="button" data-close-dialog="company-panel">Cancelar</button><button type="submit">Salvar alterações</button></div>
@@ -204,24 +205,24 @@
         </dialog>
         <section id="preflight-panel" class="hidden" aria-live="polite"></section>
         <div id="products" class="checks"></div>
-        <dialog id="plan-panel" class="wide-dialog">
-          <div class="dialog-heading"><div><div class="section-kicker">Contratação</div><h2>Ajustar plano e capacidade</h2><p>Defina o produto contratado e como a empresa distribuirá seus acessos.</p></div><button class="dialog-close" type="button" data-close-dialog="plan-panel" aria-label="Fechar">×</button></div>
+        <dialog id="plan-panel" class="wide-dialog" aria-labelledby="plan-title">
+          <div class="dialog-heading"><div><div class="section-kicker">Contratação</div><h2 id="plan-title">Ajustar plano e capacidade</h2><p>Defina o produto contratado e como a empresa distribuirá seus acessos.</p></div><button class="dialog-close" type="button" data-close-dialog="plan-panel" aria-label="Fechar">×</button></div>
           <form id="plan-form">
             <div class="fields">
               <label><span><input type="checkbox" name="crm_enabled" /> SALUS CRM contratado</span></label>
               <label>Modelo de acesso<select name="crm_access_mode"><option value="all_members">Todos os usuários da empresa</option><option value="assigned">Usuários escolhidos pelo administrador</option></select></label>
-              <label>Capacidade contratada<input name="crm_seat_limit" type="number" min="1" placeholder="Sem limite definido" /></label>
+              <label>Capacidade contratada<input name="crm_seat_limit" type="number" min="1" step="1" inputmode="numeric" placeholder="Sem limite definido" /></label>
             </div>
             <p class="muted">A capacidade define quantas pessoas podem utilizar o produto. Usuários suspensos não consomem capacidade.</p>
             <div class="modal-actions"><button class="secondary" type="button" data-close-dialog="plan-panel">Cancelar</button><button type="submit">Salvar contratação</button></div>
           </form>
         </dialog>
-        <dialog id="invite-panel" class="wide-dialog">
-          <div class="dialog-heading"><div><div class="section-kicker">Acessos</div><h2>Adicionar usuário</h2><p>Envie um convite e escolha os produtos disponíveis para essa pessoa.</p></div><button class="dialog-close" type="button" data-close-dialog="invite-panel" aria-label="Fechar">×</button></div>
+        <dialog id="invite-panel" class="wide-dialog" aria-labelledby="invite-title">
+          <div class="dialog-heading"><div><div class="section-kicker">Acessos</div><h2 id="invite-title">Adicionar usuário</h2><p>Envie um convite e escolha os produtos disponíveis para essa pessoa.</p></div><button class="dialog-close" type="button" data-close-dialog="invite-panel" aria-label="Fechar">×</button></div>
           <form id="member-form">
             <div class="fields">
-              <label>Nome completo<input name="display_name" required minlength="2" maxlength="160" /></label>
-              <label>E-mail profissional<input name="email" type="email" required maxlength="320" /></label>
+              <label>Nome completo<input name="display_name" autocomplete="name" required minlength="2" maxlength="160" /></label>
+              <label>E-mail profissional<input name="email" type="email" autocomplete="email" required maxlength="320" /></label>
               <label>Perfil na empresa<select name="tenant_role" id="member-tenant-role"><option value="member">Usuário</option></select></label>
               <label>Perfil CRM<select name="crm_role"><option value="user">Vendedor</option><option value="manager">Gerente CRM</option></select></label>
             </div>
@@ -231,15 +232,15 @@
         </dialog>
         <h2>Usuários da empresa</h2>
         <div class="table-wrap"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Produtos</th><th>Status</th><th></th></tr></thead><tbody id="members"></tbody></table></div>
-        <dialog id="edit-member-dialog">
+        <dialog id="edit-member-dialog" aria-labelledby="edit-member-title">
           <form id="edit-member-form">
-            <h2>Editar usuário</h2>
+            <div class="dialog-heading"><div><div class="section-kicker">Acessos</div><h2 id="edit-member-title">Editar usuário</h2></div><button class="dialog-close" type="button" id="cancel-edit-member" aria-label="Fechar">×</button></div>
             <input type="hidden" name="subject" />
            <label class="member-role-field">Perfil na empresa<select name="tenant_role"></select></label>
            <label>Produtos contratados</label>
             <div id="edit-product-choices" class="checks"></div>
             <label>Perfil CRM<select name="crm_role"><option value="user">Vendedor</option><option value="manager">Gerente CRM</option></select></label>
-            <div class="toolbar"><button type="button" id="cancel-edit-member" class="secondary">Cancelar</button><button type="submit">Salvar acesso</button></div>
+           <div class="modal-actions"><button type="button" class="secondary" data-close-dialog="edit-member-dialog">Cancelar</button><button type="submit">Salvar acesso</button></div>
           </form>
         </dialog>
         </div>
@@ -253,7 +254,7 @@
 
     <script>
       const api = "/tenant-admin/api/v1";
-      const state = { me: null, tenants: [], catalog: [], selected: null, memberEditMode: "products" };
+      const state = { me: null, tenants: [], catalog: [], selected: null, memberEditMode: "products", dialogTriggers: {} };
       const notice = document.getElementById("notice");
       const esc = value => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
       const tenantStatusLabels = { provisioning: "Em preparação", active: "Ativa", suspended: "Suspensa" };
@@ -288,15 +289,52 @@
         const crmEnabled = form.elements.crm_enabled.checked;
         document.getElementById("crm-plan-fields").classList.toggle("hidden", !crmEnabled);
       }
-      function openDialog(id) {
+      function openDialog(id, trigger = document.activeElement) {
         const dialog = document.getElementById(id);
         if (!dialog) return;
+        state.dialogTriggers[id] = trigger instanceof HTMLElement ? trigger : null;
         dialog.classList.remove("hidden");
         if (!dialog.open) dialog.showModal();
+        requestAnimationFrame(() => dialog.querySelector("input:not([type='hidden']), select, button:not(.dialog-close)")?.focus());
       }
       function closeDialog(id) {
         const dialog = document.getElementById(id);
-        if (dialog?.open) dialog.close();
+        if (!dialog) return;
+        if (dialog.open) dialog.close();
+        else restoreDialogFocus(id);
+      }
+      function restoreDialogFocus(id) {
+        const trigger = state.dialogTriggers[id];
+        delete state.dialogTriggers[id];
+        if (trigger?.isConnected && !trigger.disabled) trigger.focus();
+      }
+      function setFormBusy(form, busy) {
+        const submit = form.querySelector("button[type='submit']");
+        if (!submit) return;
+        if (busy) {
+          submit.dataset.defaultLabel = submit.textContent;
+          submit.textContent = "Salvando…";
+          submit.disabled = true;
+          form.setAttribute("aria-busy", "true");
+        } else {
+          submit.textContent = submit.dataset.defaultLabel || submit.textContent;
+          delete submit.dataset.defaultLabel;
+          submit.disabled = false;
+          form.removeAttribute("aria-busy");
+        }
+      }
+      async function withButtonBusy(button, label, task) {
+        const originalLabel = button.textContent;
+        button.disabled = true;
+        button.textContent = label;
+        button.setAttribute("aria-busy", "true");
+        try {
+          return await task();
+        } finally {
+          button.disabled = false;
+          button.textContent = originalLabel;
+          button.removeAttribute("aria-busy");
+        }
       }
 
       function showMessage(message, kind = "") {
@@ -348,9 +386,9 @@
       async function runReconciliation() {
         const button = document.getElementById("run-reconciliation");
         const host = document.getElementById("reconciliation-result");
-        button.disabled = true;
         host.textContent = "Verificando o estado atual do Keycloak…";
-        try {
+        await withButtonBusy(button, "Verificando…", async () => {
+          try {
           const report = await apiCall("/admin/reconciliation");
           const rows = [
             ...report.missing_groups.map(item => `<li>Grupo ausente na empresa ${esc(item.tenant_key)}: ${esc(item.group_path)}</li>`),
@@ -359,40 +397,44 @@
           const applyButton = document.getElementById("apply-reconciliation");
           applyButton.classList.toggle("hidden", !report.member_group_drift.length || report.missing_groups.length > 0);
           host.innerHTML = `<p class="status ${report.status === "ok" ? "ok" : "error"}">${report.status === "ok" ? "Todos os acessos estão alinhados" : "Há divergências de acesso"} · ${esc(report.tenants_checked)} empresas · ${esc(report.members_checked)} usuários</p>${rows.length ? `<ul>${rows.join("")}</ul><p class="muted">Esta é uma verificação somente leitura. Corrija os grupos no Keycloak e execute novamente.</p>` : ""}`;
-        } catch (error) {
-          document.getElementById("apply-reconciliation").classList.add("hidden");
-          host.textContent = `Falha na reconciliação: ${error.message}`;
-        } finally {
-          button.disabled = false;
-        }
+          } catch (error) {
+            document.getElementById("apply-reconciliation").classList.add("hidden");
+            host.textContent = `Falha na reconciliação: ${error.message}`;
+          }
+        });
       }
 
       async function applyReconciliation() {
          if (!confirm("Aplicar a política atual de acesso aos usuários divergentes? Grupos fora do escopo gerenciado serão preservados.")) return;
         const button = document.getElementById("apply-reconciliation");
-        button.disabled = true;
-        try {
-          const result = await apiCall("/admin/reconciliation/sync", { method: "POST" });
+        await withButtonBusy(button, "Corrigindo…", async () => {
+          try {
+           const result = await apiCall("/admin/reconciliation/sync", { method: "POST" });
            showMessage(`Sincronização concluída para ${result.members_synced} usuários.`, "ok");
           await loadAdminAudit();
           await runReconciliation();
-        } catch (error) {
-          showMessage(error.message, "error");
-        } finally {
-          button.disabled = false;
-        }
+          } catch (error) {
+            showMessage(error.message, "error");
+          }
+        });
       }
 
       async function apiCall(path, options = {}) {
-        const response = await fetch(`${api}${path}`, {
-          credentials: "same-origin",
-          headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-          ...options,
-        });
+        let response;
+        try {
+          response = await fetch(`${api}${path}`, {
+            credentials: "same-origin",
+            cache: "no-store",
+            headers: { Accept: "application/json", "Content-Type": "application/json", ...(options.headers || {}) },
+            ...options,
+          });
+        } catch {
+          throw new Error("Não foi possível comunicar com o serviço de gestão.");
+        }
         const body = response.status === 204 ? null : await response.json().catch(() => null);
         if (!response.ok) {
           const detail = body?.detail;
-          const message = typeof detail === "string" ? detail : detail?.message || JSON.stringify(detail) || `Falha HTTP ${response.status}`;
+          const message = typeof detail === "string" ? detail : detail?.message || `Falha HTTP ${response.status}`;
           throw new Error(message);
         }
         return body;
@@ -531,7 +573,7 @@
           }).join("") || "<span class='muted'>Nenhum produto pronto contratado.</span>";
           form.elements.subject.value = member.keycloak_subject;
           form.elements.crm_role.value = member.products?.find(item => item.product_key === "crm")?.product_role || "user";
-          document.getElementById("edit-member-dialog").showModal();
+           openDialog("edit-member-dialog", button);
         }));
         tbody.querySelectorAll("[data-reactivate]").forEach(button => button.addEventListener("click", () => {
           const member = members.find(item => item.keycloak_subject === button.dataset.reactivate);
@@ -549,7 +591,7 @@
           form.elements.subject.value = member.keycloak_subject;
           form.elements.tenant_role.value = member.tenant_role;
           form.elements.crm_role.value = "user";
-          document.getElementById("edit-member-dialog").showModal();
+           openDialog("edit-member-dialog", button);
         }));
         tbody.querySelectorAll("[data-remove]").forEach(button => button.addEventListener("click", async () => {
            if (!confirm("Suspender o acesso deste usuário nesta empresa?")) return;
@@ -561,6 +603,10 @@
       }
 
       document.getElementById("cancel-edit-member").addEventListener("click", () => document.getElementById("edit-member-dialog").close());
+      document.querySelectorAll("dialog").forEach(dialog => {
+        dialog.addEventListener("click", event => { if (event.target === dialog) closeDialog(dialog.id); });
+        dialog.addEventListener("close", () => restoreDialogFocus(dialog.id));
+      });
       document.querySelectorAll("[data-close-dialog]").forEach(button => button.addEventListener("click", () => closeDialog(button.dataset.closeDialog)));
       document.getElementById("open-create-tenant").addEventListener("click", () => openDialog("create-tenant-dialog"));
       document.getElementById("open-company-panel").addEventListener("click", () => openDialog("company-panel"));
@@ -573,6 +619,7 @@
         const editMode = state.memberEditMode;
         const products = [...form.querySelectorAll("input[name='products']:checked:not(:disabled)")].map(input => input.value);
         const allMemberProducts = [...document.querySelectorAll("#edit-product-choices input[name='products']:checked:disabled")].map(input => input.value);
+        setFormBusy(form, true);
         try {
           const memberPath = `/tenants/${encodeURIComponent(state.selected)}/members/${encodeURIComponent(subject)}`;
           await apiCall(editMode === "reactivate" ? `${memberPath}/reactivate` : `${memberPath}/products`, {
@@ -588,6 +635,7 @@
           await loadSelectedTenant();
            showMessage(editMode === "reactivate" ? "Usuário reativado e acessos sincronizados." : "Perfil e acessos atualizados.", "ok");
         } catch (error) { showMessage(error.message, "error"); }
+        finally { setFormBusy(form, false); }
       });
 
       document.getElementById("tenant-select").addEventListener("change", async event => {
@@ -614,6 +662,7 @@
         const formElement = event.currentTarget;
         const form = new FormData(formElement);
         const products = [...document.querySelectorAll("#product-choices input[name='products']:checked")].map(input => input.value);
+        setFormBusy(formElement, true);
         try {
           const result = await apiCall(`/tenants/${encodeURIComponent(state.selected)}/members`, {
             method: "POST",
@@ -624,6 +673,7 @@
            await loadSelectedTenant();
            showMessage(result.membership_status === "invited" ? "Convite enviado. A pessoa precisa confirmar o e-mail antes do primeiro acesso." : "Acesso habilitado para este usuário.", "ok");
         } catch (error) { showMessage(error.message, "error"); }
+        finally { setFormBusy(formElement, false); }
       });
 
       document.getElementById("tenant-form").addEventListener("submit", async event => {
@@ -632,6 +682,7 @@
         const form = new FormData(formElement);
         const tenantKey = String(form.get("tenant_key")).trim();
         const products = form.get("crm_enabled") ? [{ product_key: "crm", enabled: true, access_mode: form.get("crm_access_mode"), seat_limit: form.get("crm_seat_limit") || null }] : [];
+        setFormBusy(formElement, true);
         try {
           await apiCall("/admin/tenants", {
             method: "POST",
@@ -643,6 +694,7 @@
           await loadTenants();
            showMessage(`Empresa ${tenantKey} cadastrada. Prepare o CRM, se contratado, e ative a empresa antes de adicionar usuários.`, "ok");
         } catch (error) { showMessage(error.message, "error"); }
+        finally { setFormBusy(formElement, false); }
       });
 
       document.querySelector("#tenant-form [name='crm_enabled']").addEventListener("change", event => {
@@ -654,6 +706,7 @@
         const tenant = state.tenants.find(item => item.tenant_key === state.selected);
         if (!tenant) return;
         const form = event.currentTarget;
+        setFormBusy(form, true);
         try {
           await apiCall(`/admin/tenants/${encodeURIComponent(tenant.tenant_key)}`, {
             method: "PATCH",
@@ -663,6 +716,7 @@
            await loadTenants();
            showMessage("Dados da empresa atualizados.", "ok");
         } catch (error) { showMessage(error.message, "error"); }
+        finally { setFormBusy(form, false); }
       });
 
       document.getElementById("plan-form").addEventListener("submit", async event => {
@@ -670,6 +724,7 @@
         const form = event.currentTarget;
         const current = state.tenants.find(tenant => tenant.tenant_key === state.selected);
         if (!current) return;
+        setFormBusy(form, true);
         const products = (current.products || []).filter(product => product.product_key !== "crm").map(product => ({
           product_key: product.product_key,
           enabled: product.enabled,
@@ -693,12 +748,15 @@
            await loadTenants();
            showMessage("Contratação e capacidade atualizadas.", "ok");
         } catch (error) { showMessage(error.message, "error"); }
+        finally { setFormBusy(form, false); }
       });
 
       async function checkTenantActivation() {
         const tenant = state.tenants.find(item => item.tenant_key === state.selected);
         if (!tenant) return null;
-        try {
+        const button = document.getElementById("preflight-tenant");
+        return withButtonBusy(button, "Verificando…", async () => {
+          try {
           const result = await apiCall(`/admin/tenants/${encodeURIComponent(tenant.tenant_key)}/preflight`);
           const panel = document.getElementById("preflight-panel");
           const checkLabel = key => key === "crm_host" ? "Host CRM" : key.startsWith("group:") ? `Grupo ${key.slice(6)}` : key;
@@ -706,53 +764,63 @@
           panel.innerHTML = `<h2>Verificação para ativar</h2><div class="checks">${result.checks.map(check => `<span class="status ${check.status === "ready" ? "ok" : check.status === "blocked" ? "error" : ""}"><strong>${esc(checkLabel(check.key))}:</strong> ${esc(statusLabel(check.status))} · ${esc(check.detail)}</span>`).join("")}</div>${result.manual_checks?.length ? `<p class="callout">${result.manual_checks.map(esc).join(" ")}</p>` : ""}<p class="muted">${result.ready ? "As verificações automáticas passaram. Confirme também as etapas manuais antes de ativar." : "Resolva as pendências acima e execute a verificação novamente."}</p>`;
           panel.classList.remove("hidden");
           return result;
-        } catch (error) {
-          showMessage(error.message, "error");
-          return null;
-        }
+          } catch (error) {
+            showMessage(error.message, "error");
+            return null;
+          }
+        });
       }
 
       document.getElementById("preflight-tenant").addEventListener("click", checkTenantActivation);
       document.getElementById("activate-tenant").addEventListener("click", async () => {
+        const button = document.getElementById("activate-tenant");
         const tenant = state.tenants.find(item => item.tenant_key === state.selected);
         if (!tenant) return;
         const readiness = await checkTenantActivation();
         if (!readiness?.ready) return;
          if (!confirm(`Ativar a empresa ${tenant.display_name}? Confira também a preparação técnica antes de confirmar.`)) return;
-        try {
-          await apiCall(`/admin/tenants/${encodeURIComponent(tenant.tenant_key)}`, {
-            method: "PATCH", body: JSON.stringify({ tenant_status: "active" }),
-          });
-          await loadTenants();
-           showMessage("Empresa ativada e acessos sincronizados.", "ok");
-        } catch (error) { showMessage(error.message, "error"); }
+        await withButtonBusy(button, "Ativando…", async () => {
+          try {
+            await apiCall(`/admin/tenants/${encodeURIComponent(tenant.tenant_key)}`, {
+              method: "PATCH", body: JSON.stringify({ tenant_status: "active" }),
+            });
+            await loadTenants();
+            showMessage("Empresa ativada e acessos sincronizados.", "ok");
+          } catch (error) { showMessage(error.message, "error"); }
+        });
       });
 
       document.getElementById("suspend-tenant").addEventListener("click", async () => {
+        const button = document.getElementById("suspend-tenant");
         const tenant = state.tenants.find(item => item.tenant_key === state.selected);
-         if (!tenant || !confirm(`Suspender ${tenant.display_name}? O acesso dos usuários a esta empresa será removido.`)) return;
-        try {
-          await apiCall(`/admin/tenants/${encodeURIComponent(tenant.tenant_key)}`, {
-            method: "PATCH", body: JSON.stringify({ tenant_status: "suspended" }),
-          });
-          await loadTenants();
-           showMessage("Empresa suspensa; os acessos foram atualizados.", "ok");
-        } catch (error) { showMessage(error.message, "error"); }
+        if (!tenant || !confirm(`Suspender ${tenant.display_name}? O acesso dos usuários a esta empresa será removido.`)) return;
+        await withButtonBusy(button, "Suspendendo…", async () => {
+          try {
+            await apiCall(`/admin/tenants/${encodeURIComponent(tenant.tenant_key)}`, {
+              method: "PATCH", body: JSON.stringify({ tenant_status: "suspended" }),
+            });
+            await loadTenants();
+            showMessage("Empresa suspensa; os acessos foram atualizados.", "ok");
+          } catch (error) { showMessage(error.message, "error"); }
+        });
       });
 
       document.getElementById("resume-tenant").addEventListener("click", async () => {
+        const button = document.getElementById("resume-tenant");
         const tenant = state.tenants.find(item => item.tenant_key === state.selected);
         if (!tenant) return;
         const readiness = await checkTenantActivation();
         if (!readiness?.ready) return;
          if (!confirm(`Reativar ${tenant.display_name} e restaurar os acessos contratados?`)) return;
-        try {
-          await apiCall(`/admin/tenants/${encodeURIComponent(tenant.tenant_key)}`, {
-            method: "PATCH", body: JSON.stringify({ tenant_status: "active" }),
-          });
-          await loadTenants();
-           showMessage("Empresa reativada e acessos sincronizados.", "ok");
-        } catch (error) { showMessage(error.message, "error"); }
+        await withButtonBusy(button, "Reativando…", async () => {
+          try {
+            await apiCall(`/admin/tenants/${encodeURIComponent(tenant.tenant_key)}`, {
+              method: "PATCH", body: JSON.stringify({ tenant_status: "active" }),
+            });
+            await loadTenants();
+            showMessage("Empresa reativada e acessos sincronizados.", "ok");
+          } catch (error) { showMessage(error.message, "error"); }
+        });
       });
 
       async function init() {
