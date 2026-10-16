@@ -55,6 +55,8 @@ CREATE TABLE IF NOT EXISTS tenant_memberships (
         CHECK (membership_status IN ('invited', 'active', 'suspended')),
     invited_by text NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
+    activated_at timestamptz,
+    last_access_at timestamptz,
     PRIMARY KEY (tenant_key, keycloak_subject),
     UNIQUE (tenant_key, email)
 );

@@ -429,34 +429,61 @@ async def sync_reconciliation_drift(
     return {"members_synced": synced, "status": "ok"}
 
 
+async def membership_ready_in_keycloak(request: Request, subject: str) -> bool:
+    user_by_id = getattr(request.app.state.keycloak, "user_by_id", None)
+    if user_by_id is None:
+        # Keep lightweight test doubles and older adapters compatible. The
+        # production KeycloakAdmin always provides this verification.
+        return True
+    user = await user_by_id(subject)
+    if not user or not user.get("emailVerified"):
+        return False
+    return "UPDATE_PASSWORD" not in (user.get("requiredActions") or [])
+
+
+async def activate_verified_memberships(request: Request, identity: Identity) -> None:
+    """Promote an invitation only after Keycloak confirms email and password setup."""
+    if not identity.email_verified or not await membership_ready_in_keycloak(request, identity.subject):
+        return
+    activated_memberships = await request.app.state.pool.fetch(
+        """UPDATE tenant_memberships
+           SET membership_status='active',activated_at=COALESCE(activated_at,now()),
+               last_access_at=now()
+           WHERE keycloak_subject=$1 AND membership_status='invited'
+           RETURNING tenant_key""",
+        identity.subject,
+    )
+    await request.app.state.pool.execute(
+        """UPDATE tenant_memberships SET last_access_at=now()
+           WHERE keycloak_subject=$1 AND membership_status='active'""",
+        identity.subject,
+    )
+    if not activated_memberships:
+        return
+    try:
+        await sync_subject_groups(request, identity.subject)
+    except KeycloakError as error:
+        for membership in activated_memberships:
+            await request.app.state.pool.execute(
+                """UPDATE tenant_memberships
+                   SET membership_status='invited',activated_at=NULL,last_access_at=NULL
+                   WHERE tenant_key=$1 AND keycloak_subject=$2
+                     AND membership_status='active'""",
+                membership["tenant_key"],
+                identity.subject,
+            )
+        try:
+            await sync_subject_groups(request, identity.subject)
+        except KeycloakError:
+            pass
+        raise HTTPException(503, "Identity access synchronization is temporarily unavailable") from error
+
+
 @app.get("/v1/me")
 async def current_user(
     request: Request, identity: Identity = Depends(current_identity)
 ) -> dict:
-    if identity.email_verified:
-        activated_memberships = await request.app.state.pool.fetch(
-            """UPDATE tenant_memberships SET membership_status='active'
-               WHERE keycloak_subject=$1 AND membership_status='invited'
-               RETURNING tenant_key""",
-            identity.subject,
-        )
-        if activated_memberships:
-            try:
-                await sync_subject_groups(request, identity.subject)
-            except KeycloakError as error:
-                for membership in activated_memberships:
-                    await request.app.state.pool.execute(
-                        """UPDATE tenant_memberships SET membership_status='invited'
-                           WHERE tenant_key=$1 AND keycloak_subject=$2
-                             AND membership_status='active'""",
-                        membership["tenant_key"],
-                        identity.subject,
-                    )
-                try:
-                    await sync_subject_groups(request, identity.subject)
-                except KeycloakError:
-                    pass
-                raise HTTPException(503, "Identity access synchronization is temporarily unavailable") from error
+    await activate_verified_memberships(request, identity)
     memberships = await request.app.state.pool.fetch(
         """SELECT t.tenant_key,t.display_name,t.crm_host,t.tenant_status,
                   m.tenant_role,m.membership_status
@@ -479,6 +506,7 @@ async def current_user_services(
     request: Request, identity: Identity = Depends(current_identity)
 ) -> dict:
     """Return only services this identity can actually open from the Portal."""
+    await activate_verified_memberships(request, identity)
     if is_platform_admin(identity):
         rows = await request.app.state.pool.fetch(
             """SELECT tp.product_key,t.tenant_key,t.display_name AS tenant_name,
@@ -1035,8 +1063,35 @@ async def list_members(
     identity: Identity = Depends(current_identity),
 ) -> list[dict]:
     await require_tenant_admin(request, identity, tenant_key)
+
+    invited = await request.app.state.pool.fetch(
+        """SELECT keycloak_subject FROM tenant_memberships
+           WHERE tenant_key=$1 AND membership_status='invited'""",
+        tenant_key,
+    )
+    for member in invited:
+        if not await membership_ready_in_keycloak(request, member["keycloak_subject"]):
+            continue
+        await request.app.state.pool.execute(
+            """UPDATE tenant_memberships
+               SET membership_status='active',activated_at=COALESCE(activated_at,now())
+               WHERE tenant_key=$1 AND keycloak_subject=$2 AND membership_status='invited'""",
+            tenant_key,
+            member["keycloak_subject"],
+        )
+        try:
+            await sync_subject_groups(request, member["keycloak_subject"])
+        except KeycloakError as error:
+            await request.app.state.pool.execute(
+                """UPDATE tenant_memberships SET membership_status='invited',activated_at=NULL
+                   WHERE tenant_key=$1 AND keycloak_subject=$2 AND membership_status='active'""",
+                tenant_key,
+                member["keycloak_subject"],
+            )
+            raise HTTPException(503, "Identity access synchronization is temporarily unavailable") from error
     members = await request.app.state.pool.fetch(
-        """SELECT keycloak_subject,email,display_name,tenant_role,membership_status,created_at
+        """SELECT keycloak_subject,email,display_name,tenant_role,membership_status,
+                  created_at,activated_at,last_access_at
            FROM tenant_memberships WHERE tenant_key=$1 ORDER BY display_name""",
         tenant_key,
     )

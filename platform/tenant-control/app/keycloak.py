@@ -94,6 +94,15 @@ class KeycloakAdmin:
             raise KeycloakError("Multiple Keycloak identities match this email")
         return users[0] if users else None
 
+    async def user_by_id(self, user_id: str) -> dict | None:
+        try:
+            response = await self.request("GET", f"users/{user_id}")
+        except KeycloakError as error:
+            if "(404)" in str(error):
+                return None
+            raise
+        return response.json()
+
     async def create_user(self, email: str, display_name: str, locale: str = "pt-BR") -> dict:
         first, _, last = display_name.strip().partition(" ")
         response = await self.request(

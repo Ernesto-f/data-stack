@@ -69,6 +69,7 @@ Melhorias de robustez aplicadas nesta revisão:
 - O convite passou a registrar o idioma escolhido (`pt-BR`, `en` ou `es`) no usuário Keycloak; realm e tema foram preparados para manter a mesma língua na confirmação do e-mail e na criação da senha.
 - O Portal deixou de exibir o catálogo global para usuários comuns: `/v1/me/services` filtra memberships, contratação, status e capacidade, e o card SALUS CRM recebe dinamicamente o host do tenant autorizado. Analytics, Invoice e demais destinos continuam ocultos até terem integração tenant-aware.
 - O botão de copiar convite agora usa um action-token real assinado pelo Keycloak, com validade de 24 horas; o endpoint customizado exige o service account do tenant-control e não registra o token em auditoria.
+- Memberships agora registram `activated_at` e `last_access_at`. A ativação só ocorre quando o Keycloak confirma o e-mail e não há mais `UPDATE_PASSWORD` pendente; a lista administrativa reconcilia convites concluídos e exibe o último acesso.
 - Corrigido `500` intermitente no CRM: os vhosts tenantizados passaram a aceitar cabeçalhos grandes do OAuth2 Proxy (`proxy_buffer_size 32k`); o Acme voltou a redirecionar para o login e o Odoo continuou saudável.
 
 Arquivos da alteração atual:
@@ -93,6 +94,7 @@ Arquivos da alteração atual:
 - `node --check` no JavaScript embutido de `platform/portal/index.html` — passou.
 - Build local da imagem Keycloak 26.7.0 com o provider de action-token — passou.
 - `git diff --check` nos arquivos da tarefa — passou.
+- Após a correção de status/data de acesso, a suíte tenant-control voltou a passar com **30 testes**.
 - Última validação: suíte tenant-control **28 passaram**; compilação Python, sintaxe JS, Ruff e `git diff --check` passaram.
 - Revisão de autorização e fluxo concluída: preflight/update restritos a platform admins; a ativação exige grupo admin tenant-scoped mesmo sem CRM; suspender/reativar sincroniza grupos sem alterar os grupos de outros tenants.
 - Não foi feita validação visual com sessão Keycloak no navegador.
