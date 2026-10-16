@@ -83,6 +83,8 @@
       .modal-actions { display:flex; align-items:center; justify-content:flex-end; gap:10px; margin-top:22px; padding-top:18px; border-top:1px solid var(--line-soft); }
       .tenant-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
       .tenant-actions button { min-height:36px; padding:7px 11px; font-size:13px; }
+      .table-actions { display:flex; flex-wrap:wrap; gap:6px; }
+      .table-actions button { min-height:34px; padding:6px 10px; font-size:12px; }
       table { width:100%; border-collapse:collapse; margin-top:8px; }
       th,td { padding:10px 8px; border-bottom:1px solid #28415b; text-align:left; vertical-align:top; }
       th { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
@@ -257,7 +259,7 @@
       const actionLabels = {
         "tenant.created": "Empresa cadastrada", "tenant.updated": "Empresa atualizada",
         "tenant.entitlements_updated": "Contratação atualizada", "member.invited": "Usuário adicionado",
-        "member.access_updated": "Acesso atualizado", "member.suspended": "Acesso suspenso",
+         "member.access_updated": "Acesso atualizado", "member.suspended": "Acesso suspenso", "member.invitation_resent": "Convite reenviado",
         "member.reactivated": "Acesso reativado", "keycloak.reconciliation_applied": "Acessos sincronizados",
         "keycloak.reconciliation_partial": "Sincronização parcial",
       };
@@ -329,6 +331,22 @@
           button.textContent = originalLabel;
           button.removeAttribute("aria-busy");
         }
+      }
+      async function copyToClipboard(text) {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(text);
+          return;
+        }
+        const helper = document.createElement("textarea");
+        helper.value = text;
+        helper.setAttribute("readonly", "");
+        helper.style.position = "fixed";
+        helper.style.opacity = "0";
+        document.body.appendChild(helper);
+        helper.select();
+        const copied = document.execCommand("copy");
+        helper.remove();
+        if (!copied) throw new Error("Não foi possível copiar o link. Copie manualmente: " + text);
       }
 
       function showMessage(message, kind = "") {
@@ -543,7 +561,7 @@
           <td>${esc(roleLabel(member.tenant_role))}${member.products?.some(p => p.product_role === "manager") ? " · Gerente CRM" : ""}</td>
           <td>${esc((member.products || []).map(p => p.product_key).join(", "))}</td>
           <td>${esc(membershipStatusLabel(member.membership_status))}</td>
-          <td>${mayEdit(member) ? member.membership_status === "suspended" ? `<button class="secondary" data-reactivate="${esc(member.keycloak_subject)}">Reativar acesso</button>` : `<button class="secondary" data-edit="${esc(member.keycloak_subject)}">Editar</button> <button class="danger" data-remove="${esc(member.keycloak_subject)}">Suspender</button>` : ""}</td>
+          <td><div class="table-actions">${mayEdit(member) ? member.membership_status === "suspended" ? `<button class="secondary" data-reactivate="${esc(member.keycloak_subject)}">Reativar acesso</button>` : `<button class="secondary" data-edit="${esc(member.keycloak_subject)}">Editar</button>${member.membership_status === "invited" ? `<button class="secondary" data-resend="${esc(member.keycloak_subject)}">Reenviar convite</button><button class="secondary" data-copy-portal="${esc(member.email)}">Copiar link do Portal</button>` : ""}<button class="danger" data-remove="${esc(member.keycloak_subject)}">Suspender</button>` : ""}</div></td>
         </tr>`).join("");
         tbody.querySelectorAll("[data-edit]").forEach(button => button.addEventListener("click", () => {
           const member = members.find(item => item.keycloak_subject === button.dataset.edit);
@@ -595,6 +613,20 @@
           try {
             await apiCall(`/tenants/${encodeURIComponent(state.selected)}/members/${encodeURIComponent(button.dataset.remove)}`, { method: "DELETE" });
             await loadSelectedTenant();
+          } catch (error) { showMessage(error.message, "error"); }
+        }));
+        tbody.querySelectorAll("[data-resend]").forEach(button => button.addEventListener("click", async () => {
+          await withButtonBusy(button, "Enviando…", async () => {
+            try {
+              await apiCall(`/tenants/${encodeURIComponent(state.selected)}/members/${encodeURIComponent(button.dataset.resend)}/resend-invitation`, { method: "POST" });
+              showMessage("Convite reenviado. Confira também a pasta de spam.", "ok");
+            } catch (error) { showMessage(error.message, "error"); }
+          });
+        }));
+        tbody.querySelectorAll("[data-copy-portal]").forEach(button => button.addEventListener("click", async () => {
+          try {
+            await copyToClipboard("https://portal.izatacore.com/");
+            showMessage("Link do Portal copiado. A pessoa ainda precisa concluir o convite e criar a senha.", "ok");
           } catch (error) { showMessage(error.message, "error"); }
         }));
       }

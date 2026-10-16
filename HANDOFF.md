@@ -127,6 +127,9 @@ Arquivos da alteração atual:
 - Backup da correção de recuperação de convite para tenants já ativos:
   `/srv/backups/tenant-control/20261016-004000/`. Ao salvar novamente o responsável de um
   tenant ativo sem membership, o control plane cria o proprietário e envia o convite.
+- A lista de usuários agora oferece `Reenviar convite` e `Copiar link do Portal` para convites
+  pendentes; o link não substitui a criação segura da senha. Backup dessa publicação:
+  `/srv/backups/tenant-control/20261016-004300/`.
 
 ## Próximos passos
 

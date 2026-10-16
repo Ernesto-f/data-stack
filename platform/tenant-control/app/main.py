@@ -1192,6 +1192,43 @@ async def invite_member(
     return await create_membership_invitation(request, tenant_key, body, identity)
 
 
+@app.post("/v1/tenants/{tenant_key}/members/{subject}/resend-invitation")
+async def resend_member_invitation(
+    tenant_key: str,
+    subject: str,
+    request: Request,
+    identity: Identity = Depends(current_identity),
+) -> dict:
+    await require_tenant_admin(request, identity, tenant_key)
+    member = await request.app.state.pool.fetchrow(
+        """SELECT email,membership_status FROM tenant_memberships
+           WHERE tenant_key=$1 AND keycloak_subject=$2""",
+        tenant_key,
+        subject,
+    )
+    if member is None:
+        raise HTTPException(404, "Tenant membership not found")
+    if member["membership_status"] != "invited":
+        raise HTTPException(409, "This invitation has already been accepted")
+    try:
+        keycloak_user = await request.app.state.keycloak.user_by_email(member["email"])
+        if keycloak_user is None:
+            raise HTTPException(404, "The invited identity no longer exists")
+        await request.app.state.keycloak.send_invitation(keycloak_user["id"])
+    except HTTPException:
+        raise
+    except KeycloakError as error:
+        raise HTTPException(503, "The invitation could not be sent; check Keycloak and SMTP.") from error
+    await record_audit(
+        request,
+        identity,
+        tenant_key,
+        "member.invitation_resent",
+        {"subject": subject},
+    )
+    return {"email": member["email"], "membership_status": "invited"}
+
+
 @app.put("/v1/tenants/{tenant_key}/members/{subject}/products")
 async def update_member_products(
     tenant_key: str,
