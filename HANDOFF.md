@@ -61,6 +61,7 @@ Melhorias de robustez aplicadas nesta revisão:
 - Rollback de alteração de tenant restaura nome, host e status anteriores quando a sincronização falha, evitando aplicação parcial em PATCH combinado.
 - Replace de entitlements agora bloqueia a linha do tenant antes de validar remoções, desativações e limites, alinhando a concorrência com mutações de memberships.
 - Interface do `/admin` revisada com linguagem comercial: “usuários contratados”, “usuários utilizados”, “capacidade” e “contratação” substituem “assentos”; cards, métricas, status e ações foram reorganizados para leitura operacional.
+- Interface do `/admin` reorganizada em fluxo de cadastro: dados básicos, contratação e ativação; host CRM passou a ser gerado automaticamente, ferramentas técnicas foram recolhidas e o catálogo ficou separado da tarefa principal.
 
 Arquivos da alteração atual:
 
