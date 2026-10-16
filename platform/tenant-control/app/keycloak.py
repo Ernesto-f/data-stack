@@ -66,6 +66,25 @@ class KeycloakAdmin:
             raise KeycloakError(f"Keycloak operation failed ({response.status_code})")
         return response
 
+    async def realm_request(self, method: str, path: str, *, params=None) -> httpx.Response:
+        token = await self._admin_token()
+        try:
+            response = await self.client.request(
+                method,
+                f"{self.base}/realms/pulse/{path.lstrip('/')}",
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "X-Forwarded-Host": "portal.izatacore.com",
+                    "X-Forwarded-Proto": "https",
+                },
+                params=params,
+            )
+        except httpx.HTTPError as error:
+            raise KeycloakError("Keycloak action-token endpoint unavailable") from error
+        if response.status_code >= 400:
+            raise KeycloakError("Keycloak action-token endpoint rejected the request")
+        return response
+
     async def user_by_email(self, email: str) -> dict | None:
         response = await self.request(
             "GET", "users", params={"email": email, "exact": "true"}
@@ -75,7 +94,7 @@ class KeycloakAdmin:
             raise KeycloakError("Multiple Keycloak identities match this email")
         return users[0] if users else None
 
-    async def create_user(self, email: str, display_name: str) -> dict:
+    async def create_user(self, email: str, display_name: str, locale: str = "pt-BR") -> dict:
         first, _, last = display_name.strip().partition(" ")
         response = await self.request(
             "POST",
@@ -87,6 +106,7 @@ class KeycloakAdmin:
                 "enabled": True,
                 "firstName": first or email,
                 "lastName": last,
+                "attributes": {"locale": [locale]},
                 "requiredActions": ["VERIFY_EMAIL", "UPDATE_PASSWORD"],
             },
         )
@@ -98,6 +118,14 @@ class KeycloakAdmin:
         if not user_id:
             raise KeycloakError("Keycloak created an identity but returned no ID")
         return {"id": user_id, "email": email, "emailVerified": False}
+
+    async def set_user_locale(self, user_id: str, locale: str) -> None:
+        response = await self.request("GET", f"users/{user_id}")
+        user = response.json()
+        attributes = dict(user.get("attributes") or {})
+        attributes["locale"] = [locale]
+        user["attributes"] = attributes
+        await self.request("PUT", f"users/{user_id}", json=user)
 
     async def group_id(self, group_path: str) -> str:
         parent_id = None
@@ -179,6 +207,17 @@ class KeycloakAdmin:
             params={"lifespan": "86400"},
             json=["VERIFY_EMAIL", "UPDATE_PASSWORD"],
         )
+
+    async def invitation_link(self, user_id: str) -> str:
+        response = await self.realm_request(
+            "GET",
+            "pulse-action-token",
+            params={"userId": user_id, "lifespan": "86400"},
+        )
+        link = response.json().get("link")
+        if not link or not link.startswith("https://portal.izatacore.com/keylogin/"):
+            raise KeycloakError("Keycloak returned an invalid invitation link")
+        return link
 
     async def delete_user(self, user_id: str) -> None:
         await self.request("DELETE", f"users/{user_id}")

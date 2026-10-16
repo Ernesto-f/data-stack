@@ -127,6 +127,7 @@
               <label><span class="field-label">Identificador</span><input name="tenant_key" autocomplete="off" autocapitalize="none" spellcheck="false" pattern="[a-z0-9][a-z0-9-]{1,29}[a-z0-9]" required placeholder="acme" /><small class="muted">Use letras minúsculas, números e hífen.</small></label>
               <label><span class="field-label">Nome do responsável</span><input name="responsible_name" autocomplete="name" required minlength="2" maxlength="160" placeholder="Ex.: Elena Sampaio" /></label>
               <label><span class="field-label">E-mail do responsável</span><input name="responsible_email" type="email" autocomplete="email" required maxlength="320" placeholder="responsavel@empresa.com" /><small class="muted">Essa pessoa receberá o convite do Portal após a ativação.</small></label>
+              <label><span class="field-label">Idioma do responsável</span><select name="responsible_locale"><option value="pt-BR">Português</option><option value="en">English</option><option value="es">Español</option></select><small class="muted">As telas de acesso e criação da senha seguirão este idioma.</small></label>
             </div>
             <input type="hidden" name="crm_host" />
             <div class="host-preview"><span>Endereço do CRM</span><code id="create-host-preview">Digite o identificador para gerar o endereço</code></div>
@@ -195,6 +196,7 @@
               <label><span class="field-label">Host CRM</span><input name="crm_host" placeholder="acme.crm.izatacore.com" /></label>
               <label><span class="field-label">Nome do responsável</span><input name="responsible_name" autocomplete="name" minlength="2" maxlength="160" /></label>
               <label><span class="field-label">E-mail do responsável</span><input name="responsible_email" type="email" autocomplete="email" maxlength="320" /></label>
+              <label><span class="field-label">Idioma do responsável</span><select name="responsible_locale"><option value="pt-BR">Português</option><option value="en">English</option><option value="es">Español</option></select></label>
             </div>
             <div class="modal-actions"><button class="secondary" type="button" data-close-dialog="company-panel">Cancelar</button><button type="submit">Salvar alterações</button></div>
           </form>
@@ -221,6 +223,7 @@
               <label><span class="field-label">E-mail profissional</span><input name="email" type="email" autocomplete="email" required maxlength="320" /></label>
               <label><span class="field-label">Perfil na empresa</span><select name="tenant_role" id="member-tenant-role"><option value="member">Usuário</option></select></label>
               <label><span class="field-label">Perfil CRM</span><select name="crm_role"><option value="user">Vendedor</option><option value="manager">Gerente CRM</option></select></label>
+              <label><span class="field-label">Idioma do usuário</span><select name="locale"><option value="pt-BR">Português</option><option value="en">English</option><option value="es">Español</option></select><small class="muted">O convite e as telas de autenticação seguirão este idioma.</small></label>
             </div>
             <div id="product-choices" class="checks"></div>
             <div class="modal-actions"><button class="secondary" type="button" data-close-dialog="invite-panel">Cancelar</button><button type="submit">Enviar convite</button></div>
@@ -508,6 +511,7 @@
           companyForm.elements.crm_host.value = tenant.crm_host || "";
           companyForm.elements.responsible_name.value = tenant.responsible_name || "";
           companyForm.elements.responsible_email.value = tenant.responsible_email || "";
+          companyForm.elements.responsible_locale.value = tenant.responsible_locale || "pt-BR";
         }
         document.getElementById("preflight-tenant").classList.toggle("hidden", !platformAdmin || tenant.tenant_status === "active");
         document.getElementById("activate-tenant").classList.toggle("hidden", !platformAdmin || tenant.tenant_status === "active");
@@ -561,7 +565,7 @@
           <td>${esc(roleLabel(member.tenant_role))}${member.products?.some(p => p.product_role === "manager") ? " · Gerente CRM" : ""}</td>
           <td>${esc((member.products || []).map(p => p.product_key).join(", "))}</td>
           <td>${esc(membershipStatusLabel(member.membership_status))}</td>
-          <td><div class="table-actions">${mayEdit(member) ? member.membership_status === "suspended" ? `<button class="secondary" data-reactivate="${esc(member.keycloak_subject)}">Reativar acesso</button>` : `<button class="secondary" data-edit="${esc(member.keycloak_subject)}">Editar</button>${member.membership_status === "invited" ? `<button class="secondary" data-resend="${esc(member.keycloak_subject)}">Reenviar convite</button><button class="secondary" data-copy-portal="${esc(member.email)}">Copiar link do Portal</button>` : ""}<button class="danger" data-remove="${esc(member.keycloak_subject)}">Suspender</button>` : ""}</div></td>
+          <td><div class="table-actions">${mayEdit(member) ? member.membership_status === "suspended" ? `<button class="secondary" data-reactivate="${esc(member.keycloak_subject)}">Reativar acesso</button>` : `<button class="secondary" data-edit="${esc(member.keycloak_subject)}">Editar</button>${member.membership_status === "invited" ? `<button class="secondary" data-resend="${esc(member.keycloak_subject)}">Reenviar convite</button><button class="secondary" data-copy-invitation="${esc(member.keycloak_subject)}">Copiar link do convite</button>` : ""}<button class="danger" data-remove="${esc(member.keycloak_subject)}">Suspender</button>` : ""}</div></td>
         </tr>`).join("");
         tbody.querySelectorAll("[data-edit]").forEach(button => button.addEventListener("click", () => {
           const member = members.find(item => item.keycloak_subject === button.dataset.edit);
@@ -623,10 +627,11 @@
             } catch (error) { showMessage(error.message, "error"); }
           });
         }));
-        tbody.querySelectorAll("[data-copy-portal]").forEach(button => button.addEventListener("click", async () => {
+        tbody.querySelectorAll("[data-copy-invitation]").forEach(button => button.addEventListener("click", async () => {
           try {
-            await copyToClipboard("https://portal.izatacore.com/");
-            showMessage("Link do Portal copiado. A pessoa ainda precisa concluir o convite e criar a senha.", "ok");
+            const result = await apiCall(`/tenants/${encodeURIComponent(state.selected)}/members/${encodeURIComponent(button.dataset.copyInvitation)}/invitation-link`);
+            await copyToClipboard(result.link);
+            showMessage("Link seguro do convite copiado. Ele expira em 24 horas e permite criar a senha.", "ok");
           } catch (error) { showMessage(error.message, "error"); }
         }));
       }
@@ -695,7 +700,7 @@
         try {
           const result = await apiCall(`/tenants/${encodeURIComponent(state.selected)}/members`, {
             method: "POST",
-            body: JSON.stringify({ display_name: form.get("display_name"), email: form.get("email"), tenant_role: form.get("tenant_role"), crm_role: form.get("crm_role"), products }),
+             body: JSON.stringify({ display_name: form.get("display_name"), email: form.get("email"), tenant_role: form.get("tenant_role"), crm_role: form.get("crm_role"), locale: form.get("locale"), products }),
            });
            formElement.reset();
            closeDialog("invite-panel");
@@ -715,7 +720,7 @@
         try {
           await apiCall("/admin/tenants", {
             method: "POST",
-            body: JSON.stringify({ tenant_key: tenantKey, display_name: form.get("display_name"), crm_host: form.get("crm_host") || null, responsible_name: form.get("responsible_name"), responsible_email: form.get("responsible_email"), products }),
+             body: JSON.stringify({ tenant_key: tenantKey, display_name: form.get("display_name"), crm_host: form.get("crm_host") || null, responsible_name: form.get("responsible_name"), responsible_email: form.get("responsible_email"), responsible_locale: form.get("responsible_locale"), products }),
            });
            closeDialog("create-tenant-dialog");
            formElement.reset();
@@ -744,6 +749,7 @@
                 crm_host: form.elements.crm_host.value || null,
                 responsible_name: form.elements.responsible_name.value || null,
                 responsible_email: form.elements.responsible_email.value || null,
+                responsible_locale: form.elements.responsible_locale.value,
               }),
            });
            closeDialog("company-panel");

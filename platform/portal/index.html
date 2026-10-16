@@ -209,7 +209,7 @@
           <div class="card-top"><span class="icon">I</span><span class="status">MVP demo</span></div>
           <h2>Pulse Invoice</h2><p>Extraia, confira e aprove notas fiscais de serviço com rastreabilidade.</p><span class="open">Abrir Pulse Invoice →</span>
         </a>
-        <a class="card" style="--accent:#875a7b" href="https://democrm.izatacore.com" target="_blank" rel="noopener noreferrer" data-search="salus crm odoo leads oportunidades contatos vendas">
+        <a class="card" style="--accent:#875a7b" href="#" target="_blank" rel="noopener noreferrer" data-product-key="crm" data-search="salus crm odoo leads oportunidades contatos vendas">
           <div class="card-top"><span class="icon">C</span><span class="status">Demo interna</span></div>
           <h2>SALUS CRM</h2><p>Organize contatos, oportunidades e atividades comerciais.</p><span class="open">Abrir SALUS CRM ↗</span>
         </a>
@@ -219,9 +219,48 @@
     </main>
     <script>
       const search = document.getElementById("service-search");
-      const cards = [...document.querySelectorAll("#service-grid .card")];
-      const count = document.getElementById("service-count");
-      search.addEventListener("input", () => {
+       let cards = [...document.querySelectorAll("#service-grid .card")];
+       const count = document.getElementById("service-count");
+       const grid = document.getElementById("service-grid");
+       for (const card of cards) card.hidden = true;
+       count.textContent = "Carregando serviços…";
+
+       async function loadServices() {
+         try {
+           const response = await fetch("/tenant-admin/api/v1/me/services", { credentials: "same-origin" });
+           if (!response.ok) throw new Error("Não foi possível carregar os acessos.");
+           const payload = await response.json();
+           const templates = new Map(cards.filter(card => card.dataset.productKey).map(card => [card.dataset.productKey, card]));
+           const visible = [];
+           for (const service of payload.services || []) {
+             const template = templates.get(service.product_key);
+             if (!template) continue;
+             const card = visible.some(item => item.dataset.tenantKey === service.tenant_key && item.dataset.productKey === service.product_key)
+               ? null
+               : (visible.filter(item => item.dataset.productKey === service.product_key).length ? template.cloneNode(true) : template);
+             if (!card) continue;
+             card.hidden = false;
+             card.dataset.tenantKey = service.tenant_key;
+             card.href = service.url;
+             const title = card.querySelector("h2");
+             if (title && service.tenant_name) title.textContent = `${service.display_name} · ${service.tenant_name}`;
+             const status = card.querySelector(".status");
+             if (status) status.textContent = "Contratado";
+             visible.push(card);
+             if (card !== template) grid.appendChild(card);
+           }
+           cards = [...grid.querySelectorAll(".card")];
+           for (const card of cards) card.hidden = !visible.includes(card);
+           if (!visible.length) grid.insertAdjacentHTML("beforeend", '<p class="pending">Nenhum produto contratado está disponível para este usuário.</p>');
+           count.textContent = `${visible.length} serviço${visible.length === 1 ? "" : "s"}`;
+         } catch (error) {
+           count.textContent = "Acessos indisponíveis";
+           grid.innerHTML = `<p class="pending">${error.message}</p>`;
+         }
+       }
+
+       loadServices();
+       search.addEventListener("input", () => {
         const query = search.value.trim().toLocaleLowerCase("pt-BR");
         let visible = 0;
         for (const card of cards) {

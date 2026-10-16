@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS tenants (
 ALTER TABLE tenants ALTER COLUMN crm_host DROP NOT NULL;
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS responsible_name text;
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS responsible_email text;
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS responsible_locale text NOT NULL DEFAULT 'pt-BR';
 
 CREATE TABLE IF NOT EXISTS tenant_products (
     tenant_key text NOT NULL REFERENCES tenants (tenant_key) ON DELETE CASCADE,

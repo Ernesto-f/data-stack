@@ -93,7 +93,14 @@ def get_admin_token(env: dict[str, str]) -> str:
 def ensure_realm(admin: KeycloakAdmin) -> None:
     try:
         realm = admin.get_json(f"/admin/realms/{REALM}")
-        if realm.get("loginTheme") != "pulse":
+        desired = {
+            "loginTheme": "pulse",
+            "internationalizationEnabled": True,
+            "supportedLocales": ["pt-BR", "en", "es"],
+            "defaultLocale": "pt-BR",
+        }
+        if any(realm.get(key) != value for key, value in desired.items()):
+            realm.update(desired)
             realm["loginTheme"] = "pulse"
             admin.request("PUT", f"/admin/realms/{REALM}", realm)
         return
@@ -106,6 +113,9 @@ def ensure_realm(admin: KeycloakAdmin) -> None:
         {
             "realm": REALM,
             "loginTheme": "pulse",
+            "internationalizationEnabled": True,
+            "supportedLocales": ["pt-BR", "en", "es"],
+            "defaultLocale": "pt-BR",
             "enabled": True,
             "sslRequired": "external",
             "registrationAllowed": False,

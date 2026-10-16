@@ -66,12 +66,20 @@ Melhorias de robustez aplicadas nesta revisão:
 - Revisão de robustez da interface: referências de formulário preservadas durante `await`, botões e formulários bloqueiam duplo envio, erros de rede têm mensagem comercial, diálogos restauram foco e podem ser fechados pelo backdrop, e campos ganharam autocomplete/validação nativa.
 - Formulários do `/admin` receberam rótulos estruturados, alturas consistentes e grid responsivo para manter textos, campos e mensagens de ajuda alinhados; estilos inline e regras CSS obsoletas foram removidos.
 - O cadastro de empresa agora coleta nome/e-mail do responsável; após a ativação, o control plane cria o proprietário no Keycloak, envia o convite e atribui somente os produtos contratados. A informação fica persistida no tenant para retries seguros.
+- O convite passou a registrar o idioma escolhido (`pt-BR`, `en` ou `es`) no usuário Keycloak; realm e tema foram preparados para manter a mesma língua na confirmação do e-mail e na criação da senha.
+- O Portal deixou de exibir o catálogo global para usuários comuns: `/v1/me/services` filtra memberships, contratação, status e capacidade, e o card SALUS CRM recebe dinamicamente o host do tenant autorizado. Analytics, Invoice e demais destinos continuam ocultos até terem integração tenant-aware.
+- O botão de copiar convite agora usa um action-token real assinado pelo Keycloak, com validade de 24 horas; o endpoint customizado exige o service account do tenant-control e não registra o token em auditoria.
 - Corrigido `500` intermitente no CRM: os vhosts tenantizados passaram a aceitar cabeçalhos grandes do OAuth2 Proxy (`proxy_buffer_size 32k`); o Acme voltou a redirecionar para o login e o Odoo continuou saudável.
 
 Arquivos da alteração atual:
 
 - `platform/portal/admin/index.html`
+- `platform/portal/index.html`
 - `platform/tenant-control/app/main.py`
+- `platform/tenant-control/app/keycloak.py`
+- `infra/keycloak/action-token-provider/`
+- `infra/keycloak/custom/login/`
+- `infra/keycloak/Dockerfile`
 - `platform/tenant-control/tests/test_tenant_lifecycle.py` (novo)
 - `HANDOFF.md`
 - `platform/tenant-control/tests/test_policies.py` (já tinha alteração local para reconhecer `/pulse/tenant-control-admin`)
@@ -82,6 +90,8 @@ Arquivos da alteração atual:
 - `PYTHONPATH=platform/tenant-control /tmp/opencode/tenant-control-venv/bin/pytest -q platform/tenant-control/tests` — **30 passaram**.
 - `python -m py_compile platform/tenant-control/app/main.py platform/tenant-control/app/policies.py` — passou.
 - `node --check` no JavaScript embutido de `platform/portal/admin/index.html` — passou.
+- `node --check` no JavaScript embutido de `platform/portal/index.html` — passou.
+- Build local da imagem Keycloak 26.7.0 com o provider de action-token — passou.
 - `git diff --check` nos arquivos da tarefa — passou.
 - Última validação: suíte tenant-control **28 passaram**; compilação Python, sintaxe JS, Ruff e `git diff --check` passaram.
 - Revisão de autorização e fluxo concluída: preflight/update restritos a platform admins; a ativação exige grupo admin tenant-scoped mesmo sem CRM; suspender/reativar sincroniza grupos sem alterar os grupos de outros tenants.

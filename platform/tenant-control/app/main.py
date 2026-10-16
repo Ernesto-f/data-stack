@@ -49,6 +49,7 @@ class TenantCreate(BaseModel):
     products: list[ProductEntitlement]
     responsible_name: str | None = Field(default=None, min_length=2, max_length=160)
     responsible_email: str | None = Field(default=None, max_length=320)
+    responsible_locale: Literal["pt-BR", "en", "es"] = "pt-BR"
 
 
 class TenantUpdate(BaseModel):
@@ -57,6 +58,7 @@ class TenantUpdate(BaseModel):
     crm_host: str | None = None
     responsible_name: str | None = Field(default=None, min_length=2, max_length=160)
     responsible_email: str | None = Field(default=None, max_length=320)
+    responsible_locale: Literal["pt-BR", "en", "es"] | None = None
 
 
 class TenantProductsUpdate(BaseModel):
@@ -69,6 +71,7 @@ class MemberCreate(BaseModel):
     tenant_role: Literal["owner", "admin", "member"] = "member"
     crm_role: Literal["user", "manager"] = "user"
     products: list[str] = Field(default_factory=list)
+    locale: Literal["pt-BR", "en", "es"] = "pt-BR"
 
 
 class MemberProductsUpdate(BaseModel):
@@ -471,6 +474,66 @@ async def current_user(
     }
 
 
+@app.get("/v1/me/services")
+async def current_user_services(
+    request: Request, identity: Identity = Depends(current_identity)
+) -> dict:
+    """Return only services this identity can actually open from the Portal."""
+    if is_platform_admin(identity):
+        rows = await request.app.state.pool.fetch(
+            """SELECT tp.product_key,t.tenant_key,t.display_name AS tenant_name,
+                      t.crm_host,pc.display_name
+               FROM tenant_products tp
+               JOIN tenants t USING (tenant_key)
+               JOIN product_catalog pc USING (product_key)
+               WHERE tp.enabled AND t.tenant_status='active'
+                 AND pc.integration_status='ready'
+               ORDER BY t.display_name,pc.display_name"""
+        )
+    else:
+        rows = await request.app.state.pool.fetch(
+            """SELECT tp.product_key,t.tenant_key,t.display_name AS tenant_name,
+                      t.crm_host,pc.display_name
+               FROM tenant_memberships tm
+               JOIN tenants t USING (tenant_key)
+               JOIN tenant_products tp USING (tenant_key)
+               JOIN product_catalog pc USING (product_key)
+               LEFT JOIN membership_products mp
+                 ON mp.tenant_key=tm.tenant_key
+                AND mp.keycloak_subject=tm.keycloak_subject
+                AND mp.product_key=tp.product_key
+               WHERE tm.keycloak_subject=$1
+                 AND tm.membership_status='active'
+                 AND t.tenant_status='active'
+                 AND tp.enabled
+                 AND pc.integration_status='ready'
+                 AND (tp.access_mode='all_members' OR mp.keycloak_subject IS NOT NULL)
+               ORDER BY t.display_name,pc.display_name""",
+            identity.subject,
+        )
+
+    services: list[dict[str, object]] = []
+    for row in rows:
+        if row["product_key"] == "crm":
+            if not row["crm_host"]:
+                continue
+            url = f"https://{row['crm_host']}/"
+        else:
+            # Other product destinations remain intentionally disabled until
+            # their tenant-aware integration is ready.
+            continue
+        services.append(
+            {
+                "product_key": row["product_key"],
+                "display_name": row["display_name"],
+                "tenant_key": row["tenant_key"],
+                "tenant_name": row["tenant_name"],
+                "url": url,
+            }
+        )
+    return {"services": services}
+
+
 @app.get("/v1/catalog")
 async def product_catalog(
     request: Request, identity: Identity = Depends(current_identity)
@@ -489,7 +552,7 @@ async def list_tenants(
     if is_platform_admin(identity):
         rows = await request.app.state.pool.fetch(
             """SELECT tenant_key,display_name,crm_host,tenant_status,
-                      responsible_name,responsible_email
+                      responsible_name,responsible_email,responsible_locale
                FROM tenants ORDER BY display_name"""
         )
     else:
@@ -539,13 +602,14 @@ async def create_tenant(
         async with connection.transaction():
             await connection.execute(
                 """INSERT INTO tenants
-                   (tenant_key,display_name,crm_host,responsible_name,responsible_email,created_by)
-                   VALUES ($1,$2,$3,$4,$5,$6)""",
+                   (tenant_key,display_name,crm_host,responsible_name,responsible_email,responsible_locale,created_by)
+                   VALUES ($1,$2,$3,$4,$5,$6,$7)""",
                 body.tenant_key,
                 display_name,
                 crm_host,
                 responsible_name,
                 responsible_email,
+                body.responsible_locale,
                 identity.subject,
             )
             for product in body.products:
@@ -578,12 +642,14 @@ async def create_tenant(
         {
             "products": [item.product_key for item in body.products],
             "responsible_email": responsible_email,
+            "responsible_locale": body.responsible_locale,
         },
     )
     return {
         "tenant_key": body.tenant_key,
         "tenant_status": "provisioning",
         "responsible_email": responsible_email,
+        "responsible_locale": body.responsible_locale,
     }
 
 
@@ -620,7 +686,7 @@ async def update_tenant(
 
     current = await request.app.state.pool.fetchrow(
         """SELECT t.tenant_key,t.display_name,t.crm_host,t.tenant_status,
-                         t.responsible_name,t.responsible_email,
+                         t.responsible_name,t.responsible_email,t.responsible_locale,
                    EXISTS (SELECT 1 FROM tenant_products tp
                           WHERE tp.tenant_key=t.tenant_key
                             AND tp.product_key='crm' AND tp.enabled) AS crm_enabled
@@ -631,17 +697,22 @@ async def update_tenant(
         raise HTTPException(404, "Tenant not found")
 
     async def restore_current_tenant() -> None:
-        if "responsible_name" in current and "responsible_email" in current:
+        if {
+            "responsible_name",
+            "responsible_email",
+            "responsible_locale",
+        }.issubset(current):
             await request.app.state.pool.execute(
                 """UPDATE tenants
                    SET display_name=$2,crm_host=$3,responsible_name=$4,
-                       responsible_email=$5,tenant_status=$6
+                       responsible_email=$5,responsible_locale=$6,tenant_status=$7
                    WHERE tenant_key=$1""",
                 tenant_key,
                 current["display_name"],
                 current["crm_host"],
                 current.get("responsible_name"),
                 current.get("responsible_email"),
+                current.get("responsible_locale", "pt-BR"),
                 current["tenant_status"],
             )
             return
@@ -688,6 +759,9 @@ async def update_tenant(
             changes["responsible_name"] = normalized_name
             changes["responsible_email"] = normalized_email
 
+    if "responsible_locale" in body.model_fields_set:
+        changes["responsible_locale"] = body.responsible_locale
+
     target_status = body.tenant_status if "tenant_status" in body.model_fields_set else None
     if "tenant_status" in body.model_fields_set and target_status is None:
         raise HTTPException(422, "Tenant status cannot be empty")
@@ -725,15 +799,23 @@ async def update_tenant(
     if row is None:
         raise HTTPException(404, "Tenant not found")
 
-    if "tenant_status" in changes:
+    if {
+        "tenant_status",
+        "responsible_name",
+        "responsible_email",
+        "responsible_locale",
+    } & changes.keys():
         members = await request.app.state.pool.fetch(
             "SELECT keycloak_subject FROM tenant_memberships WHERE tenant_key=$1", tenant_key
         )
         try:
             for member in members:
                 await sync_subject_groups(request, member["keycloak_subject"])
-            responsible_email = current.get("responsible_email")
-            responsible_name = current.get("responsible_name")
+            responsible_email = changes.get("responsible_email", current.get("responsible_email"))
+            responsible_name = changes.get("responsible_name", current.get("responsible_name"))
+            responsible_locale = changes.get(
+                "responsible_locale", current.get("responsible_locale", "pt-BR")
+            )
             if (
                 (target_status or current["tenant_status"]) == "active"
                 and responsible_email
@@ -761,9 +843,14 @@ async def update_tenant(
                             tenant_role="owner",
                             crm_role="manager",
                             products=[row["product_key"] for row in responsible_products],
+                            locale=responsible_locale,
                         ),
                         identity,
                     )
+                else:
+                    set_user_locale = getattr(request.app.state.keycloak, "set_user_locale", None)
+                    if set_user_locale is not None and responsible_locale:
+                        await set_user_locale(existing_responsible["keycloak_subject"], responsible_locale)
         except KeycloakError as error:
             await restore_current_tenant()
             try:
@@ -1078,9 +1165,12 @@ async def create_membership_invitation(
     try:
         keycloak_user = await keycloak.user_by_email(email)
         if keycloak_user is None:
-            keycloak_user = await keycloak.create_user(email, display_name)
+            keycloak_user = await keycloak.create_user(email, display_name, body.locale)
             created_user = True
         subject = keycloak_user["id"]
+        set_user_locale = getattr(keycloak, "set_user_locale", None)
+        if set_user_locale is not None:
+            await set_user_locale(subject, body.locale)
 
         async with request.app.state.pool.acquire() as connection:
             async with connection.transaction():
@@ -1227,6 +1317,45 @@ async def resend_member_invitation(
         {"subject": subject},
     )
     return {"email": member["email"], "membership_status": "invited"}
+
+
+@app.get("/v1/tenants/{tenant_key}/members/{subject}/invitation-link")
+async def member_invitation_link(
+    tenant_key: str,
+    subject: str,
+    request: Request,
+    response: Response,
+    identity: Identity = Depends(current_identity),
+) -> dict:
+    await require_tenant_admin(request, identity, tenant_key)
+    member = await request.app.state.pool.fetchrow(
+        """SELECT email,membership_status FROM tenant_memberships
+           WHERE tenant_key=$1 AND keycloak_subject=$2""",
+        tenant_key,
+        subject,
+    )
+    if member is None:
+        raise HTTPException(404, "Tenant membership not found")
+    if member["membership_status"] != "invited":
+        raise HTTPException(409, "This invitation has already been accepted")
+    try:
+        keycloak_user = await request.app.state.keycloak.user_by_email(member["email"])
+        if keycloak_user is None:
+            raise HTTPException(404, "The invited identity no longer exists")
+        link = await request.app.state.keycloak.invitation_link(keycloak_user["id"])
+    except HTTPException:
+        raise
+    except KeycloakError as error:
+        raise HTTPException(503, "The invitation link could not be generated; check Keycloak.") from error
+    response.headers["Cache-Control"] = "no-store"
+    await record_audit(
+        request,
+        identity,
+        tenant_key,
+        "member.invitation_link_generated",
+        {"subject": subject},
+    )
+    return {"email": member["email"], "link": link, "expires_in": 86400}
 
 
 @app.put("/v1/tenants/{tenant_key}/members/{subject}/products")

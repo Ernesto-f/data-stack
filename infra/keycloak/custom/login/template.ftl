@@ -260,8 +260,7 @@
 
                 <p>
 
-                    Acesse o Pulse de forma simples,
-                    segura e conectada ao seu dia a dia.
+                    ${msg("pulseBrandDescription")}
 
                 </p>
 
@@ -501,8 +500,7 @@
 
                 <p class="pulse-card-subtitle">
 
-                    Use suas credenciais para continuar
-                    para o ambiente Pulse.
+                    ${msg("pulseAuthSubtitle")}
 
                 </p>
 
@@ -743,8 +741,7 @@
                     aria-hidden="true"
                 ></span>
 
-                Sua sessão é protegida por
-                autenticação centralizada.
+                ${msg("pulseSecurityNotice")}
 
             </div>
 
