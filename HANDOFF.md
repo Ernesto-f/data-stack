@@ -64,6 +64,7 @@ Melhorias de robustez aplicadas nesta revisão:
 - Interface do `/admin` reorganizada em fluxo de cadastro: dados básicos, contratação e ativação; host CRM passou a ser gerado automaticamente, ferramentas técnicas foram recolhidas e o catálogo ficou separado da tarefa principal.
 - Formulários do `/admin` passaram a ser acionados por botões e abertos em modais: nova empresa, dados da empresa, contratação e convite de usuário; a tela principal ficou focada em resumo, seleção e ações.
 - Revisão de robustez da interface: referências de formulário preservadas durante `await`, botões e formulários bloqueiam duplo envio, erros de rede têm mensagem comercial, diálogos restauram foco e podem ser fechados pelo backdrop, e campos ganharam autocomplete/validação nativa.
+- Formulários do `/admin` receberam rótulos estruturados, alturas consistentes e grid responsivo para manter textos, campos e mensagens de ajuda alinhados; estilos inline e regras CSS obsoletas foram removidos.
 
 Arquivos da alteração atual:
 
