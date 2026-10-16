@@ -62,6 +62,7 @@ Melhorias de robustez aplicadas nesta revisão:
 - Replace de entitlements agora bloqueia a linha do tenant antes de validar remoções, desativações e limites, alinhando a concorrência com mutações de memberships.
 - Interface do `/admin` revisada com linguagem comercial: “usuários contratados”, “usuários utilizados”, “capacidade” e “contratação” substituem “assentos”; cards, métricas, status e ações foram reorganizados para leitura operacional.
 - Interface do `/admin` reorganizada em fluxo de cadastro: dados básicos, contratação e ativação; host CRM passou a ser gerado automaticamente, ferramentas técnicas foram recolhidas e o catálogo ficou separado da tarefa principal.
+- Formulários do `/admin` passaram a ser acionados por botões e abertos em modais: nova empresa, dados da empresa, contratação e convite de usuário; a tela principal ficou focada em resumo, seleção e ações.
 
 Arquivos da alteração atual:
 
